@@ -1,0 +1,34 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Testing / Caches
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Outputs / Temporary uploads / Generated test samples
+output/
+temp_uploads/
+samples/
+*.log
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/*.local
+
+# OS & Editors
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

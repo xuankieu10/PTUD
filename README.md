@@ -1,131 +1,159 @@
-# Nghiên cứu và phát triển trợ lý AI hỗ trợ tư vấn học vụ cho sinh viên chuẩn bị tốt nghiệp
+# Pipeline Lọc Môn Không Đạt Từ Bảng Điểm (Ollama Vision + OpenCV)
+
+Hệ thống đọc bảng điểm học sinh / sinh viên (từ file ảnh hoặc file PDF scan / text layer), trích xuất danh sách môn học và điểm số qua mô hình thị giác AI cục bộ (**Ollama Vision**), kết hợp thuật toán thị giác máy tính **OpenCV (HSV)** để phát hiện các dấu vết khoanh đỏ, gạch đỏ của giáo viên, và lọc ra các môn không đạt theo luật thuần Python.
+
+Dự án được thiết kế chuẩn modular với **Backend FastAPI** và **Frontend React (TypeScript + Tailwind CSS)** riêng biệt, đồng thời hỗ trợ giao diện dòng lệnh **CLI**.
 
 ---
 
-## 1. Giới thiệu
+## 1. Tính năng nổi bật
 
-- **Tên đề tài:** Nghiên cứu và phát triển trợ lý AI hỗ trợ tư vấn học vụ cho sinh viên chuẩn bị tốt nghiệp
-- **Mô tả ngắn gọn:** Hệ thống Web/Mobile ứng dụng mô hình ngôn ngữ lớn (LLM) kết hợp kỹ thuật truy xuất tăng cường sinh nội dung (RAG - Retrieval-Augmented Generation), giúp sinh viên dễ dàng tra cứu quy chế đào tạo, đối soát chuẩn đầu ra tốt nghiệp và nhận tư vấn lộ trình cá nhân hóa nhằm hoàn thành các điều kiện tốt nghiệp đúng hạn.
-- **Đơn vị thực hiện:** Trường Đại học Lạc Hồng (LHU) — Khoa Công nghệ Thông tin.
+- **Xử lý đa định dạng đầu vào**: Hỗ trợ ảnh (`.png`, `.jpg`, `.jpeg`) và tài liệu (`.pdf`).
+- **Phân nhánh PDF thông minh**:
+  - Dùng `pdfplumber` trích xuất text layer và cấu trúc bảng trực tiếp nếu có.
+  - Nếu là PDF scan (không có text layer), tự động chuyển đổi các trang thành ảnh bằng `pdf2image` (kèm cơ chế dự phòng `pypdfium2` không cần cài Poppler bên ngoài trên Windows).
+- **Trích xuất cục bộ qua Ollama Vision**:
+  - Mặc định sử dụng mô hình thị giác local `llama3.2-vision` (hoặc `qwen2.5vl:7b`) tại `http://localhost:11434`.
+  - Ép kiểu định dạng JSON chuẩn: `[{"mon": string, "diem": number}]`.
+  - Bộ parser chịu lỗi cao, xử lý markdown fence và tự động **retry 1 lần** với prompt nghiêm ngặt nếu model trả sai cú pháp.
+- **Phát hiện vùng màu đỏ bằng OpenCV**:
+  - Chuyển đổi sang không gian màu HSV, lấy ngưỡng 2 dải màu đỏ (0-10 và 165-180).
+  - Áp dụng Morphology để nối liền nét vẽ khoanh tròn hoặc gạch chân.
+  - Hàm `is_marked_red(bbox, red_regions)` so khớp tọa độ dòng chữ với các vùng đỏ phát hiện được.
+- **Luật lọc thuần Python**:
+  - Một môn bị coi là **"Không đạt"** nếu: `điểm < 4.0` **HOẶC** `được đánh dấu màu đỏ`.
+  - Không dựa vào phán đoán chủ quan của AI.
+- **Xuất kết quả đa dạng**:
+  - File `JSON` định dạng chuẩn.
+  - File `CSV` chuẩn mã hóa `UTF-8-SIG` (mở trên Excel tiếng Việt không bị lỗi font).
+  - Ảnh trực quan hóa (`annotated.png`) vẽ rõ bounding box vùng đỏ phát hiện bởi OpenCV.
 
 ---
 
-## 2. Công nghệ sử dụng
-
-Dự án được xây dựng trên nền tảng công nghệ Frontend hiện đại với các thư viện và công cụ thực tế:
-
-| Công nghệ / Thư viện | Phiên bản | Vai trò & Mục đích |
-| :--- | :--- | :--- |
-| **React** | `^18.3.1` | Thư viện nền tảng xây dựng giao diện người dùng (UI) dạng Single Page Application (SPA). |
-| **React DOM** | `^18.3.1` | Render các component React lên DOM trình duyệt. |
-| **TypeScript** | `^5.6.3` | Ngôn ngữ lập trình tĩnh, đảm bảo tính chặt chẽ về kiểu dữ liệu (Types/Interfaces). |
-| **Vite** | `^6.0.1` | Build tool và Development Server tốc độ cao, hỗ trợ Hot Module Replacement (HMR). |
-| **TailwindCSS** | `^3.4.17` | Framework Utility-First CSS hỗ trợ thiết kế giao diện hiện đại, responsive và tối ưu hiệu năng. |
-| **React Router DOM** | `^6.28.0` | Thư viện điều hướng và định tuyến đa trang (Routing) trong ứng dụng React. |
-| **Lucide React** | `^1.16.0` | Bộ icon vector hiện đại, tối giản và đồng bộ. |
-| **PostCSS & Autoprefixer** | `^8.4.49` / `^10.4.20` | Tiền xử lý và tự động tối ưu tương thích CSS cho nhiều trình duyệt. |
-
----
-
-## 3. Cấu trúc thư mục
+## 2. Cấu trúc thư mục
 
 ```
 PTUD/
-├── index.html                   # HTML template chính, cấu hình phông chữ và Favicon
-├── package.json                 # Danh sách dependencies, scripts và thông tin dự án
-├── postcss.config.js            # Cấu hình PostCSS và Autoprefixer
-├── tailwind.config.js           # Cấu hình theme màu LHU và định nghĩa lớp tiện ích Tailwind
-├── tsconfig.json                # Cấu hình TypeScript compiler cho mã nguồn
-├── tsconfig.node.json           # Cấu hình TypeScript cho môi trường Node/Vite
-├── vite.config.ts               # Cấu hình Vite bundler và dev server
-└── src/
-    ├── main.tsx                 # Điểm khởi chạy (entry point) của ứng dụng
-    ├── App.tsx                  # Thiết lập hệ thống định tuyến (React Router DOM)
-    ├── index.css                # Tệp định kiểu toàn cục, nạp Tailwind và tùy biến giao diện
-    │
-    ├── types/                   # Khai báo các interface và type definitions
-    │   └── index.ts             # Định nghĩa cấu trúc StudentProfile, CreditCategory, Milestone, ChatMessage...
-    │
-    ├── mock/                    # Dữ liệu giả lập phục vụ giai đoạn phát triển giao diện
-    │   └── studentData.ts       # Mock data hồ sơ sinh viên LHU, tiến độ tín chỉ, mốc thời gian và logic AI bot mẫu
-    │
-    ├── components/              # Các thành phần giao diện dùng chung (reusable components)
-    │   ├── Navbar.tsx           # Thanh điều hướng phía trên kèm Logo trường và nút Đăng nhập
-    │   ├── Footer.tsx           # Chân trang hiển thị thông tin bản quyền và liên hệ Phòng Đào tạo
-    │   ├── FeatureCard.tsx      # Thẻ card hiển thị tính năng nổi bật có hiệu ứng hover
-    │   ├── GraduationStatusBadge.tsx # Huy hiệu (badge) biểu diễn 3 trạng thái xét tốt nghiệp (Xanh/Vàng/Đỏ)
-    │   ├── CreditProgressBar.tsx# Khối hiển thị tiến độ tín chỉ và phân bổ theo các khối kiến thức
-    │   ├── MilestoneList.tsx    # Danh sách các mốc thời gian quan trọng sắp tới kèm đếm ngược ngày
-    │   └── AIChatModal.tsx      # Cửa sổ hội thoại tương tác trực tiếp với Trợ lý AI tư vấn học vụ
-    │
-    └── pages/                   # Các trang màn hình chính của ứng dụng
-        ├── HomePage.tsx         # Trang chủ: Giới thiệu hệ thống, Hero section, tính năng và xem trước
-        ├── LoginPage.tsx        # Trang đăng nhập: Form xác thực MSSV/Mật khẩu với validation và loading
-        └── StudentDashboard.tsx # Trang tài khoản sinh viên: Tổng quan học vụ, tiến độ tín chỉ và nhắc lịch
+├── backend/
+│   ├── __init__.py
+│   ├── ocr_extractor.py      # Gọi Ollama Vision API, cơ chế retry & parse JSON chịu lỗi
+│   ├── red_detector.py       # OpenCV HSV thresholding, contour & hàm is_marked_red
+│   ├── pdf_processor.py      # pdfplumber trích text layer vs pdf2image chuyển PDF scan sang ảnh
+│   ├── grade_filter.py       # Logic lọc điểm < 4.0 hoặc dấu đỏ, xuất JSON/CSV
+│   ├── pipeline.py           # Bộ điều phối kết nối toàn bộ luồng xử lý
+│   ├── main.py               # CLI runner thực thi pipeline từ dòng lệnh
+│   ├── api.py                # REST API FastAPI phục vụ upload và giao tiếp frontend
+│   ├── requirements.txt      # Danh sách thư viện Python
+│   └── tests/                # Bộ kiểm thử tự động pytest
+│       ├── test_red_detector.py
+│       ├── test_grade_filter.py
+│       └── test_ocr_parser.py
+│
+├── frontend/                 # Giao diện Web SPA (React + TypeScript + Tailwind CSS)
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── FileUploader.tsx      # Vùng kéo thả file & chọn model Ollama
+│   │   │   ├── ResultSummary.tsx     # Thống kê tổng môn, đạt, không đạt, vùng đỏ
+│   │   │   ├── TranscriptTable.tsx   # Bảng danh sách môn không đạt, tải CSV/JSON
+│   │   │   └── VisualPreview.tsx     # Xem trước ảnh gốc kèm bounding box đỏ
+│   │   ├── types.ts                  # Khai báo TypeScript types
+│   │   └── App.tsx                   # Màn hình điều khiển chính
+│   ├── package.json
+│   └── vite.config.ts
+│
+├── samples/                  # Dữ liệu bảng điểm mẫu (Ảnh & PDF scan)
+├── main.py                   # Wrapper chạy CLI từ thư mục gốc
+├── requirements.txt          # File cài đặt dependencies ở thư mục gốc
+└── README.md
 ```
 
 ---
 
-## 4. Hướng dẫn cài đặt & chạy dự án
+## 3. Hướng dẫn cài đặt & Chuẩn bị môi trường
 
-### Yêu cầu môi trường
-- **Node.js**: Phiên bản `>= 18.x` (khuyến nghị bản LTS)
-- **NPM**: Phiên bản `>= 9.x` hoặc công cụ tương đương (Yarn, PNPM)
+### Bước 1: Kéo model Ollama Vision local
+Đảm bảo bạn đã cài đặt [Ollama](https://ollama.com/) trên máy và dịch vụ đang chạy:
 
-### Các bước thực hiện
+```bash
+# Kéo mô hình llama3.2-vision theo yêu cầu
+ollama pull llama3.2-vision
 
-1. **Clone mã nguồn dự án về máy:**
-   ```bash
-   git clone https://github.com/xuankieu10/PTUD.git
-   cd PTUD
-   ```
+# Khởi động dịch vụ Ollama (nếu chưa chạy nền)
+ollama serve
+```
 
-2. **Cài đặt các gói phụ thuộc (Dependencies):**
-   ```bash
-   npm install
-   ```
+*(Lưu ý: Hệ thống cũng hỗ trợ các model Vision khác đã cài sẵn trên máy bạn như `qwen2.5vl:7b`)*
 
-3. **Khởi chạy máy chủ phát triển (Development Server):**
-   ```bash
-   npm run dev
-   ```
+### Bước 2: Cài đặt thư viện Python (Backend)
+Mở terminal tại thư mục gốc `PTUD/`:
 
-4. **Truy cập ứng dụng:**
-   Mở trình duyệt web và điều hướng tới địa chỉ:
-   ```
-   http://localhost:3000
-   ```
-
-5. **Biên dịch sản phẩm (Build for Production):**
-   ```bash
-   npm run build
-   ```
+```bash
+pip install -r requirements.txt
+```
 
 ---
 
-## 5. Danh sách các trang hiện có
+## 4. Hướng dẫn chạy chương trình
 
-| Tên trang | Đường dẫn (Route) | Mô tả chức năng |
-| :--- | :--- | :--- |
-| **Trang chủ** | `/` | Giới thiệu tổng quan về hệ thống Trợ lý AI Học vụ LHU, trình bày 4 tính năng trọng tâm, hỗ trợ mở nhanh cửa sổ chat thử nghiệm và điều hướng đăng nhập. |
-| **Đăng nhập** | `/login` | Màn hình đăng nhập tài khoản sinh viên (MSSV + Mật khẩu), có tính năng ẩn/hiện mật khẩu, kiểm tra dữ liệu đầu vào (validation), ghi nhớ đăng nhập, nút điền nhanh tài khoản mẫu và hướng dẫn liên hệ Phòng Đào tạo khi quên mật khẩu. |
-| **Trang tài khoản sinh viên** | `/dashboard` | Bảng điều khiển cá nhân hóa: hiển thị thông tin sinh viên, điểm GPA, huy hiệu trạng thái tốt nghiệp, phân tích tiến độ tín chỉ theo từng khối kiến thức, danh sách mốc thời gian quan trọng đếm ngược và nút mở Trợ lý AI giải đáp học vụ 24/7. |
+### Cách 1: Chạy trực tiếp qua dòng lệnh (CLI)
+Chạy pipeline trên file ảnh hoặc file PDF với lệnh:
+
+```bash
+# Chạy với file ảnh mẫu (dùng model llama3.2-vision mặc định)
+python backend/main.py --input samples/sample_transcript.png
+
+# Hoặc chạy từ thư mục gốc và chỉ định model tùy chọn
+python main.py --input samples/sample_transcript.png --model qwen2.5vl:7b
+
+# Chạy với file PDF scan
+python main.py --input samples/sample_transcript_scan.pdf --output-dir my_output
+```
+
+Kết quả sẽ được in trực tiếp ra bảng điều khiển terminal và tự động lưu 3 tệp vào thư mục `output/`:
+- `<tên_file>_failed.json`
+- `<tên_file>_failed.csv`
+- `<tên_file>_annotated.png` (Ảnh có vẽ khung đỏ OpenCV)
 
 ---
 
-## 6. Trạng thái phát triển
+### Cách 2: Khởi chạy Giao diện Web (Tách biệt Frontend & Backend)
 
-- Hiện tại, dự án đang ở giai đoạn **Hoàn thiện Giao diện Mẫu (UI/UX Prototype)** với dữ liệu tĩnh giả lập (`mock data`).
-- **Kế hoạch giai đoạn tiếp theo:**
-  - Xây dựng hệ thống Backend API (Node.js/Python FastAPI).
-  - Tích hợp kết nối cơ sở dữ liệu học vụ thực tế.
-  - Tích hợp mô hình AI (LLM + RAG) với cơ sở tri thức là toàn bộ quy chế đào tạo, chuẩn đầu ra và biểu mẫu chính thức của Trường Đại học Lạc Hồng.
+#### 1. Chạy Backend API (FastAPI)
+Mở một cửa sổ Terminal:
+```bash
+# Khởi chạy máy chủ API tại http://127.0.0.1:8000
+python -m uvicorn backend.api:app --host 127.0.0.1 --port 8000 --reload
+```
+
+Tài liệu Swagger API tự động xem tại: `http://127.0.0.1:8000/docs`
+
+#### 2. Chạy Frontend (React + Vite)
+Mở một cửa sổ Terminal khác:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Truy cập ứng dụng tại:
+```
+http://localhost:3000
+```
+
+Tại giao diện Web, bạn có thể:
+1. Theo dõi trạng thái kết nối tới Ollama local.
+2. Chọn mô hình Vision (`llama3.2-vision` hoặc model khác trong máy).
+3. Kéo thả file ảnh hoặc PDF bảng điểm để phân tích.
+4. Xem bảng thống kê số môn đạt / không đạt.
+5. Xem ảnh giám sát trực quan các vùng đỏ do OpenCV khoanh vùng.
+6. Tải xuống báo cáo kết quả định dạng **CSV (Excel)** hoặc **JSON**.
 
 ---
 
-## 7. Thành viên thực hiện
+## 5. Chạy kiểm thử tự động (Unit Tests)
 
-| Họ và tên | Vai trò | Trách nhiệm chính |
-| :--- | :--- | :--- |
-| **Ngô Xuân Kiều** | Developer / Tester | Xây dựng kiến trúc Frontend, phát triển giao diện React + TailwindCSS, tích hợp định tuyến, kiểm thử chức năng và luồng tương tác người dùng. |
-| **Nguyễn Bùi Quỳnh Nhi** | Business Analyst | Khảo sát nhu cầu sinh viên tốt nghiệp, phân tích yêu cầu nghiệp vụ quy chế đào tạo LHU, xây dựng luồng tư vấn học vụ và kịch bản tương tác cho Trợ lý AI. |
+Bộ kiểm thử bao gồm kiểm tra thuật toán OpenCV HSV, logic lọc môn không đạt, các ca biên điểm số và parser JSON chịu lỗi:
+
+```bash
+python -m pytest backend/tests -v
+```
