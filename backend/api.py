@@ -12,14 +12,19 @@ import logging
 import os
 import shutil
 import uuid
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 import requests
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from pydantic import BaseModel, Field
+from backend.schemas import UnifiedProcessResponse, ProcessSummaryModel, FailedSubject, PrioritySubject
 
 from backend.pipeline import run_pipeline
 from backend.ocr_extractor import DEFAULT_VISION_MODEL, DEFAULT_OLLAMA_HOST
+from backend.normalize import normalize_transcript
+from backend.priority_engine import rank_priority
 
 logging.basicConfig(
     level=logging.INFO,
@@ -27,20 +32,75 @@ logging.basicConfig(
 )
 logger = logging.getLogger("GradeBackendAPI")
 
+# ==================== PYDANTIC SCHEMAS (API CONTRACT) ====================
+
+class ErrorResponseModel(BaseModel):
+    success: bool = False
+    detail: str
+    status_code: int
+
+
 app = FastAPI(
     title="Student Transcript Grade Pipeline API",
     description="API đọc bảng điểm học sinh bằng Ollama Vision và lọc môn không đạt kết hợp OpenCV HSV.",
     version="1.0.0"
 )
 
-# Cấu hình CORS để Frontend (React/Vite) gọi API không bị chặn
+# Cấu hình CORS mở rộng cho Frontend (React/Vite dev và staging)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "*"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ==================== GLOBAL EXCEPTION HANDLERS ====================
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """
+    Chuẩn hóa toàn bộ lỗi HTTP về đúng JSON schema:
+    {"success": false, "detail": "Nội dung lỗi dạng string", "status_code": 400}
+    """
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "success": False,
+            "detail": str(exc.detail),
+            "status_code": exc.status_code
+        }
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """
+    Chuyển lỗi xác thực Pydantic (thường là list object) thành chuỗi thông báo rõ ràng cho FE,
+    tránh lỗi [object Object] khi hiển thị trên giao diện.
+    """
+    error_messages = []
+    for err in exc.errors():
+        field = " -> ".join(str(loc) for loc in err.get("loc", []))
+        msg = err.get("msg", "Dữ liệu không hợp lệ")
+        error_messages.append(f"[{field}]: {msg}")
+    
+    readable_detail = "; ".join(error_messages) if error_messages else "Dữ liệu yêu cầu không hợp lệ."
+    return JSONResponse(
+        status_code=422,
+        content={
+            "success": False,
+            "detail": readable_detail,
+            "status_code": 422
+        }
+    )
+
 
 UPLOAD_DIR = os.path.abspath("temp_uploads")
 OUTPUT_DIR = os.path.abspath("output")
@@ -138,19 +198,106 @@ async def process_transcript(
             "filename": file.filename
         }
 
+        # Dual-mapping để tương thích cả trường tiếng Việt (mon, diem) và trường chuẩn hóa (name, grade)
+                # Chuẩn hóa dữ liệu trước để lấy tên tiếng Anh (name, code, credits)
+        normalized_data = normalize_transcript(result["all_subjects"])
+        norm_map = { c["name"]: c for c in normalized_data.get("courses", []) }
+        
+        def map_failed_subject(sub: Dict[str, Any]) -> dict:
+            mon = sub.get("mon", "")
+            diem = sub.get("diem", 0.0)
+            nm = norm_map.get(mon, {})
+            return {
+                "course_code": nm.get("code"),
+                "course_name": nm.get("name", mon),
+                "credits": nm.get("credits"),
+                "grade": diem,
+                "semester": nm.get("semester"),
+                "status": "failed",
+                "filter_reason": sub.get("ly_do"),
+                "is_red_marked": sub.get("is_red_marked", False),
+                "bbox": sub.get("bbox")
+            }
+            
+        def map_passed_subject(sub: Dict[str, Any]) -> dict:
+            mon = sub.get("mon", "")
+            diem = sub.get("diem", 0.0)
+            nm = norm_map.get(mon, {})
+            return {
+                "course_code": nm.get("code"),
+                "course_name": nm.get("name", mon),
+                "credits": nm.get("credits"),
+                "grade": diem,
+                "semester": nm.get("semester"),
+                "status": "passed",
+                "filter_reason": sub.get("ly_do"),
+                "is_red_marked": sub.get("is_red_marked", False),
+                "bbox": sub.get("bbox")
+            }
+
+        contract_failed_subjects = [map_failed_subject(s) for s in result["failed_subjects"]]
+        contract_all_subjects = [map_passed_subject(s) if not s.get("is_failed") else map_failed_subject(s) for s in result["all_subjects"]]
+
+        # 3. Gọi Priority Engine
+        dummy_curriculum = []
+        try:
+            pe_input = []
+            for f_sub in contract_failed_subjects:
+                pe_input.append({
+                    "ma_mon": f_sub.get("course_code"),
+                    "mon_hoc": f_sub.get("course_name"),
+                    "tin_chi": f_sub.get("credits"),
+                    "diem": f_sub.get("grade"),
+                    "hoc_ky": f_sub.get("semester")
+                })
+            ranked = rank_priority(pe_input, dummy_curriculum)
+            rank_map = { r["ma_mon"]: r for r in ranked if r.get("ma_mon") }
+            
+            for f_sub in contract_failed_subjects:
+                code = f_sub.get("course_code")
+                if code and code in rank_map:
+                    f_sub["priority_score"] = rank_map[code].get("do_uu_tien")
+                    f_sub["priority_reason"] = rank_map[code].get("ly_do")
+                    f_sub["blocked_courses"] = rank_map[code].get("mon_bi_chan", [])
+                else:
+                    f_sub["priority_score"] = None
+                    f_sub["priority_reason"] = None
+                    f_sub["blocked_courses"] = []
+                    
+            # Phải đồng bộ lại vào contract_all_subjects cho các môn failed
+            for a_sub in contract_all_subjects:
+                if a_sub["status"] == "failed":
+                    code = a_sub.get("course_code")
+                    if code and code in rank_map:
+                        a_sub["priority_score"] = rank_map[code].get("do_uu_tien")
+                        a_sub["priority_reason"] = rank_map[code].get("ly_do")
+                        a_sub["blocked_courses"] = rank_map[code].get("mon_bi_chan", [])
+                    else:
+                        a_sub["priority_score"] = None
+                        a_sub["priority_reason"] = None
+                        a_sub["blocked_courses"] = []
+        except Exception as e:
+            logger.error(f"Priority Engine error: {e}")
+
+        summary_contract = {
+            "total_subjects": result["total_subjects"],
+            "passed_count": result["passed_count"],
+            "failed_count": result["failed_count"],
+            "red_regions_count": result["red_regions_count"],
+            "gpa": normalized_data.get("summary", {}).get("gpa"),
+            "total_credits_earned": normalized_data.get("summary", {}).get("total_credits_earned", 0),
+            "total_credits_failed": normalized_data.get("summary", {}).get("total_credits_failed", 0)
+        }
+
         return {
             "success": True,
             "session_id": session_id,
             "filename": file.filename,
-            "summary": {
-                "total_subjects": result["total_subjects"],
-                "passed_count": result["passed_count"],
-                "failed_count": result["failed_count"],
-                "red_regions_count": result["red_regions_count"]
-            },
-            "failed_subjects": result["failed_subjects"],
-            "all_subjects": result["all_subjects"],
-            "annotated_image": annotated_b64
+            "summary": summary_contract,
+            "failed_subjects": contract_failed_subjects,
+            "all_subjects": contract_all_subjects,
+            "annotated_image": annotated_b64,
+            "normalized": normalized_data
         }
 
     except ConnectionError as conn_err:
@@ -160,8 +307,91 @@ async def process_transcript(
             detail=f"Không thể kết nối với Ollama tại '{host}'. Vui lòng kiểm tra dịch vụ Ollama local."
         )
     except Exception as e:
-        logger.exception(f"Lỗi xử lý file: {e}")
-        raise HTTPException(status_code=500, detail=f"Lỗi trong quá trình xử lý: {str(e)}")
+        logger.error(f"Lỗi xử lý file bảng điểm: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Lỗi trong quá trình xử lý: {str(e)}"
+        )
+
+
+@app.post("/api/certificate/process")
+async def process_certificate(
+    file: UploadFile = File(...),
+    model: Optional[str] = Form(None),
+    host: str = Form(DEFAULT_OLLAMA_HOST)
+):
+    """
+    Tiếp nhận ảnh chứng chỉ (JPG/PNG), trích xuất thông tin qua Ollama Vision
+    và tự động so khớp với danh mục điều kiện tốt nghiệp bằng rapidfuzz.
+    """
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Không có tên file.")
+
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in [".jpg", ".jpeg", ".png", ".webp"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Định dạng file '{ext}' không được hỗ trợ. Vui lòng tải lên file ảnh (.jpg, .png)."
+        )
+
+    session_id = str(uuid.uuid4())
+    session_upload_dir = os.path.join(UPLOAD_DIR, "certificates", session_id)
+    os.makedirs(session_upload_dir, exist_ok=True)
+
+    input_file_path = os.path.join(session_upload_dir, file.filename)
+
+    try:
+        # Lưu file ảnh tải lên
+        with open(input_file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        logger.info(f"Đã nhận file chứng chỉ [{file.filename}], kích thước: {os.path.getsize(input_file_path)} bytes.")
+
+        # 1. Gọi Ollama Vision trích xuất thông tin chứng chỉ
+        from backend.certificate_extractor import extract_certificate_from_image
+        from backend.certificate_matcher import match_certificate
+
+        extracted = extract_certificate_from_image(
+            image_input=input_file_path,
+            model=model,
+            host=host
+        )
+
+        # 2. So khớp mờ với điều kiện tốt nghiệp
+        match_res = match_certificate(extracted)
+
+        # 3. Chuẩn bị ảnh xem trước dạng Base64
+        with open(input_file_path, "rb") as img_f:
+            mime = "image/png" if ext == ".png" else "image/jpeg"
+            preview_b64 = f"data:{mime};base64," + base64.b64encode(img_f.read()).decode("utf-8")
+
+        return {
+            "success": True,
+            "session_id": session_id,
+            "filename": file.filename,
+            "extracted_data": extracted,
+            "matching_result": match_res,
+            "preview_image": preview_b64
+        }
+
+    except ConnectionError as conn_err:
+        logger.error(f"Lỗi kết nối Ollama: {conn_err}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Không thể kết nối với Ollama tại '{host}'. Vui lòng kiểm tra dịch vụ Ollama local."
+        )
+    except TimeoutError as timeout_err:
+        logger.error(f"Quá thời gian chờ Ollama: {timeout_err}")
+        raise HTTPException(
+            status_code=504,
+            detail="Quá thời gian phản hồi từ Ollama Vision khi phân tích chứng chỉ."
+        )
+    except Exception as e:
+        logger.error(f"Lỗi xử lý chứng chỉ: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Lỗi khi xử lý chứng chỉ: {str(e)}"
+        )
 
 
 @app.get("/api/download/{file_type}")

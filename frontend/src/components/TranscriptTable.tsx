@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import type { FC } from 'react';
 import { FileSpreadsheet, FileJson, AlertCircle, CheckCircle } from 'lucide-react';
-import type { SubjectGrade } from '../types';
+import type { SubjectRecord } from '../types';
 
 interface TranscriptTableProps {
-  failedSubjects: SubjectGrade[];
-  allSubjects: SubjectGrade[];
+  failedSubjects: SubjectRecord[];
+  allSubjects: SubjectRecord[];
   sessionId: string;
 }
 
@@ -17,8 +17,14 @@ export const TranscriptTable: FC<TranscriptTableProps> = ({
   const [activeTab, setActiveTab] = useState<'failed' | 'all'>('failed');
 
   const handleDownload = (format: 'csv' | 'json') => {
-    const url = `/api/download/${format}?session_id=${sessionId}`;
-    window.open(url, '_blank');
+    if (!sessionId) return;
+    const url = `/api/download/${format}?session_id=${encodeURIComponent(sessionId)}`;
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `ket_qua_mon_khong_dat_${sessionId.slice(0, 8)}.${format}`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const displayedList = activeTab === 'failed' ? failedSubjects : allSubjects;
@@ -85,7 +91,11 @@ export const TranscriptTable: FC<TranscriptTableProps> = ({
           <tbody className="divide-y divide-slate-100">
             {displayedList.length > 0 ? (
               displayedList.map((item, idx) => {
-                const isFailed = item.is_failed ?? (item.diem < 4.0);
+                const subjectName = item.course_name || 'Chưa rõ tên môn';
+                const gradeVal = item.grade ?? 0;
+                const isFailed = item.is_failed ?? (item.status === 'failed' || gradeVal < 4.0);
+                const reasonText = item.filter_reason || (isFailed ? 'Điểm < 4.0' : 'Đạt yêu cầu');
+
                 return (
                   <tr
                     key={idx}
@@ -97,17 +107,17 @@ export const TranscriptTable: FC<TranscriptTableProps> = ({
                       {idx + 1}
                     </td>
                     <td className="py-3 px-4 font-medium text-slate-800">
-                      {item.mon}
+                      {subjectName}
                     </td>
                     <td className="py-3 px-4 text-center font-bold font-mono">
                       <span
                         className={`inline-block px-2.5 py-0.5 rounded-md ${
-                          item.diem < 4.0
+                          gradeVal < 4.0
                             ? 'bg-rose-100 text-rose-700'
                             : 'bg-emerald-100 text-emerald-700'
                         }`}
                       >
-                        {item.diem.toFixed(1)}
+                        {gradeVal.toFixed(1)}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-center">
@@ -126,7 +136,7 @@ export const TranscriptTable: FC<TranscriptTableProps> = ({
                     <td className="py-3 px-4 text-xs text-slate-600">
                       {isFailed ? (
                         <span className="font-medium text-rose-700">
-                          {item.ly_do || 'Điểm < 4.0'}
+                          {reasonText}
                         </span>
                       ) : (
                         <span className="text-slate-400">Đạt yêu cầu</span>
