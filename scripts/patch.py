@@ -1,8 +1,12 @@
-﻿import json
+import json
+import os
 from backend.priority_engine import rank_priority
 
 def update_api_py():
-    with open('backend/api.py', 'r', encoding='utf-8') as f:
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    api_path = os.path.join(BASE_DIR, "backend", "api.py")
+
+    with open(api_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
     if 'from backend.priority_engine import rank_priority' not in content:
@@ -75,7 +79,7 @@ def update_api_py():
     
     content = content[:idx2] + new_code.strip() + '\n\n        summary_contract = {' + content[idx2+20:]
     
-    with open('backend/api.py', 'w', encoding='utf-8') as f:
+    with open(api_path, 'w', encoding='utf-8') as f:
         f.write(content)
         
 update_api_py()

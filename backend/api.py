@@ -61,6 +61,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from backend.app.routers import auth, documents
+app.include_router(auth.router)
+app.include_router(documents.router)
+
+
 # ==================== GLOBAL EXCEPTION HANDLERS ====================
 
 @app.exception_handler(HTTPException)
@@ -191,15 +196,23 @@ async def process_transcript(
             with open(result["annotated_image_path"], "rb") as img_f:
                 annotated_b64 = "data:image/png;base64," + base64.b64encode(img_f.read()).decode("utf-8")
 
+        # Dọn dẹp cache cũ (TTL = 1 giờ = 3600 giây)
+        import time
+        current_time = time.time()
+        expired_sessions = [s_id for s_id, s_data in SESSION_CACHE.items() if current_time - s_data.get("timestamp", 0) > 3600]
+        for s_id in expired_sessions:
+            del SESSION_CACHE[s_id]
+
         # Lưu session cache cho thao tác download
         SESSION_CACHE[session_id] = {
             "json_path": result["json_path"],
             "csv_path": result["csv_path"],
-            "filename": file.filename
+            "filename": file.filename,
+            "timestamp": current_time
         }
 
         # Dual-mapping để tương thích cả trường tiếng Việt (mon, diem) và trường chuẩn hóa (name, grade)
-                # Chuẩn hóa dữ liệu trước để lấy tên tiếng Anh (name, code, credits)
+        # Chuẩn hóa dữ liệu trước để lấy tên tiếng Anh (name, code, credits)
         normalized_data = normalize_transcript(result["all_subjects"])
         norm_map = { c["name"]: c for c in normalized_data.get("courses", []) }
         
@@ -239,12 +252,27 @@ async def process_transcript(
         contract_all_subjects = [map_passed_subject(s) if not s.get("is_failed") else map_failed_subject(s) for s in result["all_subjects"]]
 
         # 3. Gọi Priority Engine
-        dummy_curriculum = []
+        dummy_curriculum = [
+            {"ma_mon": "CS101", "ten_mon": "Nhập môn lập trình", "tin_chi": 3, "mon_tien_quyet": [], "hoc_ky_de_xuat": 1},
+            {"ma_mon": "CS102", "ten_mon": "Cấu trúc dữ liệu", "tin_chi": 4, "mon_tien_quyet": ["CS101"], "hoc_ky_de_xuat": 2},
+            {"ma_mon": "CS201", "ten_mon": "Lập trình hướng đối tượng", "tin_chi": 3, "mon_tien_quyet": ["CS101"], "hoc_ky_de_xuat": 3},
+            {"ma_mon": "MATH101", "ten_mon": "Toán rời rạc", "tin_chi": 3, "mon_tien_quyet": [], "hoc_ky_de_xuat": 1},
+            {"ma_mon": "ENG101", "ten_mon": "Tiếng Anh 1", "tin_chi": 3, "mon_tien_quyet": [], "hoc_ky_de_xuat": 1},
+        ]
         try:
             pe_input = []
             for f_sub in contract_failed_subjects:
+                # Tìm mã môn dự đoán hoặc dùng tên môn làm mã
+                course_code = f_sub.get("course_code")
+                if not course_code:
+                    for dc in dummy_curriculum:
+                        if dc["ten_mon"] == f_sub.get("course_name"):
+                            course_code = dc["ma_mon"]
+                            break
+                    course_code = course_code or "UNKNOWN"
+
                 pe_input.append({
-                    "ma_mon": f_sub.get("course_code"),
+                    "ma_mon": course_code,
                     "mon_hoc": f_sub.get("course_name"),
                     "tin_chi": f_sub.get("credits"),
                     "diem": f_sub.get("grade"),
@@ -254,7 +282,14 @@ async def process_transcript(
             rank_map = { r["ma_mon"]: r for r in ranked if r.get("ma_mon") }
             
             for f_sub in contract_failed_subjects:
+                # Cần dùng chung logic lấy course_code
                 code = f_sub.get("course_code")
+                if not code:
+                    for dc in dummy_curriculum:
+                        if dc["ten_mon"] == f_sub.get("course_name"):
+                            code = dc["ma_mon"]
+                            break
+                    code = code or "UNKNOWN"
                 if code and code in rank_map:
                     f_sub["priority_score"] = rank_map[code].get("do_uu_tien")
                     f_sub["priority_reason"] = rank_map[code].get("ly_do")
@@ -268,6 +303,12 @@ async def process_transcript(
             for a_sub in contract_all_subjects:
                 if a_sub["status"] == "failed":
                     code = a_sub.get("course_code")
+                    if not code:
+                        for dc in dummy_curriculum:
+                            if dc["ten_mon"] == a_sub.get("course_name"):
+                                code = dc["ma_mon"]
+                                break
+                        code = code or "UNKNOWN"
                     if code and code in rank_map:
                         a_sub["priority_score"] = rank_map[code].get("do_uu_tien")
                         a_sub["priority_reason"] = rank_map[code].get("ly_do")

@@ -28,6 +28,26 @@ class ProcessSummaryModel(BaseModel):
     total_credits_earned: Optional[int] = None
     total_credits_failed: Optional[int] = None
 
+class NormalizedCourse(BaseModel):
+    code: str
+    name: str
+    credits: int
+    grade: Optional[float]
+    status: str
+    semester: Optional[str]
+    retake_count: int
+
+class NormalizedSummary(BaseModel):
+    gpa: Optional[float]
+    total_credits_earned: int
+    total_credits_failed: int
+
+class NormalizedTranscript(BaseModel):
+    student_id: Optional[str]
+    semester_current: Optional[str]
+    courses: List[NormalizedCourse]
+    summary: NormalizedSummary
+
 class UnifiedProcessResponse(BaseModel):
     success: bool = True
     session_id: str
@@ -36,4 +56,4 @@ class UnifiedProcessResponse(BaseModel):
     failed_subjects: List[PrioritySubject]
     all_subjects: List[FailedSubject]
     annotated_image: Optional[str] = None
-    normalized: Optional[Dict[str, Any]] = None
+    normalized: Optional[NormalizedTranscript] = None

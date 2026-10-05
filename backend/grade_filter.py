@@ -23,27 +23,55 @@ def evaluate_subject(
 ) -> Dict[str, Any]:
     """
     Đánh giá một môn học có đạt hay không:
-    - Quy tắc: Môn bị coi là KHÔNG ĐẠT khi và chỉ khi: điểm số < 4.0
-    - Không sử dụng dấu đỏ để phán đoán không đạt (theo yêu cầu người dùng).
+    - Quy tắc: Môn bị coi là KHÔNG ĐẠT khi và chỉ khi: điểm số < 4.0 HOẶC bị đánh dấu đỏ.
     """
     mon = subject.get("mon", "Chưa rõ tên môn")
-    diem = float(subject.get("diem", 0.0))
+    raw_diem = subject.get("diem")
     bbox = subject.get("bbox")
 
-    # Chỉ kiểm tra điểm < 4.0
-    is_failed = (diem < PASSING_GRADE_THRESHOLD)
+    # 1. Xử lý điểm số an toàn
+    diem_val = None
+    try:
+        if raw_diem is not None and str(raw_diem).strip() != "":
+            # Xử lý trường hợp có dấu phẩy ví dụ "8,5"
+            clean_diem = str(raw_diem).replace(",", ".").strip()
+            diem_val = float(clean_diem)
+    except (ValueError, TypeError):
+        pass
+
+    # 2. Phát hiện vùng đỏ
+    is_red = False
+    if bbox and red_regions:
+        is_red = is_marked_red(bbox, red_regions)
+
+    # 3. Phân tích kết quả
+    is_failed = False
+    is_low_grade = False
+    reason_parts = []
+
+    if diem_val is None:
+        is_failed = True
+        reason_parts.append("Điểm không xác định (Vắng/M/Lỗi)")
+    elif diem_val < PASSING_GRADE_THRESHOLD:
+        is_failed = True
+        is_low_grade = True
+        reason_parts.append(f"Điểm < {PASSING_GRADE_THRESHOLD}")
+
+    if is_red:
+        is_failed = True
+        reason_parts.append("Được đánh dấu màu đỏ")
 
     status_str = "Không đạt" if is_failed else "Đạt"
-    reason_str = f"Điểm < {PASSING_GRADE_THRESHOLD}" if is_failed else "Đạt yêu cầu"
+    reason_str = " | ".join(reason_parts) if reason_parts else "Đạt yêu cầu"
 
     result = {
         "mon": mon,
-        "diem": round(diem, 2),
+        "diem": round(diem_val, 2) if diem_val is not None else 0.0,
         "trang_thai": status_str,
         "is_failed": is_failed,
         "ly_do": reason_str,
-        "is_red_marked": False,
-        "is_low_grade": is_failed
+        "is_red_marked": is_red,
+        "is_low_grade": is_low_grade
     }
 
     if bbox:

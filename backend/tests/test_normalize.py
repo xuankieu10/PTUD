@@ -7,7 +7,7 @@ Bộ kiểm thử unit test cho module normalize.py:
 
 import json
 import pytest
-from normalize import normalize_transcript, normalize_to_json
+from backend.normalize import normalize_transcript, normalize_to_json
 from backend.grade_filter import filter_grades
 
 

@@ -1,5 +1,10 @@
-﻿def update_api():
-    with open('backend/api.py', 'r', encoding='utf-8') as f:
+import os
+
+def update_api():
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    api_path = os.path.join(BASE_DIR, "backend", "api.py")
+
+    with open(api_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
     # Imports
@@ -207,7 +212,7 @@ class ProcessResponseModel(BaseModel):
     if idx1 != -1 and idx2 != -1:
         content = content[:idx1] + map_code_new + '\n\n        ' + content[idx2:]
 
-    with open('backend/api.py', 'w', encoding='utf-8') as f:
+    with open(api_path, 'w', encoding='utf-8') as f:
         f.write(content)
 
 update_api()

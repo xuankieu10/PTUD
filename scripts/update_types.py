@@ -1,7 +1,10 @@
-﻿import os
+import os
 
 def update_types():
-    with open('frontend/src/types.ts', 'r', encoding='utf-8') as f:
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    frontend_path = os.path.join(BASE_DIR, "frontend", "src", "types.ts")
+
+    with open(frontend_path, 'r', encoding='utf-8') as f:
         content = f.read()
         
     old_interface = '''export interface SubjectGrade {
@@ -55,7 +58,7 @@ def update_types():
     # Replace uses of SubjectGrade with SubjectRecord
     content = content.replace('SubjectGrade', 'SubjectRecord')
 
-    with open('frontend/src/types.ts', 'w', encoding='utf-8') as f:
+    with open(frontend_path, 'w', encoding='utf-8') as f:
         f.write(content)
 
 update_types()

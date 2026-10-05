@@ -1,5 +1,10 @@
-﻿def update_table():
-    with open('frontend/src/components/TranscriptTable.tsx', 'r', encoding='utf-8') as f:
+import os
+
+def update_table():
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    frontend_path = os.path.join(BASE_DIR, "frontend", "src", "components", "TranscriptTable.tsx")
+
+    with open(frontend_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
     # Replacements
@@ -20,7 +25,7 @@
     for k, v in replacements.items():
         content = content.replace(k, v)
 
-    with open('frontend/src/components/TranscriptTable.tsx', 'w', encoding='utf-8') as f:
+    with open(frontend_path, 'w', encoding='utf-8') as f:
         f.write(content)
 
 update_table()

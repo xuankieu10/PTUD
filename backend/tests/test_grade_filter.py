@@ -24,34 +24,56 @@ def test_evaluate_subject_grade_passed():
     assert res["trang_thai"] == "Đạt"
 
 
-def test_evaluate_subject_marked_red_does_not_fail_if_high_grade():
-    # Điểm 8.0 có dấu đỏ -> Vẫn ĐẠT (theo yêu cầu người dùng: chỉ điểm < 4 mới bị đánh không đạt)
+def test_evaluate_subject_marked_red_fails():
+    # Điểm 8.0 có dấu đỏ -> KHÔNG ĐẠT (theo luật ưu tiên khoanh đỏ)
     red_regions = [(100, 100, 80, 30)]
     subject = {
         "mon": "Lập trình Web",
         "diem": 8.0,
-        "bbox": (105, 105, 175, 125)
+        "bbox": (105, 105, 70, 20)
     }
     res = evaluate_subject(subject, red_regions)
+    assert res["is_failed"] is True
+    assert res["is_red_marked"] is True
+    assert "Được đánh dấu màu đỏ" in res["ly_do"]
+
+
+def test_evaluate_subject_invalid_grade():
+    invalid_grades = ["M", "Vắng", "", None, "8,5", " 7.0 "]
+    
+    # Test valid string floats
+    res = evaluate_subject({"mon": "Nhập môn", "diem": "8,5"})
+    assert res["diem"] == 8.5
     assert res["is_failed"] is False
-    assert res["trang_thai"] == "Đạt"
+
+    res = evaluate_subject({"mon": "Nhập môn", "diem": " 7.0 "})
+    assert res["diem"] == 7.0
+    assert res["is_failed"] is False
+
+    # Test invalid values that fail parsing
+    for val in ["M", "Vắng", "", None]:
+        res = evaluate_subject({"mon": "Nhập môn", "diem": val})
+        assert res["diem"] == 0.0
+        assert res["is_failed"] is True
+        assert "Điểm không xác định" in res["ly_do"]
 
 
 def test_filter_grades_combined():
+    red_regions = [(10, 10, 50, 50)]
     subjects = [
         {"mon": "Toán A1", "diem": 3.5},                     # rớt do điểm < 4
         {"mon": "Vật lý", "diem": 6.0},                      # đậu
-        {"mon": "Hóa đại cương", "diem": 2.0, "is_marked_red": True}, # rớt do điểm < 4
-        {"mon": "Tiếng Anh 1", "diem": 7.5, "is_marked_red": True},  # đậu vì điểm >= 4
+        {"mon": "Hóa đại cương", "diem": 2.0, "bbox": (10, 20, 40, 50)}, # rớt do điểm < 4 và đỏ
+        {"mon": "Tiếng Anh 1", "diem": 7.5, "bbox": (10, 20, 40, 50)},  # rớt vì khoanh đỏ dù điểm > 4
     ]
-    failed, all_eval = filter_grades(subjects)
-    assert len(failed) == 2
+    failed, all_eval = filter_grades(subjects, red_regions)
+    assert len(failed) == 3
     assert len(all_eval) == 4
 
     failed_names = [f["mon"] for f in failed]
     assert "Toán A1" in failed_names
     assert "Hóa đại cương" in failed_names
-    assert "Tiếng Anh 1" not in failed_names
+    assert "Tiếng Anh 1" in failed_names
     assert "Vật lý" not in failed_names
 
 

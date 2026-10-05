@@ -83,4 +83,6 @@ def create_sample_image(output_path: str):
 
 
 if __name__ == "__main__":
-    create_sample_image("samples/sample_transcript.png")
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    target_path = os.path.join(BASE_DIR, "samples", "sample_transcript.png")
+    create_sample_image(target_path)

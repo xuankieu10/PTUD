@@ -1,5 +1,10 @@
-﻿def fix_api_py():
-    with open('backend/api.py', 'r', encoding='utf-8') as f:
+import os
+
+def fix_api_py():
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    api_path = os.path.join(BASE_DIR, 'backend', 'api.py')
+    
+    with open(api_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
     # Find the double insertions
@@ -25,7 +30,7 @@
     if dup_summary in content:
         content = content.replace(dup_summary, '        summary_contract = {', 1)
 
-    with open('backend/api.py', 'w', encoding='utf-8') as f:
+    with open(api_path, 'w', encoding='utf-8') as f:
         f.write(content)
 
 fix_api_py()
