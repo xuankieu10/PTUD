@@ -31,7 +31,8 @@ def get_embeddings_batch(texts: list[str]) -> list[bytes]:
             json={
                 "model": settings.EMBEDDING_MODEL,
                 "input": texts
-            }
+            },
+            timeout=settings.OLLAMA_TIMEOUT_EMBED
         )
         response.raise_for_status()
         data = response.json()

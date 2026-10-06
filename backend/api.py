@@ -61,9 +61,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from backend.app.routers import auth, documents
+from backend.app.routers import auth, documents, chat, students, transcripts
 app.include_router(auth.router)
 app.include_router(documents.router)
+app.include_router(chat.router)
+app.include_router(students.router)
+app.include_router(transcripts.router)
 
 
 # ==================== GLOBAL EXCEPTION HANDLERS ====================

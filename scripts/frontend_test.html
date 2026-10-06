@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Học Vụ AI - Minimal Test Frontend</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { display: flex; gap: 20px; }
+        .box { border: 1px solid #ccc; padding: 15px; width: 400px; border-radius: 8px; }
+        input, button { margin: 5px 0; padding: 8px; width: 100%; }
+        .chat-box { height: 300px; overflow-y: scroll; border: 1px solid #eee; margin-bottom: 10px; padding: 10px; }
+        .msg { margin-bottom: 10px; }
+        .msg.user { color: blue; }
+        .msg.bot { color: green; }
+        .source { font-size: 0.8em; color: gray; margin-left: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Học Vụ AI - Minimal Client</h1>
+    
+    <div class="container">
+        <!-- 1. LOGIN -->
+        <div class="box">
+            <h3>1. Đăng nhập</h3>
+            <input type="text" id="username" placeholder="Username (vd: sv01)" value="sv01">
+            <input type="password" id="password" placeholder="Password" value="Sv@12345">
+            <button onclick="login()">Login</button>
+            <p id="login-status"></p>
+        </div>
+
+        <!-- 2. GRADUATION CHECK -->
+        <div class="box">
+            <h3>2. Kiểm tra tốt nghiệp</h3>
+            <button onclick="checkGrad()">Kiểm tra (Có giải thích LLM)</button>
+            <div id="grad-result" style="margin-top:10px; font-size:0.9em; white-space:pre-wrap;"></div>
+        </div>
+
+        <!-- 3. CHAT -->
+        <div class="box">
+            <h3>3. Chat Tư vấn</h3>
+            <div class="chat-box" id="chat-box"></div>
+            <input type="text" id="chat-input" placeholder="Hỏi gì đó...">
+            <button onclick="sendChat()">Gửi</button>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = 'http://127.0.0.1:8000';
+        let token = '';
+        let studentId = null;
+        let sessionId = null;
+
+        async function login() {
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            const res = await fetch(`${BASE_URL}/auth/login`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: u, password: p})
+            });
+            if(res.ok) {
+                const data = await res.json();
+                token = data.access_token;
+                document.getElementById('login-status').innerText = 'Đăng nhập thành công! Vai trò: ' + data.role;
+                
+                // Fetch me to get student_id if possible
+                const meRes = await fetch(`${BASE_URL}/auth/me`, {headers: {'Authorization': 'Bearer ' + token}});
+                if(meRes.ok) {
+                    const meData = await meRes.json();
+                    studentId = meData.id; // Note: In real app, need to map user_id to student_id
+                }
+            } else {
+                document.getElementById('login-status').innerText = 'Đăng nhập thất bại!';
+            }
+        }
+
+        async function checkGrad() {
+            if(!token) return alert('Vui lòng đăng nhập!');
+            document.getElementById('grad-result').innerText = 'Đang tải (gọi LLM)...';
+            // Hardcode student_id = 1 for testing if user is sv01, sv01 is user_id 2, student_id 1
+            const res = await fetch(`${BASE_URL}/students/1/graduation-check?explain=true`, {
+                headers: {'Authorization': 'Bearer ' + token}
+            });
+            const data = await res.json();
+            document.getElementById('grad-result').innerText = JSON.stringify(data, null, 2);
+        }
+
+        async function sendChat() {
+            if(!token) return alert('Vui lòng đăng nhập!');
+            const msg = document.getElementById('chat-input').value;
+            if(!msg) return;
+
+            const box = document.getElementById('chat-box');
+            box.innerHTML += `<div class="msg user"><b>Bạn:</b> ${msg}</div>`;
+            document.getElementById('chat-input').value = '';
+
+            const body = { message: msg };
+            if(sessionId) body.session_id = sessionId;
+
+            const res = await fetch(`${BASE_URL}/chat`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                },
+                body: JSON.stringify(body)
+            });
+            
+            const data = await res.json();
+            sessionId = data.session_id;
+
+            let sourcesHtml = '';
+            if(data.sources && data.sources.length > 0) {
+                sourcesHtml = '<div class="source">Nguồn: ' + data.sources.map(s => `[${s.title}]`).join(', ') + '</div>';
+            }
+
+            box.innerHTML += `<div class="msg bot"><b>AI:</b> ${data.answer}${sourcesHtml}</div>`;
+            box.scrollTop = box.scrollHeight;
+        }
+    </script>
+</body>
+</html>

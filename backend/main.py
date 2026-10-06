@@ -11,9 +11,7 @@ import logging
 import os
 import sys
 
-if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 
 # Thêm đường dẫn thư mục gốc vào sys.path để import chuẩn
 current_dir = os.path.dirname(os.path.abspath(__file__))

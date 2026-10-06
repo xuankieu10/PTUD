@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     CHUNK_OVERLAP: int = 80
     TOP_K: int = 4
     SIMILARITY_THRESHOLD: float = 0.35
+    REQUIRED_CREDITS: int = 120
+    OLLAMA_TIMEOUT_EMBED: int = 60
+    OLLAMA_TIMEOUT_CHAT: int = 180
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
