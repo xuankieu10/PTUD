@@ -13,6 +13,8 @@ interface SidebarProps {
   sessions: ChatSession[];
   activeSessionId: number | null;
   onSelectSession: (id: number) => void;
+  onRenameSession?: (id: number, newTitle: string) => Promise<void>;
+  onDeleteSession?: (id: number) => Promise<void>;
   onNewChat: () => void;
   user: UserProfile | null;
   onLogout: () => void;
@@ -20,6 +22,8 @@ interface SidebarProps {
   onOpenProfileModal?: () => void;
   onExploreProjects?: () => void;
   isLoadingSessions?: boolean;
+  errorSessions?: string | null;
+  onRetrySessions?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -29,6 +33,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   sessions,
   activeSessionId,
   onSelectSession,
+  onRenameSession,
+  onDeleteSession,
   onNewChat,
   user,
   onLogout,
@@ -36,6 +42,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenProfileModal,
   onExploreProjects,
   isLoadingSessions = false,
+  errorSessions = null,
+  onRetrySessions,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -97,8 +105,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onCloseMobileSidebar();
             }
           }}
+          onRenameSession={onRenameSession}
+          onDeleteSession={onDeleteSession}
           searchQuery={searchQuery}
           isLoading={isLoadingSessions}
+          error={errorSessions}
+          onRetry={onRetrySessions}
         />
 
         {/* 6. Footer thông tin người dùng */}

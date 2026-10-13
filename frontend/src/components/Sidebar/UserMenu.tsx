@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronsUpDown, LogOut, Settings, GraduationCap, KeyRound } from 'lucide-react';
+import { ChevronsUpDown, LogOut, Settings, GraduationCap, KeyRound, User as UserIcon, LogIn } from 'lucide-react';
 import type { UserProfile } from '../../types';
 
 interface UserMenuProps {
@@ -28,13 +28,45 @@ export const UserMenu: React.FC<UserMenuProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const fullName = user?.full_name || 'Kiều Ngô Xuân';
-  const studentCode = user?.student_code || user?.username || '123000969';
-  const major = user?.major || 'KCT';
-  const initial = fullName.trim().charAt(fullName.trim().lastIndexOf(' ') + 1 || 0).toUpperCase() || 'X';
+  // Guest Mode (Chưa đăng nhập)
+  if (!user) {
+    return (
+      <div className="p-2.5 bg-[#F7F7F8] border-t border-[#E5E5E5]">
+        <div className="flex items-center justify-between gap-2 p-1.5 rounded-xl">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-full bg-[#EBECEF] text-[#6B6B6B] flex items-center justify-center font-medium text-xs shrink-0 border border-black/5">
+              <UserIcon className="w-4 h-4 text-gray-500" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-[#1F1F1F] leading-tight">
+                Khách
+              </p>
+              <p className="text-[11px] text-[#8E8E93] leading-normal">
+                Chưa đăng nhập
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenLoginModal}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1F1F1F] hover:bg-black text-white text-xs font-medium transition shadow-2xs"
+          >
+            <LogIn className="w-3.5 h-3.5" />
+            <span>Đăng nhập</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Logged-in User
+  const fullName = user.full_name || user.username;
+  const studentCode = user.student_code || user.username;
+  const major = user.major || 'Đại học Lạc Hồng';
+  const initial = fullName.trim().charAt(fullName.trim().lastIndexOf(' ') + 1 || 0).toUpperCase() || 'U';
 
   return (
-    <div ref={menuRef} className="relative p-2.5 bg-[#F7F7F8]">
+    <div ref={menuRef} className="relative p-2.5 bg-[#F7F7F8] border-t border-[#E5E5E5]">
       {/* Dropdown Menu Popup */}
       {isOpen && (
         <div className="absolute bottom-full left-2.5 right-2.5 mb-2 bg-white rounded-2xl shadow-xl border border-[#E5E5E5] p-1.5 z-50 animate-fade-in text-xs text-[#1F1F1F]">
@@ -68,7 +100,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({
             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-[#F3F4F6] text-[#4B5563] hover:text-[#1F1F1F] transition-colors"
           >
             <KeyRound className="w-4 h-4 text-[#6B6B6B]" />
-            <span>Đổi tài khoản / Đăng nhập</span>
+            <span>Đổi tài khoản</span>
           </button>
 
           <button
@@ -98,7 +130,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({
         </div>
       )}
 
-      {/* Footer trigger button exactly matching screenshot */}
+      {/* Footer trigger button */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
@@ -106,15 +138,13 @@ export const UserMenu: React.FC<UserMenuProps> = ({
         aria-label="Menu tài khoản người dùng"
       >
         <div className="flex items-center gap-2.5 min-w-0">
-          {/* Avatar tròn chứa chữ cái đầu với nền xám nhạt như trong ảnh */}
           <div className="w-8 h-8 rounded-full bg-[#EBECEF] text-[#1F1F1F] flex items-center justify-center font-medium text-xs shrink-0 border border-black/5">
             {initial}
           </div>
 
-          {/* Tên • mã và khoa */}
           <div className="min-w-0 flex-1">
             <p className="text-xs font-medium text-[#1F1F1F] truncate leading-tight">
-              {fullName} • {studentCode.length > 5 ? `${studentCode.slice(0, 4)}...` : studentCode}
+              {fullName} • {studentCode.length > 6 ? `${studentCode.slice(0, 4)}...` : studentCode}
             </p>
             <p className="text-[11px] text-[#6B6B6B] truncate leading-normal">
               {major}
@@ -122,7 +152,6 @@ export const UserMenu: React.FC<UserMenuProps> = ({
           </div>
         </div>
 
-        {/* Icon mũi tên lên-xuống */}
         <ChevronsUpDown className="w-3.5 h-3.5 text-[#9CA3AF] group-hover:text-[#4B5563] shrink-0" />
       </button>
     </div>

@@ -63,26 +63,21 @@ const getAuthHeaders = (): HeadersInit => {
 };
 
 export const chatApi = {
-  // Lấy danh sách hội thoại
+  // Lấy danh sách hội thoại của người dùng hiện tại
   async getSessions(): Promise<ChatSession[]> {
     const token = getAuthToken();
     if (!token) return [];
 
-    try {
-      const res = await fetch(`${API_BASE_URL}/chat/sessions`, {
-        headers: getAuthHeaders(),
-      });
-      if (!res.ok) {
-        if (res.status === 401) {
-          removeAuthToken();
-        }
-        return [];
+    const res = await fetch(`${API_BASE_URL}/chat/sessions`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      if (res.status === 401) {
+        removeAuthToken();
       }
-      return await res.json();
-    } catch (e) {
-      console.warn('Lỗi kết nối khi lấy danh sách chat:', e);
-      return [];
+      throw new Error(`Lỗi tải danh sách cuộc trò chuyện (${res.status})`);
     }
+    return await res.json();
   },
 
   // Lấy tin nhắn của 1 session
@@ -117,6 +112,73 @@ export const chatApi = {
 
     return await res.json();
   },
+
+  // Tải tệp lên kèm tin nhắn (tối đa 5 tệp, tối đa 10MB)
+  async uploadFiles(
+    files: File[],
+    message?: string,
+    sessionId?: number | null
+  ): Promise<ChatSendResponse> {
+    const formData = new FormData();
+    files.forEach((f) => formData.append('files', f));
+    if (message) {
+      formData.append('message', message);
+    }
+    if (sessionId) {
+      formData.append('session_id', String(sessionId));
+    }
+
+    const token = getAuthToken();
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const res = await fetch(`${API_BASE_URL}/chat/upload`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      const detail = errData?.detail || `Lỗi tải tệp lên (${res.status})`;
+      throw new Error(detail);
+    }
+
+    return await res.json();
+  },
+
+  // Đổi tên cuộc trò chuyện
+  async renameSession(sessionId: number, title: string): Promise<{ success: boolean; title: string }> {
+    const res = await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ title }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.detail || 'Không thể đổi tên cuộc trò chuyện');
+    }
+
+    return await res.json();
+  },
+
+  // Xoá cuộc trò chuyện
+  async deleteSession(sessionId: number): Promise<{ success: boolean }> {
+    const res = await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.detail || 'Không thể xoá cuộc trò chuyện');
+    }
+
+    return await res.json();
+  },
 };
 
 export const authApi = {
@@ -138,7 +200,7 @@ export const authApi = {
     return data;
   },
 
-  // Lấy thông tin user hiện tại
+  // Lấy thông tin user thật từ /auth/me
   async getMe(): Promise<UserProfile> {
     const res = await fetch(`${API_BASE_URL}/auth/me`, {
       headers: getAuthHeaders(),
@@ -148,44 +210,22 @@ export const authApi = {
       throw new Error('Chưa đăng nhập');
     }
 
-    const basicUser = await res.json();
-
-    // Thử truy vấn thêm thông tin chi tiết sinh viên nếu có
-    let studentInfo: Partial<UserProfile> = {};
-    try {
-      const stuRes = await fetch(`${API_BASE_URL}/students/${basicUser.id}/graduation-check`, {
-        headers: getAuthHeaders(),
-      });
-      if (stuRes.ok) {
-        const stuData = await stuRes.json();
-        if (stuData?.student) {
-          studentInfo = {
-            student_code: stuData.student.student_code,
-            full_name: stuData.student.full_name,
-            major: stuData.student.major,
-            cohort: stuData.student.cohort,
-          };
-        }
-      }
-    } catch {
-      // Bỏ qua nếu sinh viên chưa có hồ sơ
-    }
-
+    const userData = await res.json();
     const fullProfile: UserProfile = {
-      id: basicUser.id,
-      username: basicUser.username,
-      role: basicUser.role,
-      student_code: studentInfo.student_code || (basicUser.role === 'admin' ? 'AD01' : '123000969'),
-      full_name: studentInfo.full_name || (basicUser.role === 'admin' ? 'Quản Trị Viên' : 'Nguyễn Văn A'),
-      major: studentInfo.major || 'KCT',
-      cohort: studentInfo.cohort,
+      id: userData.id,
+      username: userData.username,
+      role: userData.role,
+      student_code: userData.student_code || userData.username,
+      full_name: userData.full_name || userData.username,
+      major: userData.major || 'Chưa cập nhật',
+      cohort: userData.cohort,
     };
 
     setStoredUser(fullProfile);
     return fullProfile;
   },
 
-  // Đăng nhập demo nhanh nếu chưa có token
+  // Kiểm tra xác thực khi mở ứng dụng (không hard-code mock profile)
   async ensureAuthenticated(): Promise<UserProfile | null> {
     const token = getAuthToken();
     if (token) {
@@ -193,35 +233,10 @@ export const authApi = {
         return await this.getMe();
       } catch {
         removeAuthToken();
+        return null;
       }
     }
-
-    // Thử auto-login bằng tài khoản demo test01 hoặc sv01
-    const testAccounts = [
-      { username: 'test01', password: 'Test@123' },
-      { username: 'sv01', password: '123' },
-      { username: 'admin', password: 'change_me' }
-    ];
-
-    for (const acc of testAccounts) {
-      try {
-        await this.login(acc.username, acc.password);
-        return await this.getMe();
-      } catch {
-        // Thử tài khoản tiếp theo
-      }
-    }
-
-    // Fallback profile nếu backend chưa chạy hoặc chưa có user
-    const fallbackUser: UserProfile = {
-      id: 1,
-      username: '123000969',
-      role: 'student',
-      student_code: '123000969',
-      full_name: 'Nguyễn Văn A',
-      major: 'KCT',
-    };
-    return fallbackUser;
+    return null;
   },
 };
 

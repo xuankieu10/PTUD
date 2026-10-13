@@ -80,7 +80,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               Mã SV: <span className="font-semibold">{user?.student_code || user?.username}</span>
             </p>
             <p className="text-xs text-[#6B6B6B]">
-              Khoa: <span className="font-semibold">{user?.major || 'KCT'}</span> {user?.cohort ? `· Khóa: ${user.cohort}` : ''}
+              Khoa: <span className="font-semibold">{user?.major || 'Chưa cập nhật'}</span> {user?.cohort ? `· Khóa: ${user.cohort}` : ''}
             </p>
           </div>
         </div>

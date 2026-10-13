@@ -21,7 +21,8 @@ export function groupSessionsByDate(sessions: ChatSession[]): GroupedSessions[] 
   };
 
   for (const session of sessions) {
-    const sessionDate = session.created_at ? new Date(session.created_at) : new Date();
+    const dateStr = session.updated_at || session.created_at;
+    const sessionDate = dateStr ? new Date(dateStr) : new Date();
     const sessionDay = new Date(sessionDate.getFullYear(), sessionDate.getMonth(), sessionDate.getDate());
 
     if (sessionDay.getTime() === today.getTime()) {
