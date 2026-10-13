@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Copy, Check, ExternalLink, BookOpen, AlertCircle } from 'lucide-react';
 import { LhuLogo } from '../Common/LhuLogo';
-import type { ChatMessage } from '../../types';
+import { FileCard } from './FileCard';
+import type { ChatMessage, AttachedFile } from '../../types';
 
 interface MessageItemProps {
   message: ChatMessage;
@@ -20,11 +21,36 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
   };
 
   if (isUser) {
+    // Thu thập danh sách tệp đính kèm từ message.files hoặc message.sources
+    const attachedFiles: AttachedFile[] =
+      message.files ||
+      (Array.isArray(message.sources)
+        ? message.sources
+            .filter((s: any) => s.filename || s.name)
+            .map((s: any) => ({
+              name: s.filename || s.name,
+              size: s.size || 0,
+              type: s.type || 'file',
+            }))
+        : []);
+
     return (
-      <div className="flex justify-end mb-6 animate-fade-in">
-        <div className="bg-[#F4F4F5] text-[#1F1F1F] text-sm md:text-base px-5 py-3.5 rounded-3xl max-w-[85%] md:max-w-[75%] whitespace-pre-wrap leading-relaxed shadow-2xs">
-          {message.content}
-        </div>
+      <div className="flex flex-col items-end mb-6 animate-fade-in max-w-[85%] md:max-w-[75%] ml-auto">
+        {/* Các thẻ tệp đính kèm gửi kèm */}
+        {attachedFiles.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-2 justify-end">
+            {attachedFiles.map((file, idx) => (
+              <FileCard key={idx} file={file} />
+            ))}
+          </div>
+        )}
+
+        {/* Nội dung câu hỏi (nếu có) */}
+        {message.content && (
+          <div className="bg-[#F4F4F5] text-[#1F1F1F] text-sm md:text-base px-5 py-3.5 rounded-3xl whitespace-pre-wrap leading-relaxed shadow-2xs">
+            {message.content}
+          </div>
+        )}
       </div>
     );
   }
@@ -63,7 +89,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
             <button
               type="button"
               onClick={() => setShowSources(!showSources)}
-              className="inline-flex items-center gap-1.5 text-xs text-[#6B6B6B] hover:text-[#1F1F1F] py-1 px-2.5 rounded-lg bg-[#F7F7F8] hover:bg-[#EBECEF] transition-colors"
+              className="inline-flex items-center gap-1.5 text-xs text-[#6B6B6B] hover:text-[#1F1F1F] py-1 px-2.5 rounded-lg bg-[#F7F7F8] hover:bg-[#EBECEF] transition-colors cursor-pointer"
             >
               <BookOpen className="w-3.5 h-3.5 text-[#F5B800]" />
               <span>Nguồn tài liệu ({message.sources.length})</span>
@@ -105,7 +131,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
               type="button"
               onClick={handleCopy}
               title="Sao chép câu trả lời"
-              className="p-1.5 rounded-lg text-[#9CA3AF] hover:text-[#1F1F1F] hover:bg-[#F3F4F6] transition-colors"
+              className="p-1.5 rounded-lg text-[#9CA3AF] hover:text-[#1F1F1F] hover:bg-[#F3F4F6] transition-colors cursor-pointer"
             >
               {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
             </button>

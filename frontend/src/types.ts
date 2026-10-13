@@ -10,11 +10,22 @@ export interface ChatSource {
   fetched_at?: string | null;
 }
 
+export interface AttachedFile {
+  id?: string;
+  name: string;
+  size: number;
+  type: string;
+  file?: File;
+  progress?: number;
+  error?: string;
+}
+
 export interface ChatMessage {
   id: number | string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   sources?: ChatSource[];
+  files?: AttachedFile[];
   created_at?: string;
   isStreaming?: boolean;
   error?: string | null;
@@ -25,6 +36,7 @@ export interface ChatSession {
   user_id?: number;
   title: string;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface UserProfile {
@@ -41,6 +53,7 @@ export interface ChatSendResponse {
   session_id: number;
   answer: string;
   sources: ChatSource[];
+  files?: Array<{ filename: string; size: number; type: string }>;
 }
 
 export interface AuthLoginResponse {
