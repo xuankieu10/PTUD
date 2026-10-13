@@ -7,15 +7,15 @@ interface NewChatButtonProps {
 
 export const NewChatButton: React.FC<NewChatButtonProps> = ({ onClick }) => {
   return (
-    <div className="px-3 py-2">
+    <div className="px-3 py-1.5">
       <button
         type="button"
         onClick={onClick}
-        className="w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-2xl bg-[#ECECF1] hover:bg-[#E2E2E8] active:scale-[0.99] text-[#1F1F1F] font-medium text-sm transition-all duration-150 shadow-xs"
-        aria-label="Tạo cuộc trò chuyện mới"
+        className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-[#EFEFEF] hover:bg-[#E5E5E8] active:scale-[0.99] text-[#1F1F1F] font-normal text-xs md:text-sm transition-all duration-150"
+        aria-label="Cuộc trò chuyện mới"
       >
+        <SquarePen className="w-4 h-4 text-[#1F1F1F] shrink-0 stroke-[1.8]" />
         <span className="truncate">Cuộc trò chuyện mới</span>
-        <SquarePen className="w-4 h-4 text-[#4B5563] shrink-0" />
       </button>
     </div>
   );

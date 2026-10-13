@@ -23,7 +23,8 @@ describe("LHU AI App Integration", () => {
 
     // Welcome screen greeting
     expect(screen.getByText(/Đại học Lạc Hồng/i)).toBeInTheDocument();
-    expect(screen.getByText(/Mình là LHU AI/i)).toBeInTheDocument();
+    expect(screen.getByText(/Mình là LHU/i)).toBeInTheDocument();
+    expect(screen.getByText(/Mình có thể giúp gì cho bạn\?/i)).toBeInTheDocument();
 
     // Composer placeholder
     expect(screen.getByPlaceholderText(/Bạn muốn tìm hiểu điều gì\?/i)).toBeInTheDocument();
