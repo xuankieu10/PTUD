@@ -11,6 +11,26 @@ export default defineConfig({
       '/api': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true
+      },
+      '/chat': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true
+      },
+      '/auth': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true
+      },
+      '/students': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true
+      },
+      '/documents': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true
+      },
+      '/transcripts': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true
       }
     }
   }
