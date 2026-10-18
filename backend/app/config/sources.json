@@ -1,0 +1,21 @@
+{
+  "general": [
+    "https://sinhviendanghoc.lhu.edu.vn/483/Nien-giam.html",
+    "https://sinhviendanghoc.lhu.edu.vn/53968/Nien-giam-53968.html",
+    "https://sinhviendanghoc.lhu.edu.vn/50268/Nien-giam-50268.html",
+    "https://sinhviendanghoc.lhu.edu.vn/48379/Nien-giam-48379.html",
+    "https://graduate.lhu.edu.vn/",
+    "https://sinhviendanghoc.lhu.edu.vn/41/Ho-tro-sinh-vien.html"
+  ],
+  "exclude": [
+    "mark",
+    "calen",
+    "dkmh",
+    "me",
+    "certification",
+    "tuyen-dung",
+    "cau-lac-bo",
+    "tuyen-truyen",
+    "ky-nang-mem"
+  ]
+}

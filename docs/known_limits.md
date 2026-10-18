@@ -1,0 +1,5 @@
+- Tiền kiểm injection bằng regex chỉ chặn các mẫu đã biết, diễn đạt khác có thể lọt.
+- Tầng LLM (7B) không bị đổi vai/lộ system prompt trong các test đã chạy, nhưng có thể làm theo lệnh "lặp lại nội dung tài liệu".
+- Hậu kiểm tiếng Việt chỉ kiểm tra có ký tự tiếng Việt, không phát hiện câu trộn Anh-Việt.
+- Chưa đánh giá trên tài liệu thật nhiều chunk (xem eval_rag.py).
+- latency 20 đến 40 giây mỗi câu với qwen2.5:7b chạy cục bộ.

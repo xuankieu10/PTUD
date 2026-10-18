@@ -80,12 +80,20 @@ def upload_document(
 
         return {"id": doc_id, "title": title, "status": "indexed", "chunks": len(chunks)}
 
+    except HTTPException:
+        db.rollback()
+        if 'doc_id' in locals():
+            db.execute(text("UPDATE documents SET status = 'failed' WHERE id = :did"), {"did": doc_id})
+            db.commit()
+        raise
     except Exception as e:
         db.rollback()
         if 'doc_id' in locals():
             db.execute(text("UPDATE documents SET status = 'failed' WHERE id = :did"), {"did": doc_id})
             db.commit()
-        raise HTTPException(status_code=500, detail=str(e))
+        import logging
+        logging.getLogger(__name__).exception("Error in upload_document")
+        raise HTTPException(status_code=500, detail="Lỗi hệ thống khi xử lý tài liệu")
 
 @router.get("")
 def get_documents(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
@@ -166,11 +174,18 @@ def update_document(
             db.execute(text("UPDATE documents SET status = 'indexed' WHERE id = :did"), {"did": doc_id})
             db.commit()
             
+        except HTTPException:
+            db.rollback()
+            db.execute(text("UPDATE documents SET status = 'failed' WHERE id = :did"), {"did": doc_id})
+            db.commit()
+            raise
         except Exception as e:
             db.rollback()
             db.execute(text("UPDATE documents SET status = 'failed' WHERE id = :did"), {"did": doc_id})
             db.commit()
-            raise HTTPException(status_code=500, detail=str(e))
+            import logging
+            logging.getLogger(__name__).exception("Error in update_document")
+            raise HTTPException(status_code=500, detail="Lỗi hệ thống khi cập nhật tài liệu")
             
     return {"message": "Document updated"}
 

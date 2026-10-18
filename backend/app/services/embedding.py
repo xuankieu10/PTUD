@@ -21,8 +21,18 @@ def get_embedding(text: str) -> bytes:
         # Convert first embedding to numpy float32 and then bytes
         embedding_arr = np.array(embeddings[0], dtype=np.float32)
         return embedding_arr.tobytes()
+    except requests.exceptions.Timeout as e:
+        import logging
+        logging.getLogger(__name__).exception("Ollama timeout in get_embedding")
+        raise HTTPException(status_code=504, detail="Hệ thống đang quá tải, vui lòng thử lại sau.")
+    except requests.exceptions.ConnectionError as e:
+        import logging
+        logging.getLogger(__name__).exception("Ollama connection error in get_embedding")
+        raise HTTPException(status_code=503, detail="Hệ thống AI đang bảo trì, vui lòng thử lại sau.")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting embedding: {str(e)}")
+        import logging
+        logging.getLogger(__name__).exception("Ollama unknown error in get_embedding")
+        raise HTTPException(status_code=500, detail="Lỗi hệ thống nội bộ.")
 
 def get_embeddings_batch(texts: list[str]) -> list[bytes]:
     try:
@@ -45,5 +55,15 @@ def get_embeddings_batch(texts: list[str]) -> list[bytes]:
             embedding_arr = np.array(emb, dtype=np.float32)
             result.append(embedding_arr.tobytes())
         return result
+    except requests.exceptions.Timeout as e:
+        import logging
+        logging.getLogger(__name__).exception("Ollama timeout in get_embeddings_batch")
+        raise HTTPException(status_code=504, detail="Hệ thống đang quá tải, vui lòng thử lại sau.")
+    except requests.exceptions.ConnectionError as e:
+        import logging
+        logging.getLogger(__name__).exception("Ollama connection error in get_embeddings_batch")
+        raise HTTPException(status_code=503, detail="Hệ thống AI đang bảo trì, vui lòng thử lại sau.")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting embeddings batch: {str(e)}")
+        import logging
+        logging.getLogger(__name__).exception("Ollama unknown error in get_embeddings_batch")
+        raise HTTPException(status_code=500, detail="Lỗi hệ thống nội bộ.")

@@ -1,30 +1,36 @@
 import os
 import sys
+import getpass
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from passlib.context import CryptContext
-from sqlalchemy import create_engine, text
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-def get_password_hash(password):
-    return pwd_context.hash(password)
+from backend.app.security import get_password_hash
+from backend.app.db import engine
+from sqlalchemy import text
 
 def main():
-    db_url = os.getenv("DATABASE_URL", "mssql+pyodbc://@localhost/HocVuAI?driver=ODBC+Driver+17+for+SQL+Server&trusted_connection=yes")
-    print(f"Connecting to {db_url}")
-    engine = create_engine(db_url)
-    
-    admin_pw = get_password_hash("Admin@123")
-    student_pw = get_password_hash("Sv@12345")
-    
+    admin_pw = os.getenv("ADMIN_PASSWORD")
+    student_pw = os.getenv("STUDENT_PASSWORD")
+
+    if not admin_pw:
+        admin_pw = getpass.getpass("Nhập mật khẩu cho tài khoản admin: ")
+    if not student_pw:
+        student_pw = getpass.getpass("Nhập mật khẩu cho tài khoản sinh viên: ")
+
+    if not admin_pw or not student_pw:
+        print("Lỗi: Cần cung cấp mật khẩu cho cả admin và sinh viên.")
+        sys.exit(1)
+
+    admin_hash = get_password_hash(admin_pw)
+    student_hash = get_password_hash(student_pw)
+
+    print("Đang kết nối database...")
     with engine.connect() as conn:
         # Update admin
-        conn.execute(text("UPDATE users SET password_hash = :pw WHERE username = 'admin'"), {"pw": admin_pw})
+        conn.execute(text("UPDATE users SET password_hash = :pw WHERE username = 'admin' OR role = 'admin'"), {"pw": admin_hash})
         
         # Update students
-        conn.execute(text("UPDATE users SET password_hash = :pw WHERE role = 'student'"), {"pw": student_pw})
+        conn.execute(text("UPDATE users SET password_hash = :pw WHERE role = 'student'"), {"pw": student_hash})
         
         conn.commit()
         

@@ -139,8 +139,8 @@ def chat(
     max_score = max((c["score"] for c in chunks), default=0.0)
     
     msg_lower = req.message.lower()
-    personal_kws = ["điểm", "tín chỉ", "tốt nghiệp", "lịch học", "thời khóa biểu", "điểm rèn luyện", "học phí"]
-    personal_refs = ["của tôi", "mình", "em", "bản thân", "của em"]
+    personal_kws = ["điểm", "tín chỉ", "tốt nghiệp", "lịch học", "thời khóa biểu", "điểm rèn luyện", "học phí", "môn", "rớt", "nợ", "dưới"]
+    personal_refs = ["tôi", "của tôi", "mình", "em", "bản thân", "của em"]
     academic_kws = ["quy chế", "quy định", "thông báo", "học vụ", "niên giám", "buộc thôi học", "cảnh báo", "học bổng", "nghỉ học", "bảo lưu"]
     
     has_personal_kw = any(kw in msg_lower for kw in personal_kws)
@@ -170,13 +170,46 @@ def chat(
 
     if intent == "personal":
         # Call graduation_check logic directly
-        try:
-            pers_data = graduation_check(user_id, explain=True, db=db, current_user=current_user)
-            answer = f"Dữ liệu cá nhân của bạn:\n- Tổng tín chỉ tích lũy: {pers_data['total_credits']}/{settings.REQUIRED_CREDITS}\n- GPA: {pers_data['gpa']}\n- Trạng thái: {'Đủ điều kiện tốt nghiệp' if pers_data['can_graduate'] else 'Chưa đủ điều kiện tốt nghiệp'}\n\nChi tiết: {pers_data['explanation']}"
-        except HTTPException as e:
-            answer = f"Lỗi lấy dữ liệu cá nhân: {e.detail}"
-        except Exception as e:
-            answer = f"Không thể lấy dữ liệu cá nhân: {str(e)}"
+        stu = db.execute(text("SELECT id FROM students WHERE user_id = :uid"), {"uid": current_user["id"]}).fetchone()
+        if not stu:
+            answer = "Tài khoản chưa liên kết hồ sơ sinh viên"
+        else:
+            try:
+                pers_data = graduation_check(stu.id, explain=True, db=db, current_user=current_user)
+                gpa_line = f"- GPA: {pers_data['gpa']}\n" if "gpa" in pers_data else ""
+                
+                # Danh sách môn rớt / dưới 4.0 từ bảng grades
+                is_asking_failed = any(kw in msg_lower for kw in ["rớt", "nợ", "dưới", "chưa đạt", "không đạt", "trượt"])
+                failed_section = ""
+                if is_asking_failed:
+                    failed_grades = db.execute(
+                        text("""
+                            SELECT DISTINCT c.name, g.score
+                            FROM grades g
+                            JOIN courses c ON g.course_id = c.id
+                            WHERE g.student_id = :sid AND (g.passed = 0 OR g.score < 4.0)
+                            ORDER BY c.name
+                        """),
+                        {"sid": stu.id}
+                    ).fetchall()
+                    if failed_grades:
+                        courses_lines = "\n".join([f"  + {r.name}: {float(r.score):.1f}" for r in failed_grades])
+                        failed_section = f"\n- Danh sách môn rớt/dưới 4.0:\n{courses_lines}\n"
+                    else:
+                        failed_section = "\n- Danh sách môn rớt/dưới 4.0: Không có môn nào (tất cả các môn đều đạt >= 4.0)\n"
+
+                answer = (
+                    f"Dữ liệu cá nhân của bạn:\n"
+                    f"- Tổng tín chỉ tích lũy: {pers_data['total_credits_passed']}/{settings.REQUIRED_CREDITS}\n"
+                    f"{gpa_line}"
+                    f"- Trạng thái: {'Đủ điều kiện tốt nghiệp' if pers_data['eligible'] else 'Chưa đủ điều kiện tốt nghiệp'}\n"
+                    f"{failed_section}\n"
+                    f"Chi tiết: {pers_data['explanation']}"
+                )
+            except HTTPException as e:
+                answer = f"Lỗi lấy dữ liệu cá nhân: {e.detail}"
+            except Exception as e:
+                answer = f"Không thể lấy dữ liệu cá nhân: {str(e)}"
             
         sources_data = []
         db.execute(

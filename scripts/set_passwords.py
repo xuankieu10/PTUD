@@ -1,5 +1,6 @@
 import os
 import sys
+import getpass
 
 # Thêm thư mục gốc vào sys.path để import từ backend
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -9,23 +10,36 @@ from backend.app.db import SessionLocal
 from backend.app.security import get_password_hash
 
 def main():
+    admin_pw = os.getenv("ADMIN_PASSWORD")
+    student_pw = os.getenv("STUDENT_PASSWORD")
+
+    if not admin_pw:
+        admin_pw = getpass.getpass("Nhập mật khẩu cho tài khoản admin: ")
+    if not student_pw:
+        student_pw = getpass.getpass("Nhập mật khẩu cho tài khoản sinh viên: ")
+
+    if not admin_pw or not student_pw:
+        print("Lỗi: Cần cung cấp mật khẩu cho cả admin và sinh viên.")
+        sys.exit(1)
+
+    admin_hash = get_password_hash(admin_pw)
+    student_hash = get_password_hash(student_pw)
+
     db = SessionLocal()
     try:
         users = db.execute(text("SELECT id, username, role FROM users")).fetchall()
         
         updated_usernames = []
         for user in users:
-            new_password = None
+            hashed_pw = None
             if user.role == "admin" or user.username == "admin":
-                new_password = "Admin@123"
+                hashed_pw = admin_hash
             elif user.role == "student" or user.username.startswith("sv"):
-                new_password = "Sv@12345"
+                hashed_pw = student_hash
             else:
-                # Default for other students
-                new_password = "Sv@12345"
+                hashed_pw = student_hash
                 
-            if new_password:
-                hashed_pw = get_password_hash(new_password)
+            if hashed_pw:
                 db.execute(text("UPDATE users SET password_hash = :hash WHERE id = :id"), {"hash": hashed_pw, "id": user.id})
                 updated_usernames.append(user.username)
         

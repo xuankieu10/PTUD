@@ -7,21 +7,39 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+test_screenshots/
 
-# Outputs / Temporary uploads / Generated test samples
+# Test Results & Artifacts (exact filenames)
+chat_15_raw_results.json
+db_test_result.txt
+test_chat_results.md
+test.txt
+test2.txt
+
+# Outputs / Temporary uploads
 output/
 temp_uploads/
-samples/
+uploads/
+tmp_downloads/
 *.log
+task-*.log
 
-# Environments
+# Environments & Secrets
 .env
+.env.*
+!.env.example
 .venv
 env/
 venv/
 ENV/
 
+# Local Databases
+*.db
+*.sqlite
+*.sqlite3
+
 # Node / Frontend
+node_modules/
 frontend/node_modules/
 frontend/dist/
 frontend/dist-ssr/
@@ -32,3 +50,8 @@ frontend/*.local
 .idea/
 .DS_Store
 Thumbs.db
+desktop.ini
+scripts/_scratch/
+
+# Ignore root-level generated/downloaded PDFs only
+/*.pdf

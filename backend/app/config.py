@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     CHUNK_OVERLAP: int = 80
     TOP_K: int = 4
     SIMILARITY_THRESHOLD: float = 0.35
+    MIN_SCORE_THRESHOLD: float = 0.6
     REQUIRED_CREDITS: int = 120
     OLLAMA_TIMEOUT_EMBED: int = 60
     OLLAMA_TIMEOUT_CHAT: int = 180
