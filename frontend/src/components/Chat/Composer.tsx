@@ -23,7 +23,7 @@ export const Composer: React.FC<ComposerProps> = ({
   onInputChange,
   onSend,
   isLoading = false,
-  placeholder = 'Bạn muốn tìm hiểu điều gì?',
+  placeholder = 'Nhập tin nhắn cho trợ lý AI...',
   className = '',
   autoFocus = false,
   files = [],
@@ -37,12 +37,12 @@ export const Composer: React.FC<ComposerProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [isOverMaxHeight, setIsOverMaxHeight] = useState(false);
 
-  // Tự động giãn chiều cao theo nội dung và ẩn thanh cuộn khi < 200px
+  // Tự động giãn chiều cao theo nội dung (tối đa ~6 dòng / 150px)
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = 'auto';
-    const maxHeight = 200;
+    const maxHeight = 150; // Khoảng 6 dòng
     const scrollHeight = el.scrollHeight;
 
     if (scrollHeight > maxHeight) {
@@ -97,7 +97,7 @@ export const Composer: React.FC<ComposerProps> = ({
 
   return (
     <div
-      className={`w-full mx-auto ${className}`}
+      className={`w-full mx-auto select-none ${className}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -114,7 +114,7 @@ export const Composer: React.FC<ComposerProps> = ({
 
       {/* Thông báo lỗi bằng tiếng Việt (nếu có) */}
       {error && (
-        <div className="mb-2.5 px-3.5 py-2 bg-rose-50 border border-rose-200 rounded-2xl flex items-center justify-between text-xs text-rose-700 animate-fade-in">
+        <div className="mb-2 px-3.5 py-2 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 rounded-2xl flex items-center justify-between text-xs text-rose-700 dark:text-rose-300 animate-fade-in shadow-2xs">
           <div className="flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
             <span>{error}</span>
@@ -123,7 +123,7 @@ export const Composer: React.FC<ComposerProps> = ({
             <button
               type="button"
               onClick={onRetry}
-              className="inline-flex items-center gap-1 font-medium text-rose-700 hover:text-rose-900 underline ml-2 shrink-0 cursor-pointer"
+              className="inline-flex items-center gap-1 font-medium text-rose-700 dark:text-rose-300 hover:text-rose-900 dark:hover:text-white underline ml-2 shrink-0 cursor-pointer"
             >
               <RotateCw className="w-3 h-3" />
               <span>Thử lại</span>
@@ -134,7 +134,7 @@ export const Composer: React.FC<ComposerProps> = ({
 
       {/* Danh sách các thẻ tệp (File Cards) phía trên ô nhập */}
       {files.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 mb-2.5 px-1 animate-fade-in">
+        <div className="flex flex-wrap items-center gap-2 mb-2 px-1 animate-fade-in">
           {files.map((file, idx) => (
             <FileCard
               key={file.id || `${file.name}-${idx}`}
@@ -146,26 +146,26 @@ export const Composer: React.FC<ComposerProps> = ({
         </div>
       )}
 
-      {/* Khung ô nhập bo tròn dạng viên thuốc (border-radius ~32px) */}
+      {/* Khung ô nhập bo góc lớn 24px (rounded-[24px]), bóng nhẹ, nền trắng */}
       <div
-        className={`relative flex items-center gap-2 bg-white border rounded-full px-4 py-2 shadow-2xs transition-all ${
+        className={`relative flex items-end gap-2 bg-white dark:bg-[#162338] border rounded-[24px] px-3.5 py-2 shadow-sm transition-all duration-200 ${
           isDragging
-            ? 'border-[#F5B800] bg-amber-50/20 ring-2 ring-[#F5B800]/30'
-            : 'border-[#E5E7EB] hover:border-[#D1D5DB] focus-within:border-[#BDBDBD]'
+            ? 'border-[#1565C0] bg-blue-50/30 dark:bg-blue-900/20 ring-2 ring-[#1565C0]/30'
+            : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 focus-within:border-[#1565C0] dark:focus-within:border-[#4D8FE0] focus-within:ring-2 focus-within:ring-[#1565C0]/15'
         }`}
       >
-        {/* Nút '+' bên trái (Tải tệp lên) */}
+        {/* Nút đính kèm file bên trái */}
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
           title="Tải tệp lên"
           aria-label="Tải tệp lên"
-          className="p-1 rounded-full text-[#6B6B6B] hover:text-[#1F1F1F] transition-colors shrink-0 cursor-pointer"
+          className="p-1.5 rounded-full text-slate-500 hover:text-[#1565C0] dark:text-slate-400 dark:hover:text-[#4D8FE0] hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0 cursor-pointer mb-0.5"
         >
           <Plus className="w-5 h-5 stroke-[2]" />
         </button>
 
-        {/* Textarea tự giãn chiều cao ở giữa, ẩn thanh cuộn nếu dưới 200px */}
+        {/* Textarea tự giãn chiều cao (tối đa ~6 dòng) */}
         <textarea
           ref={textareaRef}
           value={input}
@@ -175,34 +175,34 @@ export const Composer: React.FC<ComposerProps> = ({
           rows={1}
           autoFocus={autoFocus}
           disabled={isLoading}
-          className="flex-1 py-1.5 px-2 text-sm md:text-[15px] text-[#1F1F1F] placeholder-[#6B6B6B]/80 bg-transparent resize-none focus:outline-none leading-relaxed transition-all"
+          className="flex-1 py-1 px-1 text-sm sm:text-base text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 bg-transparent resize-none focus:outline-none leading-relaxed transition-all"
           style={{
             minHeight: '26px',
-            maxHeight: '200px',
+            maxHeight: '150px',
             overflowY: isOverMaxHeight ? 'auto' : 'hidden',
           }}
         />
 
-        {/* Nút gửi tròn bên phải */}
+        {/* Nút gửi hình tròn nền --primary bên phải, chuyển xám khi ô trống */}
         <button
           type="button"
           onClick={() => canSend && onSend()}
           disabled={!canSend}
           title="Gửi tin nhắn"
           aria-label="Gửi tin nhắn"
-          className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all duration-150 ${
+          className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center shrink-0 transition-all duration-150 mb-0.5 ${
             canSend
-              ? 'bg-[#1F1F1F] hover:bg-black text-white cursor-pointer shadow-xs active:scale-95'
-              : 'bg-[#71717A] text-white/90 cursor-not-allowed opacity-90'
+              ? 'bg-[#1565C0] hover:bg-[#0D47A1] text-white cursor-pointer shadow-xs active:scale-95'
+              : 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed'
           }`}
         >
-          <ArrowUp className="w-4 h-4 stroke-[2.5]" />
+          <ArrowUp className="w-4 h-4 sm:w-4.5 sm:h-4.5 stroke-[2.5]" />
         </button>
       </div>
 
-      {/* Dòng lưu ý nhỏ, màu xám, căn giữa bên dưới ô nhập */}
-      <p className="text-center text-[11px] text-[#8E8E93] mt-3 font-normal select-none">
-        Trợ lý AI có thể mắc lỗi. Hãy kiểm tra lại thông tin quan trọng.
+      {/* Dòng chú thích nhỏ bên dưới theo yêu cầu */}
+      <p className="text-center text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 mt-2 font-normal select-none">
+        Chatbot có thể mắc sai sót. Hãy kiểm tra thông tin quan trọng.
       </p>
     </div>
   );

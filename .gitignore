@@ -55,3 +55,12 @@ scripts/_scratch/
 
 # Ignore root-level generated/downloaded PDFs only
 /*.pdf
+
+# Private data / Real student data & mapping files
+mapping_private.csv
+*mapping_private.csv
+*sinh_vien_that*.xlsx
+*du_lieu_that*.xlsx
+*private*.xlsx
+05_sinh_vien_an_danh.xlsx
+06_lich_trung_tam.xlsx

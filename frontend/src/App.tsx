@@ -11,6 +11,7 @@ import { chatApi, authApi, healthApi, removeAuthToken } from './services/api';
 import type { ChatSession, ChatMessage, UserProfile, OllamaHealth, AttachedFile } from './types';
 
 const SIDEBAR_STORAGE_KEY = 'lhu_ai_sidebar_open';
+const THEME_STORAGE_KEY = 'lhu_ai_dark_mode';
 const ALLOWED_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.pdf', '.docx', '.txt'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_FILES_COUNT = 5;
@@ -31,13 +32,51 @@ export function App() {
     return typeof window !== 'undefined' ? window.innerWidth >= 768 : true;
   });
 
+  // Dark mode state with localStorage persistence
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+      try {
+        const saved = window.localStorage.getItem(THEME_STORAGE_KEY);
+        if (saved !== null) {
+          return saved === 'true';
+        }
+        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      } catch {
+        // Fallback
+      }
+    }
+    return false;
+  });
+
+  // Apply dark mode class to root document element
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, String(isDarkMode));
+    } catch {
+      // Ignore
+    }
+  }, [isDarkMode]);
+
+  const toggleDarkMode = () => setIsDarkMode((prev) => !prev);
+
   // Chat Sessions & Active Session State
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [draftSessionId, setDraftSessionId] = useState<string>(() => `draft-${Date.now()}`);
+  const [messagesBySession, setMessagesBySession] = useState<Record<string, ChatMessage[]>>({});
+  const [loadingBySession, setLoadingBySession] = useState<Record<string, boolean>>({});
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
-  const [isSending, setIsSending] = useState(false);
+
+  // Derived state for the currently active session
+  const currentSessionKey = activeSessionId !== null ? String(activeSessionId) : draftSessionId;
+  const currentMessages = messagesBySession[currentSessionKey] || [];
+  const currentIsLoading = Boolean(loadingBySession[currentSessionKey]);
 
   // Composer Input & File Upload State
   const [input, setInput] = useState('');
@@ -75,7 +114,7 @@ export function App() {
   };
 
   const closeMobileSidebar = () => {
-    if (window.innerWidth < 768) {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
       setIsSidebarOpen(false);
     }
   };
@@ -130,28 +169,44 @@ export function App() {
     setInput('');
     setAttachedFiles([]);
     setUploadError(null);
-    try {
-      const msgs = await chatApi.getSessionMessages(sessionId);
-      setMessages(msgs);
-    } catch (err: any) {
-      setMessages([
-        {
-          id: 'error-load',
-          role: 'assistant',
-          content: '',
-          error: err.message || 'Không thể tải lịch sử tin nhắn của cuộc trò chuyện này.',
-        },
-      ]);
+    closeMobileSidebar();
+
+    const key = String(sessionId);
+    // Chỉ tải từ backend nếu phiên này không đang streaming
+    if (!loadingBySession[key]) {
+      try {
+        const msgs = await chatApi.getSessionMessages(sessionId);
+        setMessagesBySession((prev) => ({
+          ...prev,
+          [key]: msgs,
+        }));
+      } catch (err: any) {
+        setMessagesBySession((prev) => {
+          if (prev[key] && prev[key].length > 0) return prev;
+          return {
+            ...prev,
+            [key]: [
+              {
+                id: 'error-load',
+                role: 'assistant',
+                content: '',
+                error: err.message || 'Không thể tải lịch sử tin nhắn của cuộc trò chuyện này.',
+              },
+            ],
+          };
+        });
+      }
     }
   };
 
   // Create new chat
   const handleNewChat = () => {
     setActiveSessionId(null);
-    setMessages([]);
+    setDraftSessionId(`draft-${Date.now()}`);
     setInput('');
     setAttachedFiles([]);
     setUploadError(null);
+    closeMobileSidebar();
   };
 
   // Rename session
@@ -170,7 +225,18 @@ export function App() {
   const handleDeleteSession = async (sessionId: number) => {
     try {
       await chatApi.deleteSession(sessionId);
+      const key = String(sessionId);
       setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+      setMessagesBySession((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      setLoadingBySession((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
       if (activeSessionId === sessionId) {
         handleNewChat();
       }
@@ -223,8 +289,12 @@ export function App() {
     const messageContent = (textToSend ?? input).trim();
     const filesToSend = attachedFiles.map((f) => f.file!).filter(Boolean);
 
-    // Người dùng có thể nhập câu hỏi hoặc để trống nếu có tệp đính kèm
-    if ((!messageContent && filesToSend.length === 0) || isSending) return;
+    // Chốt session ID và key mục tiêu tại thời điểm bắt đầu gửi (const captured)
+    const targetSessionId = activeSessionId; // number | null
+    const targetKey = targetSessionId !== null ? String(targetSessionId) : draftSessionId;
+
+    // Chặn gửi nếu ô nhập trống hoặc phiên mục tiêu đang loading
+    if ((!messageContent && filesToSend.length === 0) || loadingBySession[targetKey]) return;
 
     // Reset input và files ở Composer ngay lập tức
     setInput('');
@@ -235,7 +305,7 @@ export function App() {
     // Lưu lại phòng trường hợp gửi thất bại cần thử lại
     lastFailedRequestRef.current = { text: messageContent, files: filesToSend };
 
-    // Thêm tin nhắn user vào danh sách kèm thẻ tệp
+    // Thêm tin nhắn user vào session tương ứng
     const userMsgId = `user-${Date.now()}`;
     const userMessage: ChatMessage = {
       id: userMsgId,
@@ -244,54 +314,147 @@ export function App() {
       files: filesSnapshot,
     };
 
-    setMessages((prev) => [...prev, userMessage]);
-    setIsSending(true);
+    // Placeholder bot message
+    const aiMsgId = `ai-${Date.now()}`;
+    const placeholderAiMessage: ChatMessage = {
+      id: aiMsgId,
+      role: 'assistant',
+      content: '',
+      isStreaming: true,
+    };
+
+    setMessagesBySession((prev) => ({
+      ...prev,
+      [targetKey]: [...(prev[targetKey] || []), userMessage, placeholderAiMessage],
+    }));
+    setLoadingBySession((prev) => ({
+      ...prev,
+      [targetKey]: true,
+    }));
+
+    // Nếu gửi từ phiên nháp mới (chưa có id), tạo sẵn draftId mới cho lần New Chat kế tiếp
+    if (targetSessionId === null) {
+      setDraftSessionId(`draft-${Date.now()}`);
+    }
 
     try {
-      let res;
+      let res: any;
       if (filesToSend.length > 0) {
         // Tải tệp lên endpoint /chat/upload
-        res = await chatApi.uploadFiles(filesToSend, messageContent || undefined, activeSessionId);
+        res = await chatApi.uploadFiles(filesToSend, messageContent || undefined, targetSessionId);
+        setMessagesBySession((prev) => {
+          const list = prev[targetKey] || [];
+          return {
+            ...prev,
+            [targetKey]: list.map((m) =>
+              m.id === aiMsgId
+                ? { ...m, content: res.answer, sources: res.sources, isStreaming: false }
+                : m
+            ),
+          };
+        });
       } else {
-        // Gửi tin nhắn thông thường
-        res = await chatApi.sendMessage(messageContent, activeSessionId);
+        // Gửi tin nhắn dạng streaming: hiển thị chữ chạy ngay khi model sinh
+        res = await chatApi.sendMessageStream(
+          messageContent,
+          targetSessionId,
+          (token) => {
+            setMessagesBySession((prev) => {
+              const list = prev[targetKey] || [];
+              return {
+                ...prev,
+                [targetKey]: list.map((m) =>
+                  m.id === aiMsgId ? { ...m, content: m.content + token } : m
+                ),
+              };
+            });
+          },
+          (sources) => {
+            setMessagesBySession((prev) => {
+              const list = prev[targetKey] || [];
+              return {
+                ...prev,
+                [targetKey]: list.map((m) =>
+                  m.id === aiMsgId ? { ...m, sources } : m
+                ),
+              };
+            });
+          }
+        );
+
+        // Kết thúc stream: cập nhật nội dung hoàn chỉnh và nguồn
+        setMessagesBySession((prev) => {
+          const list = prev[targetKey] || [];
+          return {
+            ...prev,
+            [targetKey]: list.map((m) =>
+              m.id === aiMsgId
+                ? {
+                    ...m,
+                    content: res.answer || m.content,
+                    sources: res.sources || m.sources,
+                    isStreaming: false,
+                  }
+                : m
+            ),
+          };
+        });
       }
 
-      // Tin nhắn phản hồi từ AI
-      const aiMessage: ChatMessage = {
-        id: `ai-${Date.now()}`,
-        role: 'assistant',
-        content: res.answer,
-        sources: res.sources,
-      };
-
-      setMessages((prev) => [...prev, aiMessage]);
       lastFailedRequestRef.current = null;
 
-      // Cập nhật session active & làm mới danh sách session
-      if (!activeSessionId && res.session_id) {
-        setActiveSessionId(res.session_id);
+      // Cập nhật session active & làm mới danh sách session khi tạo phiên mới
+      if (targetSessionId === null && res.session_id) {
+        const newRealKey = String(res.session_id);
+        setMessagesBySession((prev) => {
+          const existing = prev[targetKey] || [];
+          const next = { ...prev };
+          delete next[targetKey];
+          next[newRealKey] = existing;
+          return next;
+        });
+        setLoadingBySession((prev) => {
+          const next = { ...prev };
+          delete next[targetKey];
+          return next;
+        });
+
+        // Chỉ chuyển activeSessionId nếu người dùng vẫn đang ở phiên nháp lúc gửi
+        setActiveSessionId((currentActive) => {
+          if (currentActive === null) {
+            return res.session_id;
+          }
+          return currentActive;
+        });
       }
+
       refreshSessions();
     } catch (err: any) {
       const errMsg = err?.message || 'Không thể gửi tin nhắn hoặc tải tệp lên. Vui lòng thử lại.';
       setUploadError(errMsg);
 
-      const errorMessage: ChatMessage = {
-        id: `err-${Date.now()}`,
-        role: 'assistant',
-        content: '',
-        error: errMsg,
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessagesBySession((prev) => {
+        const list = prev[targetKey] || [];
+        return {
+          ...prev,
+          [targetKey]: list.map((m) =>
+            m.id === aiMsgId
+              ? { ...m, content: '', error: errMsg, isStreaming: false }
+              : m
+          ),
+        };
+      });
     } finally {
-      setIsSending(false);
+      setLoadingBySession((prev) => ({
+        ...prev,
+        [targetKey]: false,
+      }));
     }
   };
 
   // Thử lại khi gửi / tải tệp thất bại
   const handleRetry = () => {
-    if (lastFailedRequestRef.current) {
+    if (lastFailedRequestRef.current && !currentIsLoading) {
       const { text, files } = lastFailedRequestRef.current;
       setInput(text);
       if (files.length > 0) {
@@ -305,12 +468,21 @@ export function App() {
     handleSendMessage(prompt);
   };
 
+  // Regenerate last bot response
+  const handleRegenerate = () => {
+    const lastUserMsg = [...currentMessages].reverse().find((m) => m.role === 'user');
+    if (lastUserMsg && !currentIsLoading) {
+      handleSendMessage(lastUserMsg.content);
+    }
+  };
+
   // Login handler
   const handleLoginSuccess = (newUser: UserProfile) => {
     setUser(newUser);
-    // Reset toàn bộ state hội thoại cũ khi đổi người dùng
     setActiveSessionId(null);
-    setMessages([]);
+    setDraftSessionId(`draft-${Date.now()}`);
+    setMessagesBySession({});
+    setLoadingBySession({});
     setInput('');
     setAttachedFiles([]);
     setUploadError(null);
@@ -323,7 +495,9 @@ export function App() {
     setUser(null);
     setSessions([]);
     setActiveSessionId(null);
-    setMessages([]);
+    setDraftSessionId(`draft-${Date.now()}`);
+    setMessagesBySession({});
+    setLoadingBySession({});
     setInput('');
     setAttachedFiles([]);
     setUploadError(null);
@@ -349,13 +523,10 @@ export function App() {
   };
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-white text-[#1F1F1F]">
-      {/* Thanh viền tối mỏng ở mép trên cùng của trang */}
-      <div className="h-[2.5px] w-full bg-[#1F1F1F] shrink-0 z-50" />
-
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#F4F6F8] dark:bg-[#0F1B2D] text-[#222222] dark:text-[#E2E8F0] transition-colors duration-200">
       {/* Main Layout Container */}
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Sidebar bên trái */}
+        {/* Sidebar bên trái (~280px) */}
         <Sidebar
           isOpen={isSidebarOpen}
           onToggleSidebar={toggleSidebar}
@@ -378,42 +549,44 @@ export function App() {
 
         {/* Khu vực nội dung chính bên phải */}
         <div
-          className="flex-1 flex flex-col h-full overflow-hidden bg-white relative min-w-0"
+          className="flex-1 flex flex-col h-full overflow-hidden bg-[#F4F6F8] dark:bg-[#0F1B2D] relative min-w-0"
           onDragOver={handleChatDragOver}
           onDragLeave={handleChatDragLeave}
           onDrop={handleChatDrop}
         >
-          {/* Header */}
+          {/* Header mỏng phía trên khu chat (nền xanh #1565C0, cao ~56px) */}
           <ChatHeader
             isSidebarOpen={isSidebarOpen}
             onToggleSidebar={toggleSidebar}
             onNewChat={handleNewChat}
             health={health}
+            isDarkMode={isDarkMode}
+            onToggleDarkMode={toggleDarkMode}
           />
 
           {/* Overlay khi đang kéo tệp vào khung chat */}
           {isDraggingOverChat && (
-            <div className="absolute inset-0 bg-white/80 backdrop-blur-xs border-2 border-dashed border-[#F5B800] z-40 flex flex-col items-center justify-center p-6 text-center select-none animate-fade-in pointer-events-none">
-              <div className="w-16 h-16 rounded-full bg-amber-50 text-[#F5B800] flex items-center justify-center mb-3">
-                <span className="text-2xl font-bold">+</span>
+            <div className="absolute inset-0 bg-blue-50/90 dark:bg-slate-900/90 backdrop-blur-xs border-2 border-dashed border-[#1565C0] dark:border-[#4D8FE0] z-40 flex flex-col items-center justify-center p-6 text-center select-none animate-fade-in pointer-events-none">
+              <div className="w-16 h-16 rounded-full bg-[#E3F0FC] dark:bg-slate-800 text-[#1565C0] dark:text-[#4D8FE0] flex items-center justify-center mb-3 shadow-xs">
+                <span className="text-3xl font-bold">+</span>
               </div>
-              <p className="text-base font-semibold text-[#1F1F1F]">
+              <p className="text-base font-bold text-[#1565C0] dark:text-[#4D8FE0]">
                 Thả tệp vào đây để tải lên
               </p>
-              <p className="text-xs text-[#6B6B6B] mt-1">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                 Hỗ trợ PNG, JPG, PDF, DOCX, TXT · Tối đa 5 tệp, tối đa 10MB/tệp
               </p>
             </div>
           )}
 
           {/* Nội dung hội thoại */}
-          {messages.length === 0 ? (
+          {currentMessages.length === 0 ? (
             /* Màn hình chào (Welcome Screen) */
             <WelcomeScreen
               input={input}
               onInputChange={setInput}
               onSend={() => handleSendMessage()}
-              isLoading={isSending}
+              isLoading={currentIsLoading}
               files={attachedFiles}
               onAddFiles={handleAddFiles}
               onRemoveFile={handleRemoveFile}
@@ -424,15 +597,19 @@ export function App() {
           ) : (
             /* Danh sách tin nhắn + Composer ở đáy */
             <div className="flex-1 flex flex-col overflow-hidden">
-              <MessageList messages={messages} isLoading={isSending} />
+              <MessageList
+                messages={currentMessages}
+                isLoading={currentIsLoading}
+                onRegenerate={handleRegenerate}
+              />
 
               {/* Ô nhập liệu cố định ở đáy */}
-              <div className="pb-3 pt-2 bg-gradient-to-t from-white via-white to-white/80 shrink-0 px-4 max-w-4xl mx-auto w-full">
+              <div className="pb-3 pt-2 bg-gradient-to-t from-[#F4F6F8] via-[#F4F6F8] to-[#F4F6F8]/80 dark:from-[#0F1B2D] dark:via-[#0F1B2D] dark:to-[#0F1B2D]/80 shrink-0 px-4 max-w-[760px] mx-auto w-full">
                 <Composer
                   input={input}
                   onInputChange={setInput}
                   onSend={() => handleSendMessage()}
-                  isLoading={isSending}
+                  isLoading={currentIsLoading}
                   files={attachedFiles}
                   onAddFiles={handleAddFiles}
                   onRemoveFile={handleRemoveFile}

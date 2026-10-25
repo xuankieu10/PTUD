@@ -18,7 +18,7 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
     {
       title: 'Tư Vấn Tốt Nghiệp & Học Vụ AI',
       desc: 'Trợ lý tra cứu quy chế, cảnh báo điểm F, tính toán tín chỉ tích lũy và kiểm tra điều kiện tốt nghiệp.',
-      icon: <GraduationCap className="w-5 h-5 text-[#F5B800]" />,
+      icon: <GraduationCap className="w-5 h-5 text-[#1565C0] dark:text-[#4D8FE0]" />,
       prompt: 'Kiểm tra điều kiện tốt nghiệp của tôi và phân tích các môn còn nợ.',
     },
     {
@@ -42,59 +42,58 @@ export const ProjectsModal: React.FC<ProjectsModalProps> = ({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-2xs animate-fade-in">
-      <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-2xs animate-fade-in select-none">
+      <div className="bg-white dark:bg-[#162338] rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-[#F5B800]" />
-            <h3 className="text-base font-bold text-[#1F1F1F]">Khám phá dự án AI LHU</h3>
+            <Sparkles className="w-5 h-5 text-[#1565C0] dark:text-[#4D8FE0]" />
+            <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
+              Khám phá tính năng AI LHU
+            </h3>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-full hover:bg-gray-100 text-gray-500 hover:text-gray-800 transition"
+            className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <p className="text-xs text-[#6B6B6B] mt-3 mb-4">
-          Các dự án và mô-đun chuyên biệt phục vụ học vụ sinh viên và cán bộ giảng viên LHU:
+        <p className="text-xs text-slate-500 dark:text-slate-400 my-3">
+          Chọn một chủ đề chuyên biệt bên dưới để bắt đầu hội thoại với trợ lý trí tuệ nhân tạo:
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {projects.map((p, idx) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+          {projects.map((proj, idx) => (
             <div
               key={idx}
               onClick={() => {
                 if (onSelectProjectPrompt) {
-                  onSelectProjectPrompt(p.prompt);
+                  onSelectProjectPrompt(proj.prompt);
+                  onClose();
                 }
-                onClose();
               }}
-              className="p-4 rounded-2xl border border-gray-100 bg-[#F9FAFB] hover:bg-white hover:border-[#F5B800] hover:shadow-md cursor-pointer transition-all duration-200 group"
+              className="p-4 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-[#1565C0] dark:hover:border-[#4D8FE0] bg-slate-50/50 dark:bg-slate-800/40 hover:bg-white dark:hover:bg-slate-800 transition-all cursor-pointer shadow-2xs hover:shadow-md group flex flex-col justify-between"
             >
-              <div className="w-10 h-10 rounded-xl bg-white shadow-2xs flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
-                {p.icon}
+              <div>
+                <div className="p-2 rounded-xl bg-white dark:bg-slate-700 shadow-2xs inline-block mb-2 group-hover:scale-105 transition-transform">
+                  {proj.icon}
+                </div>
+                <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100 group-hover:text-[#1565C0] dark:group-hover:text-[#4D8FE0] transition-colors mb-1">
+                  {proj.title}
+                </h4>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                  {proj.desc}
+                </p>
               </div>
-              <h4 className="font-semibold text-xs text-[#1F1F1F] mb-1 group-hover:text-[#F5B800] transition-colors">
-                {p.title}
-              </h4>
-              <p className="text-[11px] text-[#6B6B6B] leading-relaxed line-clamp-3">
-                {p.desc}
-              </p>
+
+              <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-[11px] text-[#1565C0] dark:text-[#4D8FE0] font-medium">
+                <span>Bắt đầu ngay</span>
+                <span className="group-hover:translate-x-1 transition-transform">→</span>
+              </div>
             </div>
           ))}
-        </div>
-
-        <div className="mt-6 flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition"
-          >
-            Đóng
-          </button>
         </div>
       </div>
     </div>

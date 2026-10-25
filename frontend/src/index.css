@@ -2,24 +2,56 @@
 
 @layer base {
   :root {
-    --brand-yellow: #F5B800;
-    --sidebar-bg: #F7F7F8;
-    --text-primary: #1F1F1F;
-    --text-muted: #6B6B6B;
-    --border-color: #E5E5E5;
+    --primary: #1565C0;
+    --primary-hover: #0D47A1;
+    --primary-light: #E3F0FC;
+    --accent: #3F51B5;
+    --bg: #F4F6F8;
+    --surface: #FFFFFF;
+    --surface-hover: #F8FAFC;
+    --text: #222222;
+    --text-muted: #8A8F98;
+    --border: #E2E8F0;
+    --badge-red: #E53935;
+  }
+
+  .dark {
+    --primary: #4D8FE0;
+    --primary-hover: #3B7CD0;
+    --primary-light: rgba(77, 143, 224, 0.16);
+    --accent: #7986CB;
+    --bg: #0F1B2D;
+    --surface: #162338;
+    --surface-hover: #1E2D44;
+    --text: #E2E8F0;
+    --text-muted: #94A3B8;
+    --border: #23344D;
+    --badge-red: #EF4444;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
   }
 
   body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    color: var(--text-primary);
-    background-color: #ffffff;
-    margin: 0;
-    padding: 0;
+    font-family: 'Be Vietnam Pro', 'Roboto', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: var(--text);
+    background-color: var(--bg);
+    font-size: 16px;
+    line-height: 1.6;
     overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 
-/* Custom scrollbars */
+/* Thin grayish blue scrollbar matching requirement: "Thanh cuộn mảnh, màu xám xanh nhạt" */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -30,12 +62,20 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #E0E0E0;
+  background: #C5D2E0;
   border-radius: 9999px;
 }
 
+.dark ::-webkit-scrollbar-thumb {
+  background: #2A3B52;
+}
+
 ::-webkit-scrollbar-thumb:hover {
-  background: #C4C4C4;
+  background: #9BB0C7;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #3D5373;
 }
 
 /* Animations */
@@ -51,5 +91,31 @@
 }
 
 .animate-fade-in {
-  animation: fadeIn 0.25s ease-out forwards;
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* 3 Pulsing blue dots typing indicator */
+@keyframes blueBounce {
+  0%, 80%, 100% {
+    transform: scale(0.65);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+
+.animate-blue-dot-1 {
+  animation: blueBounce 1.4s infinite ease-in-out;
+  animation-delay: -0.32s;
+}
+
+.animate-blue-dot-2 {
+  animation: blueBounce 1.4s infinite ease-in-out;
+  animation-delay: -0.16s;
+}
+
+.animate-blue-dot-3 {
+  animation: blueBounce 1.4s infinite ease-in-out;
 }

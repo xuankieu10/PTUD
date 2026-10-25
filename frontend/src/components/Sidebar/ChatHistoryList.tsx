@@ -80,11 +80,11 @@ export const ChatHistoryList: React.FC<ChatHistoryListProps> = ({
   if (isLoading && sessions.length === 0) {
     return (
       <div className="flex-1 p-3.5 space-y-3 animate-pulse">
-        <div className="h-3 w-16 bg-gray-200/80 rounded"></div>
-        <div className="h-7 bg-gray-200/70 rounded-xl"></div>
-        <div className="h-7 bg-gray-200/70 rounded-xl"></div>
-        <div className="h-3 w-20 bg-gray-200/80 rounded mt-4"></div>
-        <div className="h-7 bg-gray-200/70 rounded-xl"></div>
+        <div className="h-3 w-16 bg-slate-200 dark:bg-slate-700 rounded"></div>
+        <div className="h-7 bg-slate-200/70 dark:bg-slate-700/70 rounded-xl"></div>
+        <div className="h-7 bg-slate-200/70 dark:bg-slate-700/70 rounded-xl"></div>
+        <div className="h-3 w-20 bg-slate-200 dark:bg-slate-700 rounded mt-4"></div>
+        <div className="h-7 bg-slate-200/70 dark:bg-slate-700/70 rounded-xl"></div>
       </div>
     );
   }
@@ -98,7 +98,7 @@ export const ChatHistoryList: React.FC<ChatHistoryListProps> = ({
           <button
             type="button"
             onClick={onRetry}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded-lg transition"
           >
             <RotateCw className="w-3.5 h-3.5" />
             <span>Thử lại</span>
@@ -111,8 +111,8 @@ export const ChatHistoryList: React.FC<ChatHistoryListProps> = ({
   // Empty State
   if (filteredSessions.length === 0) {
     return (
-      <div className="flex-1 p-6 flex flex-col items-center justify-center text-center text-[#8E8E93] select-none">
-        <MessageSquareDashed className="w-8 h-8 stroke-1 mb-2 text-gray-300" />
+      <div className="flex-1 p-6 flex flex-col items-center justify-center text-center text-slate-400 select-none">
+        <MessageSquareDashed className="w-8 h-8 stroke-1 mb-2 text-slate-300 dark:text-slate-600" />
         <p className="text-xs font-normal">
           {searchQuery
             ? 'Không tìm thấy cuộc trò chuyện phù hợp.'
@@ -123,11 +123,11 @@ export const ChatHistoryList: React.FC<ChatHistoryListProps> = ({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-3 py-2 space-y-3.5 select-none relative">
+    <div className="flex-1 overflow-y-auto px-3 py-2 space-y-3 select-none relative">
       {grouped.map((group) => (
-        <div key={group.groupName} className="space-y-0.5">
-          {/* Nhãn nhóm thời gian (chỉ hiện khi nhóm có dữ liệu) */}
-          <div className="px-3 py-1 text-[11px] font-semibold text-[#6B6B6B]">
+        <div key={group.groupName} className="space-y-1">
+          {/* Nhãn nhóm thời gian: "Hôm nay", "Hôm qua", "7 ngày trước" */}
+          <div className="px-3 py-1 text-[11px] font-semibold text-[#3F51B5] dark:text-[#7986CB] uppercase tracking-wider">
             {group.groupName}
           </div>
 
@@ -143,18 +143,18 @@ export const ChatHistoryList: React.FC<ChatHistoryListProps> = ({
                   <form
                     key={session.id}
                     onSubmit={(e) => handleSaveRename(session.id, e)}
-                    className="flex items-center gap-1 px-2 py-1 bg-white border border-[#F5B800] rounded-xl shadow-xs"
+                    className="flex items-center gap-1 px-2.5 py-1.5 bg-white dark:bg-[#162338] border border-[#1565C0] dark:border-[#4D8FE0] rounded-xl shadow-xs"
                   >
                     <input
                       type="text"
                       value={editTitle}
                       onChange={(e) => setEditTitle(e.target.value)}
                       autoFocus
-                      className="flex-1 text-xs px-1.5 py-1 text-[#1F1F1F] bg-transparent focus:outline-none"
+                      className="flex-1 text-xs px-1 text-slate-800 dark:text-slate-100 bg-transparent focus:outline-none"
                     />
                     <button
                       type="submit"
-                      className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"
+                      className="p-1 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded"
                       title="Lưu"
                     >
                       <Check className="w-3.5 h-3.5" />
@@ -162,7 +162,7 @@ export const ChatHistoryList: React.FC<ChatHistoryListProps> = ({
                     <button
                       type="button"
                       onClick={() => setEditingSessionId(null)}
-                      className="p-1 text-gray-400 hover:bg-gray-100 rounded"
+                      className="p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded"
                       title="Huỷ"
                     >
                       <X className="w-3.5 h-3.5" />
@@ -174,17 +174,17 @@ export const ChatHistoryList: React.FC<ChatHistoryListProps> = ({
               return (
                 <div
                   key={session.id}
-                  className={`group relative flex items-center justify-between rounded-xl transition-colors ${
+                  className={`group relative flex items-center justify-between rounded-[8px] transition-all duration-150 ${
                     isActive
-                      ? 'bg-[#ECECF1] text-[#1F1F1F] font-medium'
-                      : 'text-[#2D2D2D] hover:bg-[#EBECEF] hover:text-[#1F1F1F]'
+                      ? 'bg-[#E3F0FC] dark:bg-[#4D8FE0]/20 text-[#1565C0] dark:text-[#7986CB] font-semibold border-l-3 border-[#1565C0] dark:border-[#4D8FE0]'
+                      : 'text-slate-700 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
                   <button
                     type="button"
                     onClick={() => onSelectSession(session.id)}
                     title={session.title}
-                    className="w-full text-left px-3 py-1.5 text-xs md:text-[13px] truncate pr-8"
+                    className="w-full text-left px-3 py-2 text-xs md:text-[13px] truncate pr-8 cursor-pointer"
                   >
                     {session.title || 'Cuộc trò chuyện mới'}
                   </button>
@@ -197,7 +197,7 @@ export const ChatHistoryList: React.FC<ChatHistoryListProps> = ({
                         e.stopPropagation();
                         setMenuSessionId(isMenuOpen ? null : session.id);
                       }}
-                      className={`p-1 rounded-md text-gray-400 hover:text-gray-700 transition ${
+                      className={`p-1.5 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 transition cursor-pointer ${
                         isMenuOpen || isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                       }`}
                       title="Tuỳ chọn cuộc trò chuyện"
@@ -210,20 +210,20 @@ export const ChatHistoryList: React.FC<ChatHistoryListProps> = ({
                     {isMenuOpen && (
                       <div
                         ref={menuRef}
-                        className="absolute right-0 top-full mt-1 w-32 bg-white border border-gray-200 rounded-xl shadow-lg p-1 z-50 animate-fade-in text-xs font-normal"
+                        className="absolute right-0 top-full mt-1 w-32 bg-white dark:bg-[#162338] border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg p-1 z-50 animate-fade-in text-xs font-normal"
                       >
                         <button
                           type="button"
                           onClick={(e) => startEditing(session, e)}
-                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-gray-700 hover:bg-gray-100 transition"
+                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
                         >
-                          <Pencil className="w-3.5 h-3.5 text-gray-500" />
+                          <Pencil className="w-3.5 h-3.5 text-slate-500" />
                           <span>Đổi tên</span>
                         </button>
                         <button
                           type="button"
                           onClick={(e) => handleDelete(session.id, e)}
-                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition"
+                          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                           <span>Xoá</span>

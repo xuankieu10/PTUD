@@ -1,0 +1,37 @@
+flowchart TD
+    Start(["1. Người dùng gửi tin nhắn chat"]) --> PostChat["POST /chat (backend/app/routers/chat.py)<br/>Gửi kèm Authorization: Bearer JWT Token"]
+    PostChat --> AuthCheck["get_current_user (backend/app/deps.py)<br/>Giải mã token, xác thực user_id trong SQL Server"]
+
+    AuthCheck --> GuardCheck{"is_injection(message)<br/>(backend/app/prompts.py)<br/>Có phát hiện prompt injection?"}
+    
+    GuardCheck -- "Có" --> BlockInject["Lưu log injection vào chat_messages<br/>answer = REFUSAL_RESPONSE"] --> ReturnDirect
+
+    GuardCheck -- "Không" --> ManageSess["Quản lý session trong chat_sessions<br/>(Tạo mới nếu chưa có hoặc kiểm tra quyền sở hữu)"]
+
+    ManageSess --> RetrieveRAG["search_chunks() (backend/app/services/retrieval.py)<br/>Embedding câu hỏi (bge-m3) & tìm Top-K chunk"]
+
+    RetrieveRAG --> IntentBranch{"Phân loại ý định (Intent)"}
+
+    %% Nhánh 1: Off-topic
+    IntentBranch -- "off_topic<br/>(Ngoài phạm vi học vụ)" --> SetRefusal["answer = REFUSAL_RESPONSE<br/>('Tôi là trợ lý tư vấn học vụ...')"] --> SaveMsg
+
+    %% Nhánh 2: Personal (Dữ liệu cá nhân)
+    IntentBranch -- "personal<br/>(Hỏi điểm / nợ môn / tốt nghiệp của tôi)" --> QueryStudent["Truy vấn bảng students theo user_id<br/>Gọi graduation_check() (students.py)"]
+    QueryStudent --> CheckDebt{"Hỏi chi tiết<br/>môn rớt/nợ môn?"}
+    CheckDebt -- "Có" --> QueryGrades["Truy vấn bảng grades & courses<br/>Lọc môn có passed = 0 hoặc score < 4.0"]
+    CheckDebt -- "Không" --> FormatPersonal["Tổng hợp tín chỉ tích lũy, GPA,<br/>trạng thái tốt nghiệp & giải thích"]
+    QueryGrades --> FormatPersonal
+    FormatPersonal --> SaveMsg
+
+    %% Nhánh 3: Academic / General (Quy chế học vụ)
+    IntentBranch -- "general / academic<br/>(Tra cứu quy chế, niên giám...)" --> BuildContext["Xây dựng context từ chunks trong thẻ &lt;ngu_canh&gt;<br/>Lấy tối đa 6 tin nhắn lịch sử gần nhất"]
+    BuildContext --> CallLLM["_call_ollama() (model: qwen2.5:7b)<br/>Gửi SYSTEM_PROMPT + lịch sử + context"]
+
+    CallLLM --> CheckLang{"Hậu kiểm ngôn ngữ<br/>(has_vietnamese & mixed_language)?"}
+    CheckLang -- "Tiếng Anh / Trộn ngôn ngữ" --> RetryLang["Retry gọi lại LLM với LANG_RETRY_SYSTEM<br/>(Nếu vẫn lỗi -> trả REFUSAL_RESPONSE)"]
+    CheckLang -- "Tiếng Việt chuẩn" --> CleanAnswer["Lọc bỏ thẻ nhãn &lt;ngu_canh&gt;<br/>Nối nguồn trích dẫn tài liệu (seen_sources)"]
+    RetryLang --> CleanAnswer
+
+    CleanAnswer --> SaveMsg["Lưu chat_messages (SQL Server)<br/>- Message user<br/>- Message assistant kèm JSON sources"]
+
+    SaveMsg --> ReturnDirect(["Trả JSON: session_id, answer, sources<br/>Frontend hiển thị giao diện trò chuyện"])

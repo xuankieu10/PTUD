@@ -46,14 +46,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onRetrySessions,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-
-  const handleToggleSearch = () => {
-    setIsSearchOpen((prev) => {
-      if (prev) setSearchQuery('');
-      return !prev;
-    });
-  };
 
   return (
     <>
@@ -61,47 +53,46 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {isOpen && (
         <div
           onClick={onCloseMobileSidebar}
-          className="fixed inset-0 bg-black/30 z-40 md:hidden backdrop-blur-2xs transition-opacity"
+          className="fixed inset-0 bg-slate-900/50 z-40 md:hidden backdrop-blur-2xs transition-opacity"
+          aria-hidden="true"
         />
       )}
 
-      {/* Sidebar Container */}
+      {/* Sidebar Container (~280px, collapsible, mobile slide-out drawer) */}
       <aside
-        className={`fixed md:static inset-y-0 left-0 z-50 flex flex-col h-full bg-[#F7F7F8] border-r border-[#E5E5E5] transition-all duration-300 ease-in-out select-none ${
+        className={`fixed md:static inset-y-0 left-0 z-50 flex flex-col h-full bg-[#F8FAFC] dark:bg-[#162338] border-r border-slate-200/90 dark:border-slate-800 transition-all duration-300 ease-in-out select-none shadow-xl md:shadow-none ${
           isOpen
-            ? 'w-[320px] sm:w-[360px] md:w-[390px] translate-x-0'
-            : '-translate-x-full md:-ml-[390px] md:w-[390px]'
+            ? 'w-[280px] translate-x-0'
+            : '-translate-x-full md:-ml-[280px] md:w-[280px]'
         }`}
       >
-        {/* 1. Header */}
+        {/* 1. Header with Logo & search */}
         <SidebarHeader
           onToggleSidebar={onToggleSidebar}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          isSearchOpen={isSearchOpen}
-          onToggleSearch={handleToggleSearch}
         />
 
-        {/* 2. Cuộc trò chuyện mới */}
+        {/* 2. Cuộc trò chuyện mới (+ New Chat Button) */}
         <NewChatButton
           onClick={() => {
             onNewChat();
-            if (window.innerWidth < 768) {
+            if (typeof window !== 'undefined' && window.innerWidth < 768) {
               onCloseMobileSidebar();
             }
           }}
         />
 
-        {/* 3 & 4. Khám phá dự án & Nhóm Dự án */}
+        {/* 3. Section khám phá dự án */}
         <ProjectSection onExploreProjects={onExploreProjects} />
 
-        {/* 5. Nhóm lịch sử cuộc trò chuyện (Hôm nay / Hôm qua / 7 ngày trước / Cũ hơn) */}
+        {/* 4. Nhóm lịch sử cuộc trò chuyện (Hôm nay / Hôm qua / 7 ngày trước / Cũ hơn) */}
         <ChatHistoryList
           sessions={sessions}
           activeSessionId={activeSessionId}
           onSelectSession={(id) => {
             onSelectSession(id);
-            if (window.innerWidth < 768) {
+            if (typeof window !== 'undefined' && window.innerWidth < 768) {
               onCloseMobileSidebar();
             }
           }}
@@ -113,7 +104,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onRetry={onRetrySessions}
         />
 
-        {/* 6. Footer thông tin người dùng */}
+        {/* 5. Footer thông tin người dùng */}
         <UserMenu
           user={user}
           onLogout={onLogout}

@@ -113,6 +113,75 @@ export const chatApi = {
     return await res.json();
   },
 
+  // Gửi tin nhắn với SSE streaming (chữ chạy ngay khi model sinh)
+  async sendMessageStream(
+    message: string,
+    sessionId?: number | null,
+    onToken?: (token: string) => void,
+    onSources?: (sources: any[]) => void,
+  ): Promise<ChatSendResponse> {
+    const body: { message: string; session_id?: number } = { message };
+    if (sessionId) {
+      body.session_id = sessionId;
+    }
+
+    const res = await fetch(`${API_BASE_URL}/chat/stream`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      const detail = errData?.detail || `Lỗi máy chủ (${res.status})`;
+      throw new Error(detail);
+    }
+
+    const reader = res.body?.getReader();
+    if (!reader) {
+      throw new Error('ReadableStream không được trình duyệt hỗ trợ.');
+    }
+
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+    let finalAnswer = '';
+    let resSessionId = sessionId || 0;
+    let resSources: any[] = [];
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('data: ')) {
+          const jsonStr = trimmed.slice(6);
+          try {
+            const data = JSON.parse(jsonStr);
+            if (data.token) {
+              finalAnswer += data.token;
+              if (onToken) onToken(data.token);
+            }
+            if (data.done) {
+              if (data.session_id) resSessionId = data.session_id;
+              if (data.sources) {
+                resSources = data.sources;
+                if (onSources) onSources(data.sources);
+              }
+            }
+          } catch {
+            // bỏ qua lỗi parse json tạm thời
+          }
+        }
+      }
+    }
+
+    return { session_id: resSessionId, answer: finalAnswer, sources: resSources };
+  },
+
   // Tải tệp lên kèm tin nhắn (tối đa 5 tệp, tối đa 10MB)
   async uploadFiles(
     files: File[],

@@ -31,17 +31,17 @@ export const UserMenu: React.FC<UserMenuProps> = ({
   // Guest Mode (Chưa đăng nhập)
   if (!user) {
     return (
-      <div className="p-2.5 bg-[#F7F7F8] border-t border-[#E5E5E5]">
-        <div className="flex items-center justify-between gap-2 p-1.5 rounded-xl">
+      <div className="p-3 bg-white dark:bg-[#162338] border-t border-slate-200/80 dark:border-slate-800">
+        <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-full bg-[#EBECEF] text-[#6B6B6B] flex items-center justify-center font-medium text-xs shrink-0 border border-black/5">
-              <UserIcon className="w-4 h-4 text-gray-500" />
+            <div className="w-8 h-8 rounded-full bg-[#E3F0FC] dark:bg-slate-700 text-[#1565C0] dark:text-[#4D8FE0] flex items-center justify-center font-medium text-xs shrink-0 border border-blue-200 dark:border-slate-600">
+              <UserIcon className="w-4 h-4" />
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-[#1F1F1F] leading-tight">
+              <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 leading-tight">
                 Khách
               </p>
-              <p className="text-[11px] text-[#8E8E93] leading-normal">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-normal">
                 Chưa đăng nhập
               </p>
             </div>
@@ -49,7 +49,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({
           <button
             type="button"
             onClick={onOpenLoginModal}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1F1F1F] hover:bg-black text-white text-xs font-medium transition shadow-2xs"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] bg-[#1565C0] hover:bg-[#0D47A1] text-white text-xs font-medium transition shadow-xs cursor-pointer"
           >
             <LogIn className="w-3.5 h-3.5" />
             <span>Đăng nhập</span>
@@ -66,13 +66,13 @@ export const UserMenu: React.FC<UserMenuProps> = ({
   const initial = fullName.trim().charAt(fullName.trim().lastIndexOf(' ') + 1 || 0).toUpperCase() || 'U';
 
   return (
-    <div ref={menuRef} className="relative p-2.5 bg-[#F7F7F8] border-t border-[#E5E5E5]">
+    <div ref={menuRef} className="relative p-2.5 bg-white dark:bg-[#162338] border-t border-slate-200/80 dark:border-slate-800">
       {/* Dropdown Menu Popup */}
       {isOpen && (
-        <div className="absolute bottom-full left-2.5 right-2.5 mb-2 bg-white rounded-2xl shadow-xl border border-[#E5E5E5] p-1.5 z-50 animate-fade-in text-xs text-[#1F1F1F]">
-          <div className="px-3 py-2 border-b border-gray-100 mb-1">
-            <p className="font-semibold text-sm truncate">{fullName}</p>
-            <p className="text-[#6B6B6B] text-[11px] truncate">
+        <div className="absolute bottom-full left-2.5 right-2.5 mb-2 bg-white dark:bg-[#162338] rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-1.5 z-50 animate-fade-in text-xs text-slate-800 dark:text-slate-100">
+          <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 mb-1">
+            <p className="font-semibold text-sm truncate text-[#1565C0] dark:text-[#4D8FE0]">{fullName}</p>
+            <p className="text-slate-500 dark:text-slate-400 text-[11px] truncate">
               Mã: {studentCode} · Khoa: {major}
             </p>
           </div>
@@ -84,9 +84,9 @@ export const UserMenu: React.FC<UserMenuProps> = ({
                 setIsOpen(false);
                 onOpenProfileModal();
               }}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-[#F3F4F6] text-[#4B5563] hover:text-[#1F1F1F] transition-colors"
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-[#E3F0FC] dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-[#1565C0] dark:hover:text-[#4D8FE0] transition-colors cursor-pointer"
             >
-              <GraduationCap className="w-4 h-4 text-[#6B6B6B]" />
+              <GraduationCap className="w-4 h-4 text-[#1565C0] dark:text-[#4D8FE0]" />
               <span>Hồ sơ học vụ & Tốt nghiệp</span>
             </button>
           )}
@@ -97,9 +97,9 @@ export const UserMenu: React.FC<UserMenuProps> = ({
               setIsOpen(false);
               onOpenLoginModal();
             }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-[#F3F4F6] text-[#4B5563] hover:text-[#1F1F1F] transition-colors"
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-[#E3F0FC] dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-[#1565C0] dark:hover:text-[#4D8FE0] transition-colors cursor-pointer"
           >
-            <KeyRound className="w-4 h-4 text-[#6B6B6B]" />
+            <KeyRound className="w-4 h-4 text-[#1565C0] dark:text-[#4D8FE0]" />
             <span>Đổi tài khoản</span>
           </button>
 
@@ -107,14 +107,15 @@ export const UserMenu: React.FC<UserMenuProps> = ({
             type="button"
             onClick={() => {
               setIsOpen(false);
+              if (onOpenProfileModal) onOpenProfileModal();
             }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-[#F3F4F6] text-[#4B5563] hover:text-[#1F1F1F] transition-colors"
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-[#E3F0FC] dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-[#1565C0] dark:hover:text-[#4D8FE0] transition-colors cursor-pointer"
           >
-            <Settings className="w-4 h-4 text-[#6B6B6B]" />
+            <Settings className="w-4 h-4 text-slate-500" />
             <span>Cài đặt</span>
           </button>
 
-          <div className="h-px bg-gray-100 my-1" />
+          <div className="h-px bg-slate-100 dark:bg-slate-700 my-1" />
 
           <button
             type="button"
@@ -122,7 +123,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({
               setIsOpen(false);
               onLogout();
             }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-rose-50 text-rose-600 transition-colors"
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 transition-colors cursor-pointer"
           >
             <LogOut className="w-4 h-4" />
             <span>Đăng xuất</span>
@@ -134,25 +135,25 @@ export const UserMenu: React.FC<UserMenuProps> = ({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between gap-2.5 p-1.5 rounded-xl hover:bg-[#ECECF1] transition-colors group text-left"
+        className="w-full flex items-center justify-between gap-2.5 p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group text-left cursor-pointer"
         aria-label="Menu tài khoản người dùng"
       >
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-full bg-[#EBECEF] text-[#1F1F1F] flex items-center justify-center font-medium text-xs shrink-0 border border-black/5">
+          <div className="w-8 h-8 rounded-full bg-[#1565C0] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
             {initial}
           </div>
 
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium text-[#1F1F1F] truncate leading-tight">
-              {fullName} • {studentCode.length > 6 ? `${studentCode.slice(0, 4)}...` : studentCode}
+            <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate leading-tight">
+              {fullName}
             </p>
-            <p className="text-[11px] text-[#6B6B6B] truncate leading-normal">
-              {major}
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate leading-normal">
+              {studentCode} · {major}
             </p>
           </div>
         </div>
 
-        <ChevronsUpDown className="w-3.5 h-3.5 text-[#9CA3AF] group-hover:text-[#4B5563] shrink-0" />
+        <ChevronsUpDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200 shrink-0" />
       </button>
     </div>
   );

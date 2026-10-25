@@ -9,12 +9,12 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "qwen2.5:7b"
     CHUNK_SIZE: int = 600
     CHUNK_OVERLAP: int = 80
-    TOP_K: int = 4
+    TOP_K: int = 3
     SIMILARITY_THRESHOLD: float = 0.35
     MIN_SCORE_THRESHOLD: float = 0.6
     REQUIRED_CREDITS: int = 120
-    OLLAMA_TIMEOUT_EMBED: int = 60
-    OLLAMA_TIMEOUT_CHAT: int = 180
+    OLLAMA_TIMEOUT_EMBED: int = 180
+    OLLAMA_TIMEOUT_CHAT: int = 300
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

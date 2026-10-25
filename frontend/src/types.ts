@@ -131,10 +131,12 @@ export interface ApiErrorResponse {
 
 export interface OllamaHealth {
   status: string;
+  chat_model?: string;
   ollama: {
     online: boolean;
     host: string;
     models: string[];
+    chat_model?: string;
     recommended_model: string;
     has_recommended: boolean;
     error: string | null;

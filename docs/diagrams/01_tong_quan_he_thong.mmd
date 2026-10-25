@@ -1,0 +1,58 @@
+flowchart TD
+    subgraph FE["Frontend (React + Vite + TypeScript)"]
+        UI["Giao diện Người dùng<br/>(App.tsx / Sidebar / Composer)"]
+        TabChat["Tab 1: Trợ lý tư vấn học vụ<br/>(Chat RAG & Điểm cá nhân)"]
+        TabOCR["Tab 2: Trích xuất bảng điểm<br/>(Xử lý ảnh/PDF & Vùng đỏ)"]
+        TabCert["Tab 3: So khớp chứng chỉ<br/>(Chuẩn đầu ra tốt nghiệp)"]
+        TabDocs["Tab 4: Quản lý tài liệu<br/>(Upload & Tra cứu tri thức)"]
+        APIClient["API Client (services/api.ts)<br/>(Bearer Token JWT)"]
+    end
+
+    subgraph BE["Backend (FastAPI - api.py)"]
+        AuthRouter["auth.py<br/>(Đăng nhập / JWT Token / Phân quyền)"]
+        ChatRouter["chat.py<br/>(Xử lý Chat, Guard & Phân loại Intent)"]
+        StudentRouter["students.py<br/>(Hàm graduation_check)"]
+        ProcessRouter["api.py: /api/process<br/>(Pipeline lọc môn không đạt)"]
+        CertRouter["api.py: /api/certificate/process<br/>(Bóc tách & So khớp chứng chỉ)"]
+        DocRouter["documents.py<br/>(Upload, Chunking & Embedding)"]
+    end
+
+    subgraph PROC["Core Processing Modules"]
+        PipeMod["pipeline.py<br/>(Điều phối đọc bảng điểm)"]
+        PdfMod["pdf_processor.py<br/>(Tách text layer / Chuyển ảnh)"]
+        RedMod["red_detector.py<br/>(OpenCV HSV tìm khoanh đỏ)"]
+        OcrMod["ocr_extractor.py<br/>(Ollama Vision OCR + Retry)"]
+        FilterMod["grade_filter.py<br/>(Lọc điểm < 4.0 & Vùng đỏ)"]
+        CertMod["certificate_matcher.py<br/>(Rapidfuzz so khớp chuẩn tốt nghiệp)"]
+        RagMod["retrieval.py & embedding.py<br/>(Cosine Similarity Search)"]
+    end
+
+    subgraph AI["AI Engine (Ollama Local)"]
+        OllamaLLM["LLM (qwen2.5:7b)<br/>(Sinh câu trả lời & Giải thích)"]
+        OllamaVision["Vision Model (llama3.2-vision)<br/>(Đọc ảnh bảng điểm & Chứng chỉ)"]
+        OllamaEmbed["Embedding Model (bge-m3)<br/>(Vector hóa ngữ nghĩa 1024-dim)"]
+    end
+
+    subgraph DB["Database (SQL Server / MSSQL)"]
+        SqlData[("HocVuAI Database<br/>- users / students<br/>- courses / grades<br/>- documents / document_chunks<br/>- chat_sessions / chat_messages")]
+    end
+
+    %% Liên kết Frontend sang Backend
+    UI --> TabChat & TabOCR & TabCert & TabDocs
+    TabChat & TabOCR & TabCert & TabDocs --> APIClient
+    APIClient -->|"REST HTTP"| AuthRouter & ChatRouter & StudentRouter & ProcessRouter & CertRouter & DocRouter
+
+    %% Liên kết Backend sang Processing Modules
+    ProcessRouter --> PipeMod
+    PipeMod --> PdfMod & RedMod & OcrMod & FilterMod
+    CertRouter --> CertMod
+    DocRouter --> RagMod
+    ChatRouter --> RagMod & StudentRouter
+
+    %% Liên kết sang AI
+    OcrMod & CertRouter --> OllamaVision
+    RagMod & DocRouter --> OllamaEmbed
+    ChatRouter & StudentRouter --> OllamaLLM
+
+    %% Liên kết sang DB
+    AuthRouter & StudentRouter & ChatRouter & DocRouter & FilterMod --> SqlData

@@ -6,79 +6,56 @@ interface SidebarHeaderProps {
   onToggleSidebar: () => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
-  isSearchOpen: boolean;
-  onToggleSearch: () => void;
+  isSearchOpen?: boolean;
+  onToggleSearch?: () => void;
 }
 
 export const SidebarHeader: React.FC<SidebarHeaderProps> = ({
   onToggleSidebar,
   searchQuery,
   onSearchChange,
-  isSearchOpen,
-  onToggleSearch,
 }) => {
   return (
-    <div className="p-3.5 pb-2">
-      <div className="flex items-center justify-between">
-        {/* Brand */}
-        <div className="flex items-center gap-2">
-          <LhuLogo size="md" />
-          <span className="text-base font-bold tracking-tight text-[#1F1F1F]">
-            LHU AI
-          </span>
+    <div className="p-3.5 pb-2 border-b border-slate-200/80 dark:border-slate-800">
+      {/* Top row: Logo Khoa CNTT + collapse sidebar button */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <LhuLogo variant="full" size="sm" className="h-8 max-w-[170px]" />
         </div>
 
-        {/* Action icons */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onToggleSearch}
-            title="Tìm kiếm cuộc trò chuyện"
-            aria-label="Tìm kiếm cuộc trò chuyện"
-            className={`p-1.5 rounded-lg transition-colors ${
-              isSearchOpen
-                ? 'bg-[#E5E7EB] text-[#1F1F1F]'
-                : 'text-[#6B6B6B] hover:text-[#1F1F1F] hover:bg-[#EBECEF]'
-            }`}
-          >
-            <Search className="w-4 h-4 stroke-[1.8]" />
-          </button>
-
-          {/* Panel toggle button matching screenshot */}
-          <button
-            type="button"
-            onClick={onToggleSidebar}
-            title="Thu gọn thanh bên"
-            aria-label="Thu gọn thanh bên"
-            className="p-1.5 rounded-lg text-[#6B6B6B] hover:text-[#1F1F1F] hover:bg-[#EBECEF] transition-colors"
-          >
-            <PanelLeft className="w-4 h-4 stroke-[1.8]" />
-          </button>
-        </div>
+        {/* Nút thu gọn thanh bên */}
+        <button
+          type="button"
+          onClick={onToggleSidebar}
+          title="Thu gọn thanh bên"
+          aria-label="Thu gọn thanh bên"
+          className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+        >
+          <PanelLeft className="w-4 h-4 stroke-[2]" />
+        </button>
       </div>
 
-      {/* Expandable search input */}
-      {isSearchOpen && (
-        <div className="mt-2.5 relative animate-fade-in">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Tìm kiếm cuộc trò chuyện..."
-            autoFocus
-            className="w-full text-xs bg-white border border-[#E5E5E5] rounded-xl px-3 py-1.5 pr-7 text-[#1F1F1F] placeholder-[#9CA3AF] focus:outline-none focus:border-[#F5B800] focus:ring-1 focus:ring-[#F5B800]"
-          />
-          {searchQuery ? (
-            <button
-              type="button"
-              onClick={() => onSearchChange('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          ) : null}
-        </div>
-      )}
+      {/* Ô tìm kiếm cuộc trò chuyện dạng viên thuốc (pill) */}
+      <div className="mt-3 relative">
+        <Search className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder="Tìm kiếm..."
+          className="w-full text-xs bg-white dark:bg-[#162338] border border-slate-200 dark:border-slate-700 rounded-full pl-8 pr-7 py-2 text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-[#1565C0] dark:focus:border-[#4D8FE0] focus:ring-1 focus:ring-[#1565C0] dark:focus:ring-[#4D8FE0] transition-all shadow-2xs"
+        />
+        {searchQuery ? (
+          <button
+            type="button"
+            onClick={() => onSearchChange('')}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+            title="Xóa tìm kiếm"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 };

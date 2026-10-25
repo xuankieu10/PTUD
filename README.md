@@ -157,3 +157,87 @@ Bộ kiểm thử bao gồm kiểm tra thuật toán OpenCV HSV, logic lọc mô
 ```bash
 python -m pytest backend/tests -v
 ```
+
+---
+
+## 6. Trợ lý AI tư vấn học vụ (RAG Chatbot, SQL Server & Dataset)
+
+Hệ thống tư vấn học vụ hỗ trợ sinh viên chuẩn bị tốt nghiệp dựa trên kỹ thuật **RAG (Retrieval-Augmented Generation)**, cơ sở dữ liệu **Microsoft SQL Server**, mô hình ngôn ngữ lớn **Qwen2.5:7b** và mô hình nhúng **BGE-M3** thông qua **Ollama**.
+
+### 6.1. Chạy Migration CSDL (T-SQL)
+
+Tệp migration nằm tại [database/migration_seed_dataset.sql](file:///d:/PTUD/database/migration_seed_dataset.sql), bổ sung:
+- Bảng điều kiện tốt nghiệp: `graduation_conditions` (kèm View `dieu_kien_tot_nghiep`) với các trường: `ma`, `nhom`, `dieu_kien`, `mo_ta`, `ap_dung_chinh_quy`, `ap_dung_lien_thong_hoan_chinh`, `muc_tren_trang`.
+- Bổ sung các cột cho `program_courses`: `hoc_ky`, `loai`, `nhom_tu_chon`, `nhan_tren_trang`, `ghi_chu`, `ten_mon`, `tin_chi`, hỗ trợ `course_id` nhận NULL khi môn học chưa có mã học phần trong `courses`.
+- Bổ sung các cột lưu nguồn văn bản trong `documents`: `so_hieu`, `url`, `ngay_thu_thap` và metadata cho `document_chunks`.
+
+Cách áp dụng migration:
+- **Cách 1**: Mở và thực thi tệp `database/migration_seed_dataset.sql` trong **SQL Server Management Studio (SSMS)** hoặc **Azure Data Studio**.
+- **Cách 2**: Chạy lệnh Python:
+  ```powershell
+  $env:PYTHONPATH="."
+  python -c "import re; from sqlalchemy import create_engine, text; from backend.app.config import settings; engine=create_engine(settings.DATABASE_URL); batches=re.split(r'^\s*GO\s*$', open('database/migration_seed_dataset.sql', encoding='utf-8').read(), flags=re.M|re.I); conn=engine.connect(); [conn.execute(text(b.strip())) for b in batches if b.strip()]; conn.commit(); print('Migration OK!')"
+  ```
+
+### 6.2. Nạp dữ liệu Dataset & Knowledge Base (Seed Dataset)
+
+Kịch bản nạp dữ liệu được viết tại [backend/scripts/seed_dataset.py](file:///d:/PTUD/backend/scripts/seed_dataset.py), có cơ chế kiểm tra idempotent (chạy lặp lại an toàn, không bị nhân đôi dữ liệu):
+- Nạp danh mục môn học từ `03_chuong_trinh_dao_tao.xlsx` (sheet `mon_hoc`) vào bảng `program_courses`. Với các môn không ghi tín chỉ (như GDQP, GDTC), hệ thống giữ giá trị `NULL`, không tự điền.
+- Nạp 11 điều kiện tốt nghiệp từ `04_dieu_kien_tot_nghiep.xlsx` (sheet `dieu_kien`) vào bảng `graduation_conditions`.
+- Nạp danh mục văn bản từ `02b_danh_muc_van_ban.xlsx` vào bảng `documents` (chỉ nạp các bản ghi có trạng thái *"Đã đọc nội dung"*).
+- Phân tách và làm sạch nội dung quy định xét tốt nghiệp (theo các mục A.1.1, A.1.2, A.2, A.3, A.4, A.5.1, A.5.2, B, C, D) cùng dữ liệu `ho_so_nop` và chương trình đào tạo; sau đó nhúng vector qua **BGE-M3** và lưu vào `document_chunks`.
+
+Lệnh chạy:
+```powershell
+$env:PYTHONPATH="."
+python backend/scripts/seed_dataset.py
+```
+
+### 6.3. Kiểm thử & Đánh giá tự động Chatbot QA (Evaluation)
+
+Kịch bản đánh giá được viết tại [backend/scripts/eval_qa.py](file:///d:/PTUD/backend/scripts/eval_qa.py):
+- Đọc 19 câu hỏi kiểm thử từ `database/seed_data/07_bo_cau_hoi_kiem_thu.xlsx` (sheet `cau_hoi`).
+- Tự động gọi API Chatbot, đối chiếu câu trả lời với đáp án chuẩn theo các ý chính (ví dụ: điểm tích lũy 5.0, Tiếng Anh Bậc 3, lệ phí 100.000 VNĐ, từ chối câu hỏi ngoài học vụ, phản hồi chưa có dữ liệu đối với khoa khác...).
+- Kiểm tra tính đầy đủ của nguồn trích dẫn.
+- Xuất báo cáo CSV tại `output/eval_qa_report.csv` gồm 4 cột: `ma_cau_hoi`, `cau_tra_loi`, `dung/sai`, `co_nguon_hay_khong`.
+
+Lệnh chạy:
+```powershell
+$env:PYTHONPATH="."
+python backend/scripts/eval_qa.py
+```
+
+---
+
+## 7. Đồng bộ Lịch học & Lịch thi Trung tâm Ngoại ngữ - Tin học (NNTH)
+
+Hệ thống tích hợp module tự động đồng bộ lịch khai giảng và lịch thi chứng chỉ (Ngoại ngữ, Tin học) từ cổng API công khai của Trung tâm Ngoại ngữ - Tin học Trường ĐH Lạc Hồng (`tapi.lhu.edu.vn`).
+
+### 7.1. Cấu trúc CSDL
+- Bảng `center_schedules`: Lưu lịch các lớp/khóa học khai giảng (tên khóa, loại, ngày khai giảng, lịch học, hình thức, học phí, kỳ thi dự kiến). Khóa chống trùng: `lop_id UNIQUE`.
+- Bảng `center_exams`: Lưu lịch thi chứng chỉ chính thức và dự kiến (tên kỳ thi, ngày thi, hạn đăng ký, tình trạng, lệ phí thi, lệ phí chứng chỉ). Khóa chống trùng: `(ky_thi_id, is_du_kien) UNIQUE`.
+- Bảng `center_sync_history`: Nhật ký lịch sử các lần đồng bộ.
+
+### 7.2. Migration & Lệnh chạy
+- **Migration T-SQL**: [database/migration_center_schedules.sql](file:///d:/PTUD/database/migration_center_schedules.sql)
+  ```powershell
+  $env:PYTHONPATH="."
+  .\venv\Scripts\python.exe -c "import re; from sqlalchemy import create_engine, text; from backend.app.config import settings; engine=create_engine(settings.DATABASE_URL); batches=re.split(r'^\s*GO\s*$', open('database/migration_center_schedules.sql', encoding='utf-8').read(), flags=re.M|re.I); conn=engine.connect(); [conn.execute(text(b.strip())) for b in batches if b.strip()]; conn.commit(); print('Migration center tables OK!')"
+  ```
+- **Chạy đồng bộ kiểm tra**:
+  ```powershell
+  $env:PYTHONPATH="."
+  .\venv\Scripts\python.exe backend/scripts/test_nnth_sync.py
+  ```
+
+### 7.3. Các Endpoint API
+- `POST /admin/sync-nnth`: Chạy đồng bộ thủ công từ API NNTH vào SQL Server (chạy lặp lại an toàn, không nhân đôi).
+- `GET /api/center/schedules?loai=...&from_today=true`: Lấy danh sách lịch khai giảng sắp tới (hỗ trợ lọc theo loại Ngoại ngữ / Tin học).
+- `GET /api/center/exams?loai=...&is_du_kien=...&from_today=true`: Lấy danh sách lịch thi sắp tới (hỗ trợ lọc loại, kỳ thi chính thức / dự kiến).
+- `GET /api/center/summary`: Thống kê tổng quan số lượng lịch học và kỳ thi sắp tới.
+
+### 7.4. Cơ chế đồng bộ nền & Chatbot
+- **Tác vụ nền**: Hệ thống chạy ngầm định kỳ **6 giờ/lần** khi ứng dụng FastAPI khởi động để cập nhật dữ liệu mới nhất mà không gọi API trường mỗi lần sinh viên truy vấn.
+- **Tư vấn qua Chatbot**: Khi người dùng hỏi về lịch thi hoặc lịch học trung tâm, hệ thống cung cấp thông tin mới nhất kèm dòng trích dẫn:
+  `Dữ liệu cập nhật lúc <ngay_lay_du_lieu>, xem lịch mới nhất tại nnth.lhu.edu.vn`.
+  (Nếu lần đồng bộ gần nhất lỗi, chatbot sẽ nêu rõ chưa lấy được lịch mới).

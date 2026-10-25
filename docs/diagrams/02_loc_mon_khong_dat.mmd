@@ -1,0 +1,37 @@
+flowchart TD
+    Start(["1. Người dùng tải lên bảng điểm (Ảnh/PDF)"]) --> Upload["POST /api/process (backend/api.py)<br/>Lưu file vào temp_uploads/{session_id}"]
+    Upload --> RunPipe["run_pipeline() (backend/pipeline.py)<br/>resolve_model() xác định vision model"]
+    
+    RunPipe --> CheckPDF{"Định dạng file<br/>là PDF hay Ảnh?"}
+
+    %% Nhánh PDF
+    CheckPDF -- "File .pdf" --> CheckLayer{"has_text_layer()<br/>(backend/pdf_processor.py)<br/>Có text layer không?"}
+    CheckLayer -- "Có (Text layer)" --> PdfText["extract_grades_from_pdf_text_layer()<br/>Dùng pdfplumber trích xuất bảng & điểm"]
+    CheckLayer -- "Không (PDF scan)" --> PdfConvert["convert_pdf_to_images()<br/>Dùng pypdfium2 chuyển trang PDF sang ảnh"]
+
+    %% Nhánh Ảnh
+    CheckPDF -- "File .png, .jpg" --> LoadImg["load_image() (backend/red_detector.py)<br/>Đọc ảnh BGR bằng OpenCV"]
+    PdfConvert --> LoadImg
+    PdfText --> LoadImg
+
+    %% Xử lý song song / tiếp nối
+    LoadImg --> DetectRed["detect_red_regions() (backend/red_detector.py)<br/>Không gian màu HSV, dải Hue 0-10 & 165-180<br/>Lọc contour lấy bounding box vùng đỏ"]
+    LoadImg --> OcrExec["extract_grades_from_image()<br/>(backend/ocr_extractor.py)<br/>Gửi ảnh + PRIMARY_PROMPT tới Ollama"]
+
+    OcrExec --> CallOllama["query_ollama()<br/>Model llama3.2-vision, format='json'"]
+    CallOllama --> CheckJSON{"clean_and_parse_json()<br/>Parse JSON thành công<br/>& đủ dòng môn học?"}
+
+    CheckJSON -- "Sai JSON hoặc thiếu dòng" --> RetryOCR["Kích hoạt RETRY (tối đa 1 lần)<br/>Gửi RETRY_PROMPT ép chuẩn JSON"]
+    RetryOCR --> ParseRetry["clean_and_parse_json() lần 2"]
+    ParseRetry --> EstBbox
+    CheckJSON -- "Thành công" --> EstBbox["estimate_subject_bboxes()<br/>Ước lượng bbox dòng nếu model chưa trả"]
+
+    DetectRed & EstBbox --> EvalGrades["filter_grades() (backend/grade_filter.py)<br/>evaluate_subject() từng môn học"]
+
+    EvalGrades --> CheckFail{"Điểm số < 4.0<br/>HOẶC<br/>Khớp vùng đỏ (is_marked_red)?"}
+    CheckFail -- "Đúng" --> MarkFail["Đánh dấu: Không đạt<br/>Ghi lý do: Điểm < 4.0 / Vùng đỏ"]
+    CheckFail -- "Sai" --> MarkPass["Đánh dấu: Đạt yêu cầu"]
+
+    MarkFail & MarkPass --> Export["Xuất kết quả (backend/grade_filter.py)<br/>- export_to_json() -> *_failed.json<br/>- export_to_csv() -> *_failed.csv<br/>- annotate_red_regions() -> *_annotated.png"]
+
+    Export --> ReturnFE(["Trả JSON summary, danh sách môn<br/>và ảnh Base64 về Frontend"])

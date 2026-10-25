@@ -61,12 +61,36 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from backend.app.routers import auth, documents, chat, students, transcripts
+from backend.app.routers import auth, documents, chat, students, transcripts, center
 app.include_router(auth.router)
 app.include_router(documents.router)
 app.include_router(chat.router)
 app.include_router(students.router)
 app.include_router(transcripts.router)
+app.include_router(center.router)
+
+import asyncio
+from backend.app.db import SessionLocal
+from backend.services.nnth_sync import sync_nnth_data
+
+async def _periodic_nnth_sync():
+    """Tác vụ nền định kỳ 6 giờ đồng bộ lịch NNTH một lần."""
+    await asyncio.sleep(5)  # Đợi 5 giây sau khi ứng dụng khởi động
+    while True:
+        try:
+            logger.info("Bắt đầu job nền đồng bộ lịch NNTH (chu kỳ 6 giờ)...")
+            db = SessionLocal()
+            try:
+                await asyncio.to_thread(sync_nnth_data, db)
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error("Lỗi trong job nền đồng bộ NNTH: %s", e)
+        await asyncio.sleep(6 * 3600)  # Chu kỳ 6 giờ (21.600 giây)
+
+@app.on_event("startup")
+async def start_background_sync():
+    asyncio.create_task(_periodic_nnth_sync())
 
 
 # ==================== GLOBAL EXCEPTION HANDLERS ====================
@@ -138,12 +162,16 @@ def check_health(host: str = DEFAULT_OLLAMA_HOST):
     except Exception as e:
         error_msg = str(e)
 
+    from backend.app.config import settings
+
     return {
         "status": "online",
+        "chat_model": settings.LLM_MODEL,
         "ollama": {
             "online": ollama_online,
             "host": host,
             "models": installed_models,
+            "chat_model": settings.LLM_MODEL,
             "recommended_model": DEFAULT_VISION_MODEL,
             "has_recommended": any(DEFAULT_VISION_MODEL in m for m in installed_models),
             "error": error_msg
