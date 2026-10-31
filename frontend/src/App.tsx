@@ -316,11 +316,13 @@ export function App() {
 
     // Placeholder bot message
     const aiMsgId = `ai-${Date.now()}`;
+    const hasFiles = filesToSend.length > 0;
     const placeholderAiMessage: ChatMessage = {
       id: aiMsgId,
       role: 'assistant',
       content: '',
       isStreaming: true,
+      statusText: hasFiles ? 'Đang đọc bảng điểm, có thể mất vài phút...' : 'Đang phản hồi...',
     };
 
     setMessagesBySession((prev) => ({

@@ -23,6 +23,7 @@ def make_token(user_id: int, role: str = "student") -> str:
 @pytest.fixture
 def test_user1():
     db = SessionLocal()
+    db.execute(text("DELETE FROM student_ocr_transcripts WHERE user_id IN (SELECT id FROM users WHERE username = 'test_isolation_1')"))
     db.execute(text("DELETE FROM chat_messages WHERE session_id IN (SELECT id FROM chat_sessions WHERE user_id IN (SELECT id FROM users WHERE username = 'test_isolation_1'))"))
     db.execute(text("DELETE FROM chat_sessions WHERE user_id IN (SELECT id FROM users WHERE username = 'test_isolation_1')"))
     db.execute(text("DELETE FROM users WHERE username = 'test_isolation_1'"))
@@ -40,6 +41,7 @@ def test_user1():
     yield uid
 
     db = SessionLocal()
+    db.execute(text("DELETE FROM student_ocr_transcripts WHERE user_id = :uid"), {"uid": uid})
     db.execute(text("DELETE FROM chat_messages WHERE session_id IN (SELECT id FROM chat_sessions WHERE user_id = :uid)"), {"uid": uid})
     db.execute(text("DELETE FROM chat_sessions WHERE user_id = :uid"), {"uid": uid})
     db.execute(text("DELETE FROM users WHERE id = :uid"), {"uid": uid})
@@ -49,6 +51,7 @@ def test_user1():
 @pytest.fixture
 def test_user2():
     db = SessionLocal()
+    db.execute(text("DELETE FROM student_ocr_transcripts WHERE user_id IN (SELECT id FROM users WHERE username = 'test_isolation_2')"))
     db.execute(text("DELETE FROM chat_messages WHERE session_id IN (SELECT id FROM chat_sessions WHERE user_id IN (SELECT id FROM users WHERE username = 'test_isolation_2'))"))
     db.execute(text("DELETE FROM chat_sessions WHERE user_id IN (SELECT id FROM users WHERE username = 'test_isolation_2')"))
     db.execute(text("DELETE FROM users WHERE username = 'test_isolation_2'"))
@@ -66,6 +69,7 @@ def test_user2():
     yield uid
 
     db = SessionLocal()
+    db.execute(text("DELETE FROM student_ocr_transcripts WHERE user_id = :uid"), {"uid": uid})
     db.execute(text("DELETE FROM chat_messages WHERE session_id IN (SELECT id FROM chat_sessions WHERE user_id = :uid)"), {"uid": uid})
     db.execute(text("DELETE FROM chat_sessions WHERE user_id = :uid"), {"uid": uid})
     db.execute(text("DELETE FROM users WHERE id = :uid"), {"uid": uid})

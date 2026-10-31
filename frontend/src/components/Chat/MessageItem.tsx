@@ -132,7 +132,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onRegenerate 
             <span className="w-2.5 h-2.5 rounded-full bg-[#1565C0] dark:bg-[#4D8FE0] animate-blue-dot-2" />
             <span className="w-2.5 h-2.5 rounded-full bg-[#1565C0] dark:bg-[#4D8FE0] animate-blue-dot-3" />
             <span className="text-xs text-slate-400 dark:text-slate-500 ml-1 font-medium select-none">
-              Đang phản hồi...
+              {message.statusText || 'Đang phản hồi...'}
             </span>
           </div>
         )}

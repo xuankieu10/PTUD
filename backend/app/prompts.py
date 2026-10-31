@@ -22,28 +22,43 @@ LANG_REMINDER = "Trả lời bằng tiếng Việt, chỉ dựa trên tài liệ
 LANG_RETRY_SYSTEM = """Bạn PHẢI trả lời bằng tiếng Việt. Tuyệt đối không được dùng tiếng Anh hay ngôn ngữ khác.
 Chỉ dựa trên tài liệu được cung cấp."""
 
-# Regex patterns cho injection detection
+import unicodedata
+
+def strip_accents(text: str) -> str:
+    """Loại bỏ dấu tiếng Việt khỏi chuỗi văn bản."""
+    if not text:
+        return ""
+    text = text.replace("đ", "d").replace("Đ", "D")
+    nfkd = unicodedata.normalize("NFKD", text)
+    return "".join(c for c in nfkd if not unicodedata.combining(c))
+
+# Regex patterns cho injection detection (khớp cả tiếng Việt có dấu, không dấu, SQL injection)
 _INJECTION_PATTERNS = re.compile(
-    r"bỏ\s*qua\s*(mọi\s*)?(hướng\s*dẫn|chỉ\s*dẫn|quy\s*tắc)"
+    r"b[oỏ]\s*qua\s*(?:(t[aấ]t\s*c[aả]|m[oọ]i)\s*)?(h[uư][oớ]ng\s*d[aẫ]n|ch[iỉ]\s*d[aẫ]n|quy\s*t[aắ]c|ch[iỉ]\s*th[iị])"
+    r"|ch[iỉ]\s*d[aẫ]n\s*tr[uư][oớ]c\s*[dđ][oó]"
     r"|system\s*prompt"
-    r"|prompt\s*hệ\s*thống"
-    r"|đóng\s*vai(?!\s*trò)"
+    r"|prompt\s*h[eệ]\s*th[oố]ng"
+    r"|[dđ][oó]ng\s*vai(?!\s*tr[oò])"
     r"|ignore\s*(all\s*)?(previous|above)"
-    r"|trả\s*lời\s*bằng\s*tiếng\s*anh"
+    r"|tr[aả]\s*l[oờ]i\s*b[aằ]ng\s*ti[eế]ng\s*anh"
     r"|answer\s*in\s*english"
-    r"|bỏ\s*qua\s*nguồn"
-    r"|không\s*cần\s*(dẫn\s*)?nguồn"
-    r"|lặp\s*lại\s*nguyên\s*văn"
-    r"|nhắc\s*lại\s*nguyên\s*văn"
-    r"|in\s*ra\s*nguyên\s*văn"
-    r"|đoạn\s*văn\s*bản\s*(bạn\s*)?nhận\s*được"
-    r"|đầu\s*cuộc\s*trò\s*chuyện"
+    r"|b[oỏ]\s*qua\s*ngu[oồ]n"
+    r"|kh[oô]ng\s*c[aầ]n\s*(d[aẫ]n\s*)?ngu[oồ]n"
+    r"|l[aặ]p\s*l[aạ]i\s*nguy[eê]n\s*v[aă]n"
+    r"|nh[aắ]c\s*l[aạ]i\s*nguy[eê]n\s*v[aă]n"
+    r"|in\s*ra\s*nguy[eê]n\s*v[aă]n"
+    r"|in\s*ra\s*(to[aà]n\s*b[oộ]\s*)?(system\s*prompt|prompt\s*h[eệ]\s*th[oố]ng|n[oộ]i\s*dung)"
+    r"|[dđ]o[aạ]n\s*v[aă]n\s*b[aả]n\s*(b[aạ]n\s*)?nh[aậ]n\s*[dđ][uư][oợ]c"
+    r"|[dđ][aầ]u\s*cu[oộ]c\s*tr[oò]\s*chuy[eệ]n"
     r"|repeat\s*(the\s*)?(text|above|everything)"
-    r"|quên\s*(các|mọi)?\s*(chỉ\s*thị|hướng\s*dẫn)"
-    r"|từ\s*giờ\s*bạn\s*là"
-    r"|bạn\s*là\s*(một\s*)?(chuyên\s*gia|trợ\s*lý|nhà)"
-    r"|hãy\s*đóng\s*vai",
-    re.IGNORECASE | re.UNICODE
+    r"|qu[eê]n\s*(c[aá]c|m[oọ]i)?\s*(ch[iỉ]\s*th[iị]|h[uư][oớ]ng\s*d[aẫ]n)"
+    r"|t[uừ]\s*gi[oờ]\s*b[aạ]n\s*l[aà]"
+    r"|b[aạ]n\s*l[aà]\s*(m[oộ]t\s*)?(chuy[eê]n\s*gia|tr[oợ]\s*l[yý]|nh[aà])"
+    r"|h[aã]y\s*[dđ][oó]ng\s*vai"
+    r"|[dđ][oó]ng\s*vai\s*ai\s*kh[oô]ng\s*b[iị]\s*r[aà]ng\s*bu[oộ]c"
+    r"|\b(select\s+\*\s+from|drop\s+table|delete\s+from|insert\s+into)\b"
+    r"|drop\s+table",
+    re.IGNORECASE
 )
 
 # Regex phát hiện ký tự tiếng Việt có dấu
@@ -55,8 +70,16 @@ _VIET_PATTERN = re.compile(
 
 
 def is_injection(question: str) -> bool:
-    """Trả True nếu câu hỏi chứa lệnh injection / yêu cầu đổi ngôn ngữ."""
-    return bool(_INJECTION_PATTERNS.search(question))
+    """Trả True nếu câu hỏi chứa lệnh injection / yêu cầu đổi ngôn ngữ / SQL injection."""
+    if not question:
+        return False
+    # Kiểm tra trên chuỗi gốc
+    if bool(_INJECTION_PATTERNS.search(question)):
+        return True
+    # Chuẩn hóa: hạ thường, bỏ dấu tiếng Việt, gom khoảng trắng để bắt câu không dấu/viết hoa
+    norm = strip_accents(question.lower())
+    norm = re.sub(r'\s+', ' ', norm).strip()
+    return bool(_INJECTION_PATTERNS.search(norm))
 
 
 def has_vietnamese(text: str) -> bool:

@@ -28,6 +28,7 @@ export interface ChatMessage {
   files?: AttachedFile[];
   created_at?: string;
   isStreaming?: boolean;
+  statusText?: string | null;
   error?: string | null;
 }
 
@@ -41,6 +42,8 @@ export interface ChatSession {
 
 export interface UserProfile {
   id: number;
+  user_id?: number;
+  student_id?: number | null;
   username: string;
   role: string;
   student_code?: string;

@@ -14,7 +14,12 @@ import shutil
 import uuid
 from typing import Optional, List, Dict, Any
 import requests
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request, Depends
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+from backend.app.db import get_db
+from backend.app.deps import get_current_user_optional
+from backend.app.prompts import strip_accents
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -183,7 +188,8 @@ def check_health(host: str = DEFAULT_OLLAMA_HOST):
 async def process_transcript(
     file: UploadFile = File(...),
     model: str = Form(DEFAULT_VISION_MODEL),
-    host: str = Form(DEFAULT_OLLAMA_HOST)
+    host: str = Form(DEFAULT_OLLAMA_HOST),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
     """
     Tiếp nhận file bảng điểm (ảnh/PDF), chạy toàn bộ pipeline và trả về kết quả.
@@ -211,7 +217,8 @@ async def process_transcript(
         with open(input_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        logger.info(f"Đã nhận file upload [{file.filename}], kích thước: {os.path.getsize(input_file_path)} bytes.")
+        user_id = current_user["id"] if current_user else None
+        logger.info(f"Đã nhận file upload [{file.filename}], user_id={user_id}, kích thước: {os.path.getsize(input_file_path)} bytes.")
 
         # Thực thi pipeline
         result = run_pipeline(
@@ -372,6 +379,12 @@ async def process_transcript(
             "normalized": normalized_data
         }
 
+    except TimeoutError as timeout_err:
+        logger.error(f"Quá thời gian xử lý bảng điểm: {timeout_err}")
+        raise HTTPException(
+            status_code=504,
+            detail="Quá thời gian phản hồi từ hệ thống đọc ảnh (timeout). Vui lòng thử lại với hình ảnh có độ phân giải phù hợp hơn."
+        )
     except ConnectionError as conn_err:
         logger.error(f"Lỗi kết nối Ollama: {conn_err}")
         raise HTTPException(
@@ -382,15 +395,24 @@ async def process_transcript(
         logger.error(f"Lỗi xử lý file bảng điểm: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Lỗi trong quá trình xử lý: {str(e)}"
+            detail="Đã xảy ra lỗi trong quá trình xử lý bảng điểm. Vui lòng kiểm tra lại chất lượng hình ảnh hoặc thử lại sau."
         )
+    finally:
+        # Xóa file upload tạm sau khi xử lý xong (kể cả khi OCR lỗi)
+        if os.path.exists(session_upload_dir):
+            try:
+                shutil.rmtree(session_upload_dir, ignore_errors=True)
+            except Exception as e:
+                logger.warning(f"Lỗi khi xóa thư mục tạm upload '{session_upload_dir}': {e}")
 
 
 @app.post("/api/certificate/process")
 async def process_certificate(
     file: UploadFile = File(...),
     model: Optional[str] = Form(None),
-    host: str = Form(DEFAULT_OLLAMA_HOST)
+    host: str = Form(DEFAULT_OLLAMA_HOST),
+    db: Session = Depends(get_db),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
     """
     Tiếp nhận ảnh chứng chỉ (JPG/PNG), trích xuất thông tin qua Ollama Vision
@@ -437,6 +459,60 @@ async def process_certificate(
             mime = "image/png" if ext == ".png" else "image/jpeg"
             preview_b64 = f"data:{mime};base64," + base64.b64encode(img_f.read()).decode("utf-8")
 
+        # 4. Ghi nhận chứng chỉ vào student_certificates nếu người dùng là sinh viên có hồ sơ
+        if current_user:
+            stu_row = db.execute(
+                text("SELECT id, full_name FROM students WHERE user_id = :uid"),
+                {"uid": current_user["id"]}
+            ).fetchone()
+            if stu_row:
+                student_id = stu_row.id
+                raw_cert_name = extracted.get("ten_nguoi_duoc_cap")
+                name_cert = " ".join(strip_accents(str(raw_cert_name or "")).lower().split()) if raw_cert_name else ""
+                name_stu = " ".join(strip_accents(str(stu_row.full_name or "")).lower().split())
+
+                is_name_matched = bool(name_cert and name_stu and name_cert == name_stu)
+                is_auto = bool(match_res.get("tu_dong_cap_nhat") is True)
+                cert_status = "valid" if (is_auto and is_name_matched) else "pending"
+
+                cert_type = match_res.get("muc_tot_nghiep_khop") or extracted.get("loai_chung_chi") or "Ngoại ngữ"
+                cert_name = extracted.get("ten_chung_chi_cu_the") or match_res.get("muc_tot_nghiep_khop") or extracted.get("loai_chung_chi") or "Chứng chỉ"
+                issued_date = str(extracted.get("ngay_cap") or "")
+
+                try:
+                    check_tbl = db.execute(text("SELECT OBJECT_ID('student_certificates', 'U')")).scalar()
+                    if check_tbl is not None:
+                        existing = db.execute(
+                            text("""
+                                SELECT id FROM student_certificates 
+                                WHERE student_id = :sid AND certificate_type = :ctype
+                            """),
+                            {"sid": student_id, "ctype": cert_type}
+                        ).fetchone()
+
+                        if existing:
+                            db.execute(
+                                text("""
+                                    UPDATE student_certificates 
+                                    SET certificate_name = :cname, issued_date = :idate, status = :status, created_at = SYSUTCDATETIME()
+                                    WHERE id = :cid
+                                """),
+                                {"cid": existing.id, "cname": cert_name, "idate": issued_date, "status": cert_status}
+                            )
+                        else:
+                            db.execute(
+                                text("""
+                                    INSERT INTO student_certificates (student_id, certificate_type, certificate_name, issued_date, status)
+                                    VALUES (:sid, :ctype, :cname, :idate, :status)
+                                """),
+                                {"sid": student_id, "ctype": cert_type, "cname": cert_name, "idate": issued_date, "status": cert_status}
+                            )
+                        db.commit()
+                        logger.info(f"Đã lưu chứng chỉ vào student_certificates: student_id={student_id}, type={cert_type}, status={cert_status}, is_name_matched={is_name_matched}")
+                except Exception as db_err:
+                    logger.error(f"Lỗi khi lưu student_certificates: {db_err}", exc_info=True)
+                    db.rollback()
+
         return {
             "success": True,
             "session_id": session_id,
@@ -462,8 +538,15 @@ async def process_certificate(
         logger.error(f"Lỗi xử lý chứng chỉ: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Lỗi khi xử lý chứng chỉ: {str(e)}"
+            detail="Đã xảy ra lỗi trong quá trình xử lý chứng chỉ. Vui lòng thử lại sau."
         )
+    finally:
+        # Xóa file upload tạm sau khi xử lý xong (kể cả khi OCR lỗi)
+        if os.path.exists(session_upload_dir):
+            try:
+                shutil.rmtree(session_upload_dir, ignore_errors=True)
+            except Exception as e:
+                logger.warning(f"Lỗi khi xóa thư mục tạm upload chứng chỉ '{session_upload_dir}': {e}")
 
 
 @app.get("/api/download/{file_type}")

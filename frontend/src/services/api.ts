@@ -203,19 +203,32 @@ export const chatApi = {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const res = await fetch(`${API_BASE_URL}/chat/upload`, {
-      method: 'POST',
-      headers,
-      body: formData,
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 190000);
 
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      const detail = errData?.detail || `Lỗi tải tệp lên (${res.status})`;
-      throw new Error(detail);
+    try {
+      const res = await fetch(`${API_BASE_URL}/chat/upload`, {
+        method: 'POST',
+        headers,
+        body: formData,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        const detail = errData?.detail || `Lỗi tải tệp lên (${res.status})`;
+        throw new Error(detail);
+      }
+
+      return await res.json();
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        throw new Error('Quá thời gian xử lý khi đọc bảng điểm (timeout). Vui lòng kiểm tra lại độ rõ nét của ảnh hoặc thử lại sau.');
+      }
+      throw err;
     }
-
-    return await res.json();
   },
 
   // Đổi tên cuộc trò chuyện
@@ -282,6 +295,8 @@ export const authApi = {
     const userData = await res.json();
     const fullProfile: UserProfile = {
       id: userData.id,
+      user_id: userData.user_id || userData.id,
+      student_id: userData.student_id ?? null,
       username: userData.username,
       role: userData.role,
       student_code: userData.student_code || userData.username,

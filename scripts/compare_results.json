@@ -1,0 +1,1064 @@
+{
+  "cfg_3b_default": {
+    "model": "qwen2.5:3b",
+    "top_k": 3,
+    "max_chunk_chars": 600,
+    "overall_kw_rate": 77.5,
+    "total_matched_kw": 31,
+    "total_expected_kw": 40,
+    "total_hallucination_flags": 5,
+    "avg_time": 24.572397729999988,
+    "total_elapsed": 491.4479545999998,
+    "details": [
+      {
+        "id": "QD01",
+        "question": "Điểm trung bình tích lũy tối thiểu để được xét tốt nghiệp là bao nhiêu?",
+        "elapsed": 21.38977049999994,
+        "sources_count": 3,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": true,
+        "hallucination_items": [
+          "5.0"
+        ],
+        "answer": "Điểm trung bình tích lũy tối thiểu để được xét tốt nghiệp là 5.0 (loại trung bình trở lên)."
+      },
+      {
+        "id": "QD02",
+        "question": "Sinh viên chính quy cần chứng chỉ ngoại ngữ trình độ nào để tốt nghiệp?",
+        "elapsed": 30.266199800000095,
+        "sources_count": 3,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Sinh viên chính quy cần chứng chỉ ngoại ngữ Tiếng Anh Bậc 3 theo Khung năng lực Ngoại ngữ 6 bậc để tốt nghiệp."
+      },
+      {
+        "id": "QD03",
+        "question": "Điều kiện về tin học để xét tốt nghiệp là gì?",
+        "elapsed": 34.83282600000007,
+        "sources_count": 3,
+        "matched_kw": 0,
+        "total_kw": 2,
+        "kw_ratio": 0.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Điều kiện về tin học để xét tốt nghiệp là:\n\n1. Bằng tốt nghiệp cao đẳng chuyên ngành Công nghệ thông tin hoặc tương đương trở lên.\n2. Chứng chỉ tin học (Trình độ A, B).\n3. Chứng nhận đạt chuẩn năng lực ứng dụng công nghệ thông tin (Khoa Công nghệ thông tin tổ chức)."
+      },
+      {
+        "id": "QD04",
+        "question": "Tôi có cần đạt Giáo dục quốc phòng và Giáo dục thể chất để tốt nghiệp không?",
+        "elapsed": 30.804984399999967,
+        "sources_count": 3,
+        "matched_kw": 0,
+        "total_kw": 2,
+        "kw_ratio": 0.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Để tốt nghiệp hệ đại học chính quy Khoa Công nghệ thông tin tại Trường Đại học Lạc Hồng, bạn cần đạt cả hai học phần: Giáo dục quốc phòng và Giáo dục thể chất."
+      },
+      {
+        "id": "QD05",
+        "question": "Cần có bao nhiêu chứng chỉ kỹ năng mềm để tốt nghiệp?",
+        "elapsed": 29.901750099999845,
+        "sources_count": 3,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Để tốt nghiệp Khoa Công nghệ thông tin, Trường Đại học Lạc Hồng, sinh viên cần đủ 4 chứng chỉ kỹ năng mềm do Trường Đại học Lạc Hồng cấp sau khi hoàn thành khóa học kỹ năng."
+      },
+      {
+        "id": "QD06",
+        "question": "Còn nợ học phí thì có được xét tốt nghiệp không?",
+        "elapsed": 28.34121049999999,
+        "sources_count": 3,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "- Không, còn nợ học phí không được xét tốt nghiệp. Cần thanh toán học phí trước khi xét."
+      },
+      {
+        "id": "QD07",
+        "question": "Chưa trả sách ở thư viện thì có được xét tốt nghiệp không?",
+        "elapsed": 30.66461400000003,
+        "sources_count": 3,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "- Không được xét tốt nghiệp vì chưa trả sách ở thư viện. Điều kiện tốt nghiệp yêu cầu không bị truy cứu trách nhiệm hình sự và không đang trong thời gian bị kỷ luật."
+      },
+      {
+        "id": "QD08",
+        "question": "Đang bị kỷ luật đình chỉ học tập thì có được xét tốt nghiệp không?",
+        "elapsed": 0.03274209999995037,
+        "sources_count": 0,
+        "matched_kw": 1,
+        "total_kw": 2,
+        "kw_ratio": 0.5,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Hiện tại hệ thống chưa có dữ liệu quy định của khoa này (hệ thống hiện chỉ hỗ trợ tư vấn học vụ cho Khoa Công nghệ thông tin); tôi không thể tự bịa thông tin. Vui lòng liên hệ văn phòng khoa tương ứng hoặc phòng Đào tạo để được hỗ trợ."
+      },
+      {
+        "id": "QD09",
+        "question": "Sinh viên hệ liên thông có cần chứng chỉ GDQP, ngoại ngữ, tin học để tốt nghiệp không?",
+        "elapsed": 33.49221990000001,
+        "sources_count": 3,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "- Sinh viên hệ liên thông cần chứng chỉ GDQP và GDTC để tốt nghiệp.\n- Sinh viên cần nộp chứng chỉ GDQP và GDTC tại phòng Đào tạo (Bộ phận học vụ), Cơ sở 1.\n- Sinh viên không cần chứng chỉ ngoại ngữ hoặc tin học để tốt nghiệp."
+      },
+      {
+        "id": "TT01",
+        "question": "Nộp hồ sơ xét tốt nghiệp ở đâu?",
+        "elapsed": 33.504466800000046,
+        "sources_count": 3,
+        "matched_kw": 1,
+        "total_kw": 1,
+        "kw_ratio": 1.0,
+        "hallucination": true,
+        "hallucination_items": [
+          "https://graduate.lhu.edu.vn/."
+        ],
+        "answer": "Nộp hồ sơ xét tốt nghiệp tại trang web https://graduate.lhu.edu.vn/. Các file cần chuẩn bị bao gồm:\n\n- Chứng chỉ Giáo dục thể chất (GDTC)\n- Chứng chỉ Giáo dục quốc phòng (GDQP)\n\nNộp các file này theo định dạng PDF. Các file này cần được upload trực tuyến trên trang web của trường."
+      },
+      {
+        "id": "TT02",
+        "question": "Lệ phí xét tốt nghiệp là bao nhiêu và đóng ở đâu?",
+        "elapsed": 31.567695400000275,
+        "sources_count": 3,
+        "matched_kw": 0,
+        "total_kw": 2,
+        "kw_ratio": 0.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Lệ phí xét tốt nghiệp là không được nêu trong tài liệu được cung cấp. Bạn nên liên hệ trực tiếp với Bộ phận học vụ Khoa Công nghệ thông tin để biết thông tin chi tiết về lệ phí và địa điểm nộp."
+      },
+      {
+        "id": "TT03",
+        "question": "Hồ sơ xét tốt nghiệp của sinh viên chính quy gồm những file nào?",
+        "elapsed": 31.51994650000006,
+        "sources_count": 3,
+        "matched_kw": 3,
+        "total_kw": 5,
+        "kw_ratio": 0.6,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "- Hồ sơ xét tốt nghiệp gồm:\n- Chứng chỉ Giáo dục thể chất (GDTC)\n- Chứng chỉ Giáo dục quốc phòng (GDQP)\n- Chứng chỉ kỹ năng mềm (4 kỹ năng theo chương trình)"
+      },
+      {
+        "id": "TT04",
+        "question": "Đủ tín chỉ nhưng thiếu các điều kiện khác thì được cấp giấy gì?",
+        "elapsed": 32.55947120000019,
+        "sources_count": 3,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": true,
+        "hallucination_items": [
+          "B101"
+        ],
+        "answer": "Giấy chứng nhận hoàn thành khóa học. Đây là giấy chứng nhận sinh viên đã đạt và tích lũy đủ học phần, số tín chỉ quy định trong chương trình đào tạo, nhưng còn thiếu các điều kiện khác để xét tốt nghiệp. Liên hệ với Phòng Đào tạo (phòng B101, Cơ sở 1) để được cấp giấy này."
+      },
+      {
+        "id": "TT05",
+        "question": "Lấy chứng chỉ GDQP, GDTC, kỹ năng mềm ở đâu?",
+        "elapsed": 32.71493819999978,
+        "sources_count": 3,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "- Chứng chỉ Giáo dục thể chất (GDTC) và Chứng chỉ Giáo dục quốc phòng (GDQP) lấy tại phòng Đào tạo (Bộ phận học vụ), Cơ sở 1.\n- Chứng chỉ kỹ năng mềm lấy tại Trường Đại học Lạc Hồng sau khi hoàn thành khóa học kỹ năng."
+      },
+      {
+        "id": "CT01",
+        "question": "Chương trình đào tạo ngành CNTT có tổng cộng bao nhiêu tín chỉ?",
+        "elapsed": 29.777147499999955,
+        "sources_count": 3,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": true,
+        "hallucination_items": [
+          "21",
+          "150"
+        ],
+        "answer": "- Tổng cộng chương trình đào tạo ngành CNTT có 150 tín chỉ.\n- Trong đó, học kỳ 7 có 21 tín chỉ.\n- Học kỳ 8 có 10 tín chỉ."
+      },
+      {
+        "id": "CT02",
+        "question": "Môn Tốt nghiệp bao nhiêu tín chỉ và học ở học kỳ nào?",
+        "elapsed": 26.032286199999817,
+        "sources_count": 3,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "- Môn Tốt nghiệp có 8 tín chỉ.\n- Môn Tốt nghiệp được học ở Học kỳ 8."
+      },
+      {
+        "id": "CT03",
+        "question": "Học kỳ 7 có những môn nào và tổng bao nhiêu tín chỉ?",
+        "elapsed": 33.97174199999972,
+        "sources_count": 3,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": true,
+        "hallucination_items": [
+          "21"
+        ],
+        "answer": "Học kỳ 7 có 21 tín chỉ, gồm:\n- English 7: 4 tín chỉ\n- Kiểm thử và đảm bảo chất lượng phần mềm: 3 tín chỉ\n- Quản trị website trên VPS: 2 tín chỉ\n- Phát triển ứng dụng: 9 tín chỉ\n- Môn tự chọn: Trí tuệ nhân tạo hoặc Công nghệ Blockchain (3 tín chỉ)"
+      },
+      {
+        "id": "NP01",
+        "question": "Cho tôi công thức nấu phở bò ngon tại nhà.",
+        "elapsed": 0.029553000000305474,
+        "sources_count": 0,
+        "matched_kw": 1,
+        "total_kw": 1,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Xin lỗi, tôi là trợ lý tư vấn học vụ và chỉ hỗ trợ giải đáp các thắc mắc về quy chế, chương trình đào tạo và thủ tục học vụ của nhà trường."
+      },
+      {
+        "id": "NP02",
+        "question": "Quy định xét tốt nghiệp của Khoa Kinh tế như thế nào?",
+        "elapsed": 0.023857199999838485,
+        "sources_count": 0,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Hiện tại hệ thống chưa có dữ liệu quy định của khoa này (hệ thống hiện chỉ hỗ trợ tư vấn học vụ cho Khoa Công nghệ thông tin); tôi không thể tự bịa thông tin. Vui lòng liên hệ văn phòng khoa tương ứng hoặc phòng Đào tạo để được hỗ trợ."
+      },
+      {
+        "id": "NP03",
+        "question": "Giá bitcoin hôm nay bao nhiêu và có nên đầu tư không?",
+        "elapsed": 0.02053329999989728,
+        "sources_count": 0,
+        "matched_kw": 1,
+        "total_kw": 1,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Xin lỗi, tôi là trợ lý tư vấn học vụ và chỉ hỗ trợ giải đáp các thắc mắc về quy chế, chương trình đào tạo và thủ tục học vụ của nhà trường."
+      }
+    ]
+  },
+  "cfg_7b_default": {
+    "model": "qwen2.5:7b",
+    "top_k": 3,
+    "max_chunk_chars": 600,
+    "overall_kw_rate": 80.0,
+    "total_matched_kw": 32,
+    "total_expected_kw": 40,
+    "total_hallucination_flags": 7,
+    "avg_time": 60.77671294500006,
+    "total_elapsed": 1215.534258900001,
+    "details": [
+      {
+        "id": "QD01",
+        "question": "Điểm trung bình tích lũy tối thiểu để được xét tốt nghiệp là bao nhiêu?",
+        "elapsed": 214.41639980000036,
+        "sources_count": 3,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": true,
+        "hallucination_items": [
+          "5.0"
+        ],
+        "answer": "Điểm trung bình tích lũy tối thiểu để được xét tốt nghiệp là 5.0 (loại trung bình trở lên)."
+      },
+      {
+        "id": "QD02",
+        "question": "Sinh viên chính quy cần chứng chỉ ngoại ngữ trình độ nào để tốt nghiệp?",
+        "elapsed": 66.48950839999998,
+        "sources_count": 3,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Sinh viên chính quy Khoa Công nghệ thông tin cần đạt chứng chỉ ngoại ngữ trình độ Tiếng Anh Bậc 3 theo Khung năng lực Ngoại ngữ 6 bậc dùng cho Việt Nam để tốt nghiệp."
+      },
+      {
+        "id": "QD03",
+        "question": "Điều kiện về tin học để xét tốt nghiệp là gì?",
+        "elapsed": 89.12131500000032,
+        "sources_count": 3,
+        "matched_kw": 1,
+        "total_kw": 2,
+        "kw_ratio": 0.5,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "- Bằng tốt nghiệp cao đẳng chuyên ngành Công nghệ thông tin hoặc tương đương trở lên.\n- Chứng chỉ tin học trình độ A hoặc B.\n- Chứng nhận đạt Sát hạch tin học do Khoa Công nghệ thông tin tổ chức hoặc chứng nhận ứng dụng công nghệ thông tin tương đương."
+      },
+      {
+        "id": "QD04",
+        "question": "Tôi có cần đạt Giáo dục quốc phòng và Giáo dục thể chất để tốt nghiệp không?",
+        "elapsed": 62.24996800000008,
+        "sources_count": 3,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "- Cần đạt học phần Giáo dục quốc phòng (GDQP).\n- Cần đạt học phần Giáo dục thể chất (GDTC)."
+      },
+      {
+        "id": "QD05",
+        "question": "Cần có bao nhiêu chứng chỉ kỹ năng mềm để tốt nghiệp?",
+        "elapsed": 62.608976600000005,
+        "sources_count": 3,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Để tốt nghiệp hệ đại học chính quy Khoa Công nghệ thông tin, sinh viên cần hoàn thành và có chứng nhận hoàn thành 4 kỹ năng mềm do Trường Đại học Lạc Hồng cấp sau khi hoàn thành khóa học kỹ năng."
+      },
+      {
+        "id": "QD06",
+        "question": "Còn nợ học phí thì có được xét tốt nghiệp không?",
+        "elapsed": 66.54081339999993,
+        "sources_count": 3,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "- Tại thời điểm xét tốt nghiệp, sinh viên không bị truy cứu trách nhiệm hình sự hoặc không đang trong thời gian bị kỷ luật ở mức đình chỉ học tập.\n- Không có quy định rõ ràng về việc phải thanh toán học phí trước khi xét tốt nghiệp."
+      },
+      {
+        "id": "QD07",
+        "question": "Chưa trả sách ở thư viện thì có được xét tốt nghiệp không?",
+        "elapsed": 65.58669910000026,
+        "sources_count": 3,
+        "matched_kw": 1,
+        "total_kw": 2,
+        "kw_ratio": 0.5,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "- Tại thời điểm xét tốt nghiệp, sinh viên chưa trả sách ở thư viện vẫn có thể xét tốt nghiệp.\n- Sinh viên sẽ nhận được giấy chứng nhận hoàn thành khóa học thay vì bằng tốt nghiệp chính thức.\n- Sinh viên cần liên hệ Phòng Đào tạo để được hướng dẫn cụ thể."
+      },
+      {
+        "id": "QD08",
+        "question": "Đang bị kỷ luật đình chỉ học tập thì có được xét tốt nghiệp không?",
+        "elapsed": 0.03832319999992251,
+        "sources_count": 0,
+        "matched_kw": 1,
+        "total_kw": 2,
+        "kw_ratio": 0.5,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Hiện tại hệ thống chưa có dữ liệu quy định của khoa này (hệ thống hiện chỉ hỗ trợ tư vấn học vụ cho Khoa Công nghệ thông tin); tôi không thể tự bịa thông tin. Vui lòng liên hệ văn phòng khoa tương ứng hoặc phòng Đào tạo để được hỗ trợ."
+      },
+      {
+        "id": "QD09",
+        "question": "Sinh viên hệ liên thông có cần chứng chỉ GDQP, ngoại ngữ, tin học để tốt nghiệp không?",
+        "elapsed": 69.74422800000002,
+        "sources_count": 3,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": true,
+        "hallucination_items": [
+          "5.0"
+        ],
+        "answer": "Sinh viên hệ liên thông không cần chứng chỉ GDQP, ngoại ngữ, tin học để tốt nghiệp. Điều kiện chính để tốt nghiệp là đạt và tích lũy đủ học phần, số tín chỉ quy định trong chương trình đào tạo và có điểm trung bình tích lũy toàn khóa từ loại trung bình trở lên (>= 5.0)."
+      },
+      {
+        "id": "TT01",
+        "question": "Nộp hồ sơ xét tốt nghiệp ở đâu?",
+        "elapsed": 70.30464770000026,
+        "sources_count": 3,
+        "matched_kw": 1,
+        "total_kw": 1,
+        "kw_ratio": 1.0,
+        "hallucination": true,
+        "hallucination_items": [
+          "https://graduate.lhu.edu.vn/."
+        ],
+        "answer": "Sinh viên nộp hồ sơ xét tốt nghiệp tại trang web https://graduate.lhu.edu.vn/. Sinh viên cần upload các file hồ sơ theo định dạng PDF. Các chứng chỉ cần chuẩn bị như Chứng chỉ Giáo dục thể chất và Giáo dục quốc phòng có thể lấy tại phòng Đào tạo (Bộ phận học vụ), Cơ sở 1."
+      },
+      {
+        "id": "TT02",
+        "question": "Lệ phí xét tốt nghiệp là bao nhiêu và đóng ở đâu?",
+        "elapsed": 71.87222460000021,
+        "sources_count": 3,
+        "matched_kw": 0,
+        "total_kw": 2,
+        "kw_ratio": 0.0,
+        "hallucination": true,
+        "hallucination_items": [
+          "https://graduate.lhu.edu.vn/"
+        ],
+        "answer": "Lệ phí xét tốt nghiệp không được đề cập trong tài liệu cung cấp. Sinh viên có thể truy cập trang web https://graduate.lhu.edu.vn/ để upload hồ sơ theo định dạng PDF và thực hiện các bước xét tốt nghiệp trực tuyến. Nếu có thắc mắc, sinh viên nên liên hệ với Bộ phận học vụ tại Cơ sở 1 của trường để được hỗ trợ thêm."
+      },
+      {
+        "id": "TT03",
+        "question": "Hồ sơ xét tốt nghiệp của sinh viên chính quy gồm những file nào?",
+        "elapsed": 62.70398380000006,
+        "sources_count": 3,
+        "matched_kw": 3,
+        "total_kw": 5,
+        "kw_ratio": 0.6,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Hồ sơ xét tốt nghiệp của sinh viên chính quy bao gồm:\n- Chứng chỉ Giáo dục thể chất (GDTC)\n- Chứng chỉ Giáo dục quốc phòng (GDQP)\n- Chứng chỉ kỹ năng mềm (4 kỹ năng theo chương trình đào tạo)"
+      },
+      {
+        "id": "TT04",
+        "question": "Đủ tín chỉ nhưng thiếu các điều kiện khác thì được cấp giấy gì?",
+        "elapsed": 61.42330219999985,
+        "sources_count": 3,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": true,
+        "hallucination_items": [
+          "B101"
+        ],
+        "answer": "Sinh viên đủ tín chỉ nhưng thiếu các điều kiện khác sẽ được cấp giấy chứng nhận hoàn thành khóa học. Liên hệ Phòng Đào tạo (phòng B101, Cơ sở 1) để được cấp giấy này."
+      },
+      {
+        "id": "TT05",
+        "question": "Lấy chứng chỉ GDQP, GDTC, kỹ năng mềm ở đâu?",
+        "elapsed": 70.99262370000042,
+        "sources_count": 3,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "- Chứng chỉ Giáo dục thể chất (GDTC): Lấy tại phòng Đào tạo (Bộ phận học vụ), Cơ sở 1.\n- Chứng chỉ Giáo dục quốc phòng (GDQP): Lấy tại phòng Đào tạo (Bộ phận học vụ), Cơ sở 1.\n- Chứng chỉ kỹ năng mềm: Hoàn thành khóa học kỹ năng mềm do Trường Đại học Lạc Hồng tổ chức và nhận giấy chứng nhận từ trường."
+      },
+      {
+        "id": "CT01",
+        "question": "Chương trình đào tạo ngành CNTT có tổng cộng bao nhiêu tín chỉ?",
+        "elapsed": 53.080018499999824,
+        "sources_count": 3,
+        "matched_kw": 1,
+        "total_kw": 2,
+        "kw_ratio": 0.5,
+        "hallucination": true,
+        "hallucination_items": [
+          "21"
+        ],
+        "answer": "Chương trình đào tạo ngành CNTT có tổng cộng 21 tín chỉ trong học kỳ 7."
+      },
+      {
+        "id": "CT02",
+        "question": "Môn Tốt nghiệp bao nhiêu tín chỉ và học ở học kỳ nào?",
+        "elapsed": 54.25264500000003,
+        "sources_count": 3,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "- Môn Tốt nghiệp có 8 tín chỉ.\n- Môn Tốt nghiệp được học ở Học kỳ 8."
+      },
+      {
+        "id": "CT03",
+        "question": "Học kỳ 7 có những môn nào và tổng bao nhiêu tín chỉ?",
+        "elapsed": 74.01824669999996,
+        "sources_count": 3,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": true,
+        "hallucination_items": [
+          "21"
+        ],
+        "answer": "Học kỳ 7 có những môn sau:\n- English 7: 4 tín chỉ\n- Kiểm thử và đảm bảo chất lượng phần mềm: 3 tín chỉ\n- Quản trị website trên VPS: 2 tín chỉ\n- Phát triển ứng dụng: 9 tín chỉ\n- Môn tự chọn: Trí tuệ nhân tạo (3 tín chỉ) hoặc Công nghệ Blockchain (3 tín chỉ)\n\nTổng số tín chỉ học kỳ 7 là 21 tín chỉ."
+      },
+      {
+        "id": "NP01",
+        "question": "Cho tôi công thức nấu phở bò ngon tại nhà.",
+        "elapsed": 0.04239099999995233,
+        "sources_count": 0,
+        "matched_kw": 1,
+        "total_kw": 1,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Xin lỗi, tôi là trợ lý tư vấn học vụ và chỉ hỗ trợ giải đáp các thắc mắc về quy chế, chương trình đào tạo và thủ tục học vụ của nhà trường."
+      },
+      {
+        "id": "NP02",
+        "question": "Quy định xét tốt nghiệp của Khoa Kinh tế như thế nào?",
+        "elapsed": 0.029649899999640184,
+        "sources_count": 0,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Hiện tại hệ thống chưa có dữ liệu quy định của khoa này (hệ thống hiện chỉ hỗ trợ tư vấn học vụ cho Khoa Công nghệ thông tin); tôi không thể tự bịa thông tin. Vui lòng liên hệ văn phòng khoa tương ứng hoặc phòng Đào tạo để được hỗ trợ."
+      },
+      {
+        "id": "NP03",
+        "question": "Giá bitcoin hôm nay bao nhiêu và có nên đầu tư không?",
+        "elapsed": 0.018294299999979557,
+        "sources_count": 0,
+        "matched_kw": 1,
+        "total_kw": 1,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Xin lỗi, tôi là trợ lý tư vấn học vụ và chỉ hỗ trợ giải đáp các thắc mắc về quy chế, chương trình đào tạo và thủ tục học vụ của nhà trường."
+      }
+    ]
+  },
+  "cfg_3b_topk2": {
+    "model": "qwen2.5:3b",
+    "top_k": 2,
+    "max_chunk_chars": 600,
+    "overall_kw_rate": 75.0,
+    "total_matched_kw": 30,
+    "total_expected_kw": 40,
+    "total_hallucination_flags": 7,
+    "avg_time": 9.8532565049999,
+    "total_elapsed": 197.065130099998,
+    "details": [
+      {
+        "id": "QD01",
+        "question": "Điểm trung bình tích lũy tối thiểu để được xét tốt nghiệp là bao nhiêu?",
+        "elapsed": 23.300417899999957,
+        "sources_count": 2,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": true,
+        "hallucination_items": [
+          "5.0"
+        ],
+        "answer": "Điểm trung bình tích lũy tối thiểu để được xét tốt nghiệp là 5.0 (loại trung bình trở lên)."
+      },
+      {
+        "id": "QD02",
+        "question": "Sinh viên chính quy cần chứng chỉ ngoại ngữ trình độ nào để tốt nghiệp?",
+        "elapsed": 8.259267699999782,
+        "sources_count": 2,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Sinh viên chính quy cần chứng chỉ ngoại ngữ trình độ Tiếng Anh Bậc 3 theo Khung năng lực Ngoại ngữ 6 bậc để tốt nghiệp."
+      },
+      {
+        "id": "QD03",
+        "question": "Điều kiện về tin học để xét tốt nghiệp là gì?",
+        "elapsed": 12.338424799999757,
+        "sources_count": 2,
+        "matched_kw": 0,
+        "total_kw": 2,
+        "kw_ratio": 0.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Điều kiện về tin học để xét tốt nghiệp là:\n\n1. Bằng tốt nghiệp cao đẳng chuyên ngành Công nghệ thông tin hoặc tương đương.\n2. Chứng chỉ tin học (Trình độ A hoặc B).\n3. Chứng nhận đạt chuẩn năng lực ứng dụng công nghệ thông tin (Khoa Công nghệ thông tin tổ chức)."
+      },
+      {
+        "id": "QD04",
+        "question": "Tôi có cần đạt Giáo dục quốc phòng và Giáo dục thể chất để tốt nghiệp không?",
+        "elapsed": 8.976039300000139,
+        "sources_count": 2,
+        "matched_kw": 0,
+        "total_kw": 2,
+        "kw_ratio": 0.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Để tốt nghiệp hệ đại học chính quy tại Khoa Công nghệ thông tin của Trường Đại học Lạc Hồng, bạn cần đạt cả hai học phần: Giáo dục quốc phòng và Giáo dục thể chất."
+      },
+      {
+        "id": "QD05",
+        "question": "Cần có bao nhiêu chứng chỉ kỹ năng mềm để tốt nghiệp?",
+        "elapsed": 9.701781799999935,
+        "sources_count": 2,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Để tốt nghiệp, sinh viên cần đủ 4 chứng chỉ kỹ năng mềm do Trường Đại học Lạc Hồng cấp sau khi hoàn thành khóa học kỹ năng. Ngoài ra, còn cần chứng chỉ Giáo dục thể chất và Giáo dục quốc phòng."
+      },
+      {
+        "id": "QD06",
+        "question": "Còn nợ học phí thì có được xét tốt nghiệp không?",
+        "elapsed": 10.645996700000069,
+        "sources_count": 2,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Còn nợ học phí không ảnh hưởng đến việc xét tốt nghiệp. Điều kiện tốt nghiệp chỉ nhắc đến việc không bị truy cứu trách nhiệm hình sự hoặc đang trong thời gian bị kỷ luật. Học phí chỉ là một trong các điều kiện cần thiết để nộp hồ sơ xét tốt nghiệp."
+      },
+      {
+        "id": "QD07",
+        "question": "Chưa trả sách ở thư viện thì có được xét tốt nghiệp không?",
+        "elapsed": 24.9993986999998,
+        "sources_count": 2,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Không, việc chưa trả sách ở thư viện không ảnh hưởng đến việc xét tốt nghiệp. Điều kiện tốt nghiệp chỉ đề cập đến việc không bị truy cứu trách nhiệm hình sự hoặc không đang trong thời gian bị kỷ luật. Việc trả sách đúng hạn là trách nhiệm của sinh viên, không liên quan trực tiếp đến việc xét tốt nghiệp."
+      },
+      {
+        "id": "QD08",
+        "question": "Đang bị kỷ luật đình chỉ học tập thì có được xét tốt nghiệp không?",
+        "elapsed": 0.03096449999975448,
+        "sources_count": 0,
+        "matched_kw": 1,
+        "total_kw": 2,
+        "kw_ratio": 0.5,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Hiện tại hệ thống chưa có dữ liệu quy định của khoa này (hệ thống hiện chỉ hỗ trợ tư vấn học vụ cho Khoa Công nghệ thông tin); tôi không thể tự bịa thông tin. Vui lòng liên hệ văn phòng khoa tương ứng hoặc phòng Đào tạo để được hỗ trợ."
+      },
+      {
+        "id": "QD09",
+        "question": "Sinh viên hệ liên thông có cần chứng chỉ GDQP, ngoại ngữ, tin học để tốt nghiệp không?",
+        "elapsed": 11.654683100000057,
+        "sources_count": 2,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Các sinh viên hệ liên thông tại Khoa Công nghệ thông tin, Trường Đại học Lạc Hồng không yêu cầu chứng chỉ GDQP, ngoại ngữ hoặc tin học để tốt nghiệp. Điều kiện chính là đạt và tích lũy đủ học phần và có điểm trung bình tích lũy từ loại trung bình trở lên."
+      },
+      {
+        "id": "TT01",
+        "question": "Nộp hồ sơ xét tốt nghiệp ở đâu?",
+        "elapsed": 10.36425509999981,
+        "sources_count": 2,
+        "matched_kw": 1,
+        "total_kw": 1,
+        "kw_ratio": 1.0,
+        "hallucination": true,
+        "hallucination_items": [
+          "https://graduate.lhu.edu.vn/."
+        ],
+        "answer": "Nộp hồ sơ xét tốt nghiệp tại trang web https://graduate.lhu.edu.vn/. Bạn cần upload các file hồ sơ PDF. Đối với các chứng chỉ Giáo dục thể chất (GDTC) và Giáo dục quốc phòng (GDQP), bạn đến phòng Đào tạo, Cơ sở 1 để lấy."
+      },
+      {
+        "id": "TT02",
+        "question": "Lệ phí xét tốt nghiệp là bao nhiêu và đóng ở đâu?",
+        "elapsed": 24.626288399999794,
+        "sources_count": 2,
+        "matched_kw": 0,
+        "total_kw": 2,
+        "kw_ratio": 0.0,
+        "hallucination": true,
+        "hallucination_items": [
+          "https://graduate.lhu.edu.vn/"
+        ],
+        "answer": "Lệ phí xét tốt nghiệp không được nêu trong tài liệu được cung cấp. Bạn cần truy cập trang web https://graduate.lhu.edu.vn/ để nộp hồ sơ trực tuyến và xem chi tiết về lệ phí. Các chứng chỉ Giáo dục thể chất và Giáo dục quốc phòng cần lấy tại phòng Đào tạo, Cơ sở 1."
+      },
+      {
+        "id": "TT03",
+        "question": "Hồ sơ xét tốt nghiệp của sinh viên chính quy gồm những file nào?",
+        "elapsed": 5.979412199999842,
+        "sources_count": 2,
+        "matched_kw": 2,
+        "total_kw": 5,
+        "kw_ratio": 0.4,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "- Chứng chỉ Giáo dục thể chất (GDTC)\n- Chứng chỉ Giáo dục quốc phòng (GDQP)"
+      },
+      {
+        "id": "TT04",
+        "question": "Đủ tín chỉ nhưng thiếu các điều kiện khác thì được cấp giấy gì?",
+        "elapsed": 8.702261299999918,
+        "sources_count": 2,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": true,
+        "hallucination_items": [
+          "B101"
+        ],
+        "answer": "- Giấy chứng nhận hoàn thành khóa học: Được cấp cho sinh viên đã đạt đủ tín chỉ nhưng còn thiếu điều kiện khác để xét tốt nghiệp. Liên hệ Phòng Đào tạo (phòng B101, Cơ sở 1)."
+      },
+      {
+        "id": "TT05",
+        "question": "Lấy chứng chỉ GDQP, GDTC, kỹ năng mềm ở đâu?",
+        "elapsed": 11.605017299999872,
+        "sources_count": 2,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": true,
+        "hallucination_items": [
+          "https://graduate.lhu.edu.vn/."
+        ],
+        "answer": "Lưu ý: Bạn có thể lấy chứng chỉ Giáo dục thể chất (GDTC) và Giáo dục quốc phòng (GDQP) tại phòng Đào tạo (Bộ phận học vụ), Cơ sở 1. Chứng chỉ kỹ năng mềm cần chuẩn bị theo hướng dẫn tại trang web https://graduate.lhu.edu.vn/."
+      },
+      {
+        "id": "CT01",
+        "question": "Chương trình đào tạo ngành CNTT có tổng cộng bao nhiêu tín chỉ?",
+        "elapsed": 6.8941759999997885,
+        "sources_count": 2,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": true,
+        "hallucination_items": [
+          "21",
+          "150"
+        ],
+        "answer": "Chương trình đào tạo ngành CNTT có tổng cộng 150 tín chỉ. Học kỳ 7 có 21 tín chỉ."
+      },
+      {
+        "id": "CT02",
+        "question": "Môn Tốt nghiệp bao nhiêu tín chỉ và học ở học kỳ nào?",
+        "elapsed": 6.307308999999805,
+        "sources_count": 2,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "- Môn Tốt nghiệp có 8 tín chỉ.\n- Môn Tốt nghiệp được học ở Học kỳ 8."
+      },
+      {
+        "id": "CT03",
+        "question": "Học kỳ 7 có những môn nào và tổng bao nhiêu tín chỉ?",
+        "elapsed": 12.588780699999916,
+        "sources_count": 2,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": true,
+        "hallucination_items": [
+          "21"
+        ],
+        "answer": "- Học kỳ 7 có 21 tín chỉ\n- Môn học gồm: English 7 (4 tín chỉ), Kiểm thử và đảm bảo chất lượng phần mềm (3 tín chỉ), Quản trị website trên VPS (2 tín chỉ), Phát triển ứng dụng (9 tín chỉ)\n- Môn tự chọn: Trí tuệ nhân tạo (3 tín chỉ) hoặc Công nghệ Blockchain (3 tín chỉ)"
+      },
+      {
+        "id": "NP01",
+        "question": "Cho tôi công thức nấu phở bò ngon tại nhà.",
+        "elapsed": 0.035272099999929196,
+        "sources_count": 0,
+        "matched_kw": 1,
+        "total_kw": 1,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Xin lỗi, tôi là trợ lý tư vấn học vụ và chỉ hỗ trợ giải đáp các thắc mắc về quy chế, chương trình đào tạo và thủ tục học vụ của nhà trường."
+      },
+      {
+        "id": "NP02",
+        "question": "Quy định xét tốt nghiệp của Khoa Kinh tế như thế nào?",
+        "elapsed": 0.028871699999854172,
+        "sources_count": 0,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Hiện tại hệ thống chưa có dữ liệu quy định của khoa này (hệ thống hiện chỉ hỗ trợ tư vấn học vụ cho Khoa Công nghệ thông tin); tôi không thể tự bịa thông tin. Vui lòng liên hệ văn phòng khoa tương ứng hoặc phòng Đào tạo để được hỗ trợ."
+      },
+      {
+        "id": "NP03",
+        "question": "Giá bitcoin hôm nay bao nhiêu và có nên đầu tư không?",
+        "elapsed": 0.026511800000207586,
+        "sources_count": 0,
+        "matched_kw": 1,
+        "total_kw": 1,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Xin lỗi, tôi là trợ lý tư vấn học vụ và chỉ hỗ trợ giải đáp các thắc mắc về quy chế, chương trình đào tạo và thủ tục học vụ của nhà trường."
+      }
+    ]
+  },
+  "cfg_3b_topk2_c400": {
+    "model": "qwen2.5:3b",
+    "top_k": 2,
+    "max_chunk_chars": 400,
+    "overall_kw_rate": 57.49999999999999,
+    "total_matched_kw": 23,
+    "total_expected_kw": 40,
+    "total_hallucination_flags": 5,
+    "avg_time": 12.093864489999964,
+    "total_elapsed": 241.8772897999993,
+    "details": [
+      {
+        "id": "QD01",
+        "question": "Điểm trung bình tích lũy tối thiểu để được xét tốt nghiệp là bao nhiêu?",
+        "elapsed": 12.003374700000222,
+        "sources_count": 2,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": true,
+        "hallucination_items": [
+          "5.0"
+        ],
+        "answer": "Điểm trung bình tích lũy tối thiểu để được xét tốt nghiệp là 5.0."
+      },
+      {
+        "id": "QD02",
+        "question": "Sinh viên chính quy cần chứng chỉ ngoại ngữ trình độ nào để tốt nghiệp?",
+        "elapsed": 10.949642400000357,
+        "sources_count": 2,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "- Chứng chỉ ngoại ngữ trình độ Tiếng Anh Bậc 3."
+      },
+      {
+        "id": "QD03",
+        "question": "Điều kiện về tin học để xét tốt nghiệp là gì?",
+        "elapsed": 15.322208399999909,
+        "sources_count": 2,
+        "matched_kw": 0,
+        "total_kw": 2,
+        "kw_ratio": 0.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "- Đã có điều kiện về tin học trong mục A.5.2 của Điều kiện & Thủ tục quy trình xét cấp bằng Tốt nghiệp Đại học.\n- Điều kiện cụ thể chưa được cung cấp trong tài liệu hiện có."
+      },
+      {
+        "id": "QD04",
+        "question": "Tôi có cần đạt Giáo dục quốc phòng và Giáo dục thể chất để tốt nghiệp không?",
+        "elapsed": 13.210385599999881,
+        "sources_count": 2,
+        "matched_kw": 0,
+        "total_kw": 2,
+        "kw_ratio": 0.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Để tốt nghiệp hệ đại học chính quy Khoa Công nghệ thông tin tại Trường Đại học Lạc Hồng, bạn cần hoàn thành học phần Giáo dục quốc phòng và Giáo dục thể chất."
+      },
+      {
+        "id": "QD05",
+        "question": "Cần có bao nhiêu chứng chỉ kỹ năng mềm để tốt nghiệp?",
+        "elapsed": 11.109882499999912,
+        "sources_count": 2,
+        "matched_kw": 1,
+        "total_kw": 2,
+        "kw_ratio": 0.5,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "3 chứng chỉ kỹ năng mềm để tốt nghiệp Khoa Công nghệ thông tin, Trường Đại học Lạc Hồng."
+      },
+      {
+        "id": "QD06",
+        "question": "Còn nợ học phí thì có được xét tốt nghiệp không?",
+        "elapsed": 17.599789000000328,
+        "sources_count": 2,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Còn nợ học phí không ảnh hưởng đến việc xét tốt nghiệp. Điều kiện tốt nghiệp hệ đại học chính quy Khoa Công nghệ thông tin không đề cập đến việc nợ học phí. Bạn cần đảm bảo đã hoàn thành các môn học và các yêu cầu khác theo quy trình xét tốt nghiệp được hướng dẫn tại Hình 3."
+      },
+      {
+        "id": "QD07",
+        "question": "Chưa trả sách ở thư viện thì có được xét tốt nghiệp không?",
+        "elapsed": 14.22500510000009,
+        "sources_count": 2,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "- Không, việc chưa trả sách ở thư viện không ảnh hưởng đến việc xét tốt nghiệp. Điều kiện tốt nghiệp chỉ đề cập đến các yêu cầu về chứng chỉ, ngoại ngữ, tin học và hoàn thành khóa học."
+      },
+      {
+        "id": "QD08",
+        "question": "Đang bị kỷ luật đình chỉ học tập thì có được xét tốt nghiệp không?",
+        "elapsed": 0.04753119999986666,
+        "sources_count": 0,
+        "matched_kw": 1,
+        "total_kw": 2,
+        "kw_ratio": 0.5,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Hiện tại hệ thống chưa có dữ liệu quy định của khoa này (hệ thống hiện chỉ hỗ trợ tư vấn học vụ cho Khoa Công nghệ thông tin); tôi không thể tự bịa thông tin. Vui lòng liên hệ văn phòng khoa tương ứng hoặc phòng Đào tạo để được hỗ trợ."
+      },
+      {
+        "id": "QD09",
+        "question": "Sinh viên hệ liên thông có cần chứng chỉ GDQP, ngoại ngữ, tin học để tốt nghiệp không?",
+        "elapsed": 12.272414399999889,
+        "sources_count": 2,
+        "matched_kw": 1,
+        "total_kw": 2,
+        "kw_ratio": 0.5,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "- Có, sinh viên hệ liên thông cần chứng chỉ GDQP, ngoại ngữ và tin học để tốt nghiệp như quy định tại tài liệu."
+      },
+      {
+        "id": "TT01",
+        "question": "Nộp hồ sơ xét tốt nghiệp ở đâu?",
+        "elapsed": 13.608906299999944,
+        "sources_count": 2,
+        "matched_kw": 1,
+        "total_kw": 1,
+        "kw_ratio": 1.0,
+        "hallucination": true,
+        "hallucination_items": [
+          "https://graduate.lhu.edu.vn/."
+        ],
+        "answer": "Nộp hồ sơ xét tốt nghiệp tại trang web https://graduate.lhu.edu.vn/. Sinh viên cần tải lên các file hồ sơ theo định dạng PDF trên trang web đó."
+      },
+      {
+        "id": "TT02",
+        "question": "Lệ phí xét tốt nghiệp là bao nhiêu và đóng ở đâu?",
+        "elapsed": 14.751430099999652,
+        "sources_count": 2,
+        "matched_kw": 0,
+        "total_kw": 2,
+        "kw_ratio": 0.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Lệ phí xét tốt nghiệp là không được nêu trong tài liệu được cung cấp. Bạn cần liên hệ trực tiếp với Ban QLĐ hoặc Trung tâm Hỗ trợ Sinh viên để biết thông tin chính xác về lệ phí và địa điểm đóng."
+      },
+      {
+        "id": "TT03",
+        "question": "Hồ sơ xét tốt nghiệp của sinh viên chính quy gồm những file nào?",
+        "elapsed": 18.848187000000053,
+        "sources_count": 2,
+        "matched_kw": 0,
+        "total_kw": 5,
+        "kw_ratio": 0.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "- Hồ sơ xét tốt nghiệp sinh viên chính quy gồm:\n- Hồ sơ cá nhân (bản chính)\n- Học bạ\n- Chứng chỉ giáo dục trung học\n- Kết quả học tập\n- Giấy chứng nhận hoàn thành chương trình đào tạo\n- Giấy chứng nhận tốt nghiệp trung học\n- Giấy chứng nhận đủ điều kiện học lên đại học\n- Các giấy tờ khác theo yêu cầu của trường"
+      },
+      {
+        "id": "TT04",
+        "question": "Đủ tín chỉ nhưng thiếu các điều kiện khác thì được cấp giấy gì?",
+        "elapsed": 36.99696919999997,
+        "sources_count": 2,
+        "matched_kw": 1,
+        "total_kw": 2,
+        "kw_ratio": 0.5,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Đủ tín chỉ nhưng thiếu các điều kiện khác thì được cấp giấy chứng nhận hoàn thành khóa học. Đây là giấy chứng nhận cho sinh viên đã hoàn thành đủ tín chỉ học tập nhưng chưa đáp ứng đủ các yêu cầu về ngoại ngữ, tin học hoặc hình thức học như học trực tuyến."
+      },
+      {
+        "id": "TT05",
+        "question": "Lấy chứng chỉ GDQP, GDTC, kỹ năng mềm ở đâu?",
+        "elapsed": 15.67527119999977,
+        "sources_count": 2,
+        "matched_kw": 0,
+        "total_kw": 2,
+        "kw_ratio": 0.0,
+        "hallucination": true,
+        "hallucination_items": [
+          "https://graduate.lhu.edu.vn/"
+        ],
+        "answer": "Để lấy chứng chỉ GDQP, GDTC và kỹ năng mềm, bạn cần:\n\n- Nộp hồ sơ xét tốt nghiệp tại trang web: https://graduate.lhu.edu.vn/\n- Đính kèm các chứng chỉ GDQP, GDTC và các giấy tờ chứng minh kỹ năng mềm trong hồ sơ của mình."
+      },
+      {
+        "id": "CT01",
+        "question": "Chương trình đào tạo ngành CNTT có tổng cộng bao nhiêu tín chỉ?",
+        "elapsed": 9.753713900000093,
+        "sources_count": 2,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": true,
+        "hallucination_items": [
+          "150"
+        ],
+        "answer": "- Tổng cộng chương trình đào tạo ngành CNTT có 150 tín chỉ."
+      },
+      {
+        "id": "CT02",
+        "question": "Môn Tốt nghiệp bao nhiêu tín chỉ và học ở học kỳ nào?",
+        "elapsed": 10.407481700000062,
+        "sources_count": 2,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "- Môn Tốt nghiệp có 8 tín chỉ.\n- Học ở học kỳ 8."
+      },
+      {
+        "id": "CT03",
+        "question": "Học kỳ 7 có những môn nào và tổng bao nhiêu tín chỉ?",
+        "elapsed": 15.003516199999922,
+        "sources_count": 2,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": true,
+        "hallucination_items": [
+          "21"
+        ],
+        "answer": "- Học kỳ 7 có 21 tín chỉ\n- Bao gồm: \n - English 7: 4 tín chỉ\n - Kiểm thử và đảm bảo chất lượng phần mềm: 3 tín chỉ\n - Quản trị website trên VPS: 2 tín chỉ"
+      },
+      {
+        "id": "NP01",
+        "question": "Cho tôi công thức nấu phở bò ngon tại nhà.",
+        "elapsed": 0.03904759999977614,
+        "sources_count": 0,
+        "matched_kw": 1,
+        "total_kw": 1,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Xin lỗi, tôi là trợ lý tư vấn học vụ và chỉ hỗ trợ giải đáp các thắc mắc về quy chế, chương trình đào tạo và thủ tục học vụ của nhà trường."
+      },
+      {
+        "id": "NP02",
+        "question": "Quy định xét tốt nghiệp của Khoa Kinh tế như thế nào?",
+        "elapsed": 0.028060199999799806,
+        "sources_count": 0,
+        "matched_kw": 2,
+        "total_kw": 2,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Hiện tại hệ thống chưa có dữ liệu quy định của khoa này (hệ thống hiện chỉ hỗ trợ tư vấn học vụ cho Khoa Công nghệ thông tin); tôi không thể tự bịa thông tin. Vui lòng liên hệ văn phòng khoa tương ứng hoặc phòng Đào tạo để được hỗ trợ."
+      },
+      {
+        "id": "NP03",
+        "question": "Giá bitcoin hôm nay bao nhiêu và có nên đầu tư không?",
+        "elapsed": 0.024473099999795522,
+        "sources_count": 0,
+        "matched_kw": 1,
+        "total_kw": 1,
+        "kw_ratio": 1.0,
+        "hallucination": false,
+        "hallucination_items": [],
+        "answer": "Xin lỗi, tôi là trợ lý tư vấn học vụ và chỉ hỗ trợ giải đáp các thắc mắc về quy chế, chương trình đào tạo và thủ tục học vụ của nhà trường."
+      }
+    ]
+  }
+}

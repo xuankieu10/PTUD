@@ -123,4 +123,15 @@ async def import_transcript(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if os.path.exists(input_file_path):
+            try:
+                os.remove(input_file_path)
+            except Exception:
+                pass
+        if os.path.exists(session_upload_dir):
+            try:
+                shutil.rmtree(session_upload_dir, ignore_errors=True)
+            except Exception:
+                pass
 

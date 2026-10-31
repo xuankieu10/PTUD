@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
@@ -7,6 +8,7 @@ from backend.app.config import settings
 from backend.app.db import get_db
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="auth/token", auto_error=False)
 
 def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(
@@ -28,6 +30,25 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_
         raise credentials_exception
     
     return {"id": user.id, "username": user.username, "role": user.role}
+
+def get_current_user_optional(
+    db: Session = Depends(get_db),
+    token: Optional[str] = Depends(oauth2_scheme_optional)
+) -> Optional[dict]:
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"])
+        user_id = payload.get("sub")
+        role = payload.get("role")
+        if user_id is None or role is None:
+            return None
+        user = db.execute(text("SELECT id, username, role FROM users WHERE id = :uid"), {"uid": int(user_id)}).fetchone()
+        if user is None:
+            return None
+        return {"id": user.id, "username": user.username, "role": user.role}
+    except Exception:
+        return None
 
 def require_admin(current_user: dict = Depends(get_current_user)):
     if current_user["role"] != "admin":

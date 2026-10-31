@@ -19,12 +19,14 @@ from PIL import Image
 import numpy as np
 import cv2
 
+from backend.app.config import settings
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_OLLAMA_HOST = "http://localhost:11434"
 DEFAULT_VISION_MODEL = "llama3.2-vision"
 
-DEFAULT_TIMEOUT = 300
+DEFAULT_TIMEOUT = getattr(settings, "OLLAMA_TIMEOUT_OCR", 180)
 
 PRIMARY_PROMPT = (
     "Bạn là trợ lý AI chuyên đọc bảng điểm học sinh / sinh viên từ ảnh.\n"
@@ -218,6 +220,23 @@ def _normalize_subject_list(raw_list: List[Dict[str, Any]]) -> List[Dict[str, An
     return normalized
 
 
+def resolve_vision_model(model_name: str, host: str = DEFAULT_OLLAMA_HOST) -> str:
+    """Tự động chọn mô hình Vision khả dụng trong Ollama (ưu tiên model có sẵn như qwen2.5vl:7b nếu llama3.2-vision chưa pull)"""
+    if not model_name or model_name == "llama3.2-vision":
+        try:
+            r = requests.get(f"{host.rstrip('/')}/api/tags", timeout=2)
+            if r.status_code == 200:
+                installed = [m.get("name", "") for m in r.json().get("models", [])]
+                if not any("llama3.2-vision" in m for m in installed):
+                    for fallback in ["qwen2.5vl:7b", "qwen2.5vl", "llava"]:
+                        for m in installed:
+                            if fallback in m:
+                                return m
+        except Exception:
+            pass
+    return model_name or DEFAULT_VISION_MODEL
+
+
 def query_ollama(
     prompt: str,
     image_base64: str,
@@ -228,6 +247,7 @@ def query_ollama(
     """
     Gửi request tới API Ollama `/api/generate`.
     """
+    model = resolve_vision_model(model, host)
     url = f"{host.rstrip('/')}/api/generate"
     cpu_cores = os.cpu_count() or 4
     num_threads = max(1, cpu_cores - 2)

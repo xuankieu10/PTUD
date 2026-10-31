@@ -47,19 +47,22 @@ def read_users_me(
 ):
     res = {
         "id": current_user["id"],
+        "user_id": current_user["id"],
         "username": current_user["username"],
         "role": current_user["role"],
     }
     stu = db.execute(
-        text("SELECT student_code, full_name, major, cohort FROM students WHERE user_id = :uid"),
+        text("SELECT id, student_code, full_name, major, cohort FROM students WHERE user_id = :uid"),
         {"uid": current_user["id"]}
     ).fetchone()
     if stu:
+        res["student_id"] = stu.id
         res["student_code"] = stu.student_code
         res["full_name"] = stu.full_name
         res["major"] = stu.major
         res["cohort"] = stu.cohort
     else:
+        res["student_id"] = None
         if current_user["role"] == "admin":
             res["student_code"] = "ADMIN"
             res["full_name"] = "Quản trị viên"

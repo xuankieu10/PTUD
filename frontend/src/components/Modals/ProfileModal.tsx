@@ -7,15 +7,18 @@ interface ProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
   user: UserProfile | null;
+  studentId?: number | null;
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
   isOpen,
   onClose,
   user,
+  studentId,
 }) => {
   const [data, setData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isExplaining, setIsExplaining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -23,11 +26,28 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     const fetchGradCheck = async () => {
       setIsLoading(true);
       setError(null);
+      setData(null);
       const token = getAuthToken();
       const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || '';
 
       try {
-        const res = await fetch(`${API_BASE_URL}/students/${user.id}/graduation-check?explain=true`, {
+        let url = `${API_BASE_URL}/students/me/graduation-check?explain=false`;
+        if (user.role === 'admin') {
+          // Với admin xem hồ sơ sinh viên cụ thể: dùng student_id, không dùng users.id
+          const targetStudentId = studentId ?? user.student_id;
+          if (targetStudentId) {
+            url = `${API_BASE_URL}/students/${targetStudentId}/graduation-check?explain=false`;
+          } else {
+            setError('Tài khoản Quản trị viên không có hồ sơ sinh viên để kiểm tra tốt nghiệp.');
+            setIsLoading(false);
+            return;
+          }
+        } else {
+          // Với sinh viên: luôn gọi /students/me/graduation-check, không truyền user.id vào URL
+          url = `${API_BASE_URL}/students/me/graduation-check?explain=false`;
+        }
+
+        const res = await fetch(url, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -35,6 +55,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         if (res.ok) {
           const resData = await res.json();
           setData(resData);
+        } else if (res.status === 403) {
+          setError('Bạn không có quyền xem thông tin sinh viên này.');
         } else {
           setError('Chưa thể lấy thông tin xét tốt nghiệp của sinh viên này.');
         }
@@ -46,7 +68,37 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     };
 
     fetchGradCheck();
-  }, [isOpen, user]);
+  }, [isOpen, user, studentId]);
+
+  const handleExplain = async () => {
+    if (!user || isExplaining) return;
+    setIsExplaining(true);
+    const token = getAuthToken();
+    const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || '';
+
+    try {
+      let url = `${API_BASE_URL}/students/me/graduation-check?explain=true`;
+      if (user.role === 'admin') {
+        const targetStudentId = studentId ?? user.student_id;
+        if (targetStudentId) {
+          url = `${API_BASE_URL}/students/${targetStudentId}/graduation-check?explain=true`;
+        }
+      }
+      const res = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (res.ok) {
+        const resData = await res.json();
+        setData((prev: any) => ({ ...prev, explanation: resData.explanation }));
+      }
+    } catch {
+      // Không chặn luồng nếu lỗi gọi giải thích
+    } finally {
+      setIsExplaining(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -116,7 +168,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   {data.is_eligible ? 'ĐỦ ĐIỀU KIỆN TỐT NGHIỆP' : 'CHƯA ĐỦ ĐIỀU KIỆN TỐT NGHIỆP'}
                 </p>
                 <p className="text-[11px] mt-0.5">
-                  Tín chỉ tích lũy: {data.total_credits_earned || 0} / {data.total_credits_required || 140}
+                  Tín chỉ tích lũy: {data.total_credits_earned ?? data.total_credits_passed ?? 0} / {data.total_credits_required || data.required_credits || 120}
                 </p>
               </div>
             </div>
@@ -136,9 +188,27 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             )}
 
             {/* Explanation / Advice */}
-            {data.explanation && (
+            {data.explanation ? (
               <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
                 {data.explanation}
+              </div>
+            ) : (
+              <div className="flex justify-end pt-1">
+                <button
+                  type="button"
+                  onClick={handleExplain}
+                  disabled={isExplaining}
+                  className="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#1565C0] dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-[#4D8FE0] font-medium text-xs flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
+                >
+                  {isExplaining ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Đang tạo giải thích...</span>
+                    </>
+                  ) : (
+                    <span>Giải thích</span>
+                  )}
+                </button>
               </div>
             )}
           </div>
