@@ -21,15 +21,30 @@ SYNONYM_MAPPINGS = [
         ["rớt", "rot", "trượt", "truot", "nợ môn", "no mon", "chưa đạt", "chua dat"],
         "không đạt điểm dưới 4.0 cảnh báo học vụ buộc thôi học"
     ),
-    # 4. Thi lại
+    # 4. Thi lại, thi lại lần 2
     (
-        ["thi lại", "thi lai", "thi lai mon"],
-        "thi lại đánh giá lại cải thiện điểm số"
+        ["thi lại", "thi lai", "thi lai mon", "thi lại lần 2", "thi lai lan 2", "thi lần 2", "thi lan 2"],
+        "hình thức thi lại lần 2 cuối kỳ đầu học kỳ mới điểm dưới 5 chuyên cần giữa kỳ không thi lại đánh giá lại cải thiện điểm số"
     ),
     # 5. Học lại, học vét
     (
         ["học lại", "hoc lai", "học vét", "hoc vet", "trả nợ môn", "tra no mon"],
-        "đăng ký học lại học phần học kỳ phụ trả nợ tín chỉ"
+        "đăng ký học lại học vét học phần bắt buộc tự chọn điểm dưới 5 học kỳ phụ hè trả nợ tín chỉ trực tuyến app ME group Zalo"
+    ),
+    # 5b. Cấm thi
+    (
+        ["cấm thi", "cam thi", "bị cấm thi", "bi cam thi"],
+        "điều kiện cấm thi kết thúc học phần vắng quá 20% số tiết điểm thành phần chuyên cần giữa kỳ dưới 2.0"
+    ),
+    # 5c. Cải thiện điểm
+    (
+        ["cải thiện điểm", "cai thien diem", "nâng điểm", "nang diem"],
+        "quy định cải thiện điểm học lại học phần đạt từ 5.0 trở lên lấy điểm cao nhất thi cải thiện lần 2"
+    ),
+    # 5d. Cảnh báo học vụ và buộc thôi học
+    (
+        ["cảnh báo học vụ", "canh bao hoc vu", "buộc thôi học", "buoc thoi hoc"],
+        "cảnh báo học vụ buộc thôi học điểm trung bình chung tích lũy dưới 1.2 1.4 1.6 1.8 cảnh báo 2 học kỳ liên tiếp quá thời hạn tối đa 12 13 học kỳ"
     ),
     # 6. Ngoại ngữ -> tiếng Anh, TOEIC, IELTS, VSTEP
     (

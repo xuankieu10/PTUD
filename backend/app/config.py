@@ -1,3 +1,4 @@
+from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -12,7 +13,7 @@ class Settings(BaseSettings):
     TOP_K: int = 3
     SIMILARITY_THRESHOLD: float = 0.35
     MIN_SCORE_THRESHOLD: float = 0.6
-    REQUIRED_CREDITS: int = 120
+    REQUIRED_CREDITS: int = 150
     OLLAMA_TIMEOUT_EMBED: int = 180
     OLLAMA_TIMEOUT_CHAT: int = 300
     OLLAMA_TIMEOUT_OCR: int = 180
@@ -20,6 +21,8 @@ class Settings(BaseSettings):
     OLLAMA_NUM_CTX: int = 4096  # Context window phù hợp ngữ cảnh học vụ
     OLLAMA_NUM_PREDICT: int = 300  # Giới hạn độ dài token phản hồi
     MAX_CHUNK_CHARS: int = 600  # Cắt ngắn chunk quá dài khi đưa vào prompt LLM
+    OLLAMA_NUM_THREAD: Optional[int] = None  # Số luồng CPU tính toán (None = mặc định Ollama)
+    OLLAMA_NUM_BATCH: Optional[int] = None  # Batch size xử lý prompt (None = mặc định Ollama)
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

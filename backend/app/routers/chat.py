@@ -177,21 +177,82 @@ def check_guardrails(msg: str) -> Optional[tuple[str, str]]:
     is_it_query = any(k in msg_unaccent for k in it_keywords)
 
     if not is_it_query:
-        other_faculties = [
-            "luat", "du lich", "kinh te", "duoc", "y khoa", "y hoc", "co dien", "dien tu",
-            "ngon ngu", "dong phuong", "tai chinh", "ngan hang", "ke toan", "quan tri",
-            "moi truong", "thuc pham", "hoa hoc", "xay dung", "khoa khac", "nganh khac"
+        # Danh sách các động từ và từ chỉ hành động học vụ theo sau để nhận diện câu hỏi học vụ hợp lệ
+        # (tránh chặn nhầm 'được'/'dược', 'luật'/'kỷ luật' khi người dùng gõ không dấu hoặc hỏi quy chế chung)
+        ACADEMIC_ACTION_VERBS = [
+            "xet", "nop", "mien", "thi", "hoc", "cap", "dang ky", "to chuc",
+            "nhan", "bao luu", "tot nghiep", "cong nhan", "khai giang", "sat hach",
+            "canh bao", "thoi hoc", "dieu kien", "hoan thanh", "ho so", "quyet dinh"
         ]
-        for fac in other_faculties:
-            # Riêng ngành Dược: chữ "được" bỏ dấu thành "duoc", nên chỉ khớp khi có chữ "khoa duoc" hoặc "nganh duoc"
-            if fac == "duoc":
-                if "khoa duoc" in msg_unaccent or "nganh duoc" in msg_unaccent:
-                    return FACULTY_NOT_SUPPORTED_RESPONSE, "other_faculty"
-            else:
-                if f"khoa {fac}" in msg_unaccent or f"nganh {fac}" in msg_unaccent:
-                    return FACULTY_NOT_SUPPORTED_RESPONSE, "other_faculty"
-                if fac in ["luat", "du lich", "kinh te"] and f" {fac}" in msg_unaccent and any(w in msg_unaccent for w in ["tot nghiep", "dieu kien", "xet", "chuan dau ra", "ngoai ngu"]):
-                    return FACULTY_NOT_SUPPORTED_RESPONSE, "other_faculty"
+
+        other_faculties_map = [
+            ("dược", "duoc"),
+            ("luật", "luat"),
+            ("kinh tế", "kinh te"),
+            ("du lịch", "du lich"),
+            ("y khoa", "y khoa"),
+            ("y học", "y hoc"),
+            ("cơ điện", "co dien"),
+            ("điện tử", "dien tu"),
+            ("ngôn ngữ", "ngon ngu"),
+            ("đông phương", "dong phuong"),
+            ("tài chính", "tai chinh"),
+            ("ngân hàng", "ngan hang"),
+            ("kế toán", "ke toan"),
+            ("quản trị", "quan tri"),
+            ("môi trường", "moi truong"),
+            ("thực phẩm", "thuc pham"),
+            ("hóa học", "hoa hoc"),
+            ("xây dựng", "xay dung"),
+            ("khoa khác", "khoa khac"),
+            ("ngành khác", "nganh khac"),
+        ]
+
+        is_accented = has_vietnamese(msg)
+
+        if is_accented:
+            # Phân nhánh 1: Câu CÓ DẤU -> so khớp chính xác theo dạng có dấu, không nhầm "dược" với "được"
+            for fac_vi, _ in other_faculties_map:
+                if fac_vi == "dược":
+                    if re.search(r'\b(khoa|ngành|sinh viên|bộ môn)\s+dược\b', msg_clean) or re.search(r'\b(dược sĩ|dược học)\b', msg_clean):
+                        return FACULTY_NOT_SUPPORTED_RESPONSE, "other_faculty"
+                    if re.search(r'\b(tốt nghiệp|chuẩn đầu ra)\s+(?:của\s+)?(?:khoa\s+)?dược\b', msg_clean):
+                        return FACULTY_NOT_SUPPORTED_RESPONSE, "other_faculty"
+                elif fac_vi == "luật":
+                    # Chỉ chặn khi đề cập Khoa/Ngành Luật; loại trừ "kỷ luật", "quy luật", "pháp luật", "luật giáo dục"
+                    if re.search(r'(?<!kỷ\s)(?<!quy\s)(?<!pháp\s)(?<!bộ\s)\b(khoa|ngành|sinh viên khoa)\s+luật\b', msg_clean):
+                        return FACULTY_NOT_SUPPORTED_RESPONSE, "other_faculty"
+                    if re.search(r'\b(khoa luật|ngành luật)\b', msg_clean):
+                        return FACULTY_NOT_SUPPORTED_RESPONSE, "other_faculty"
+                    if re.search(r'\bsinh viên\s+khoa\s+luật\b', msg_clean):
+                        return FACULTY_NOT_SUPPORTED_RESPONSE, "other_faculty"
+                    if re.search(r'\b(tốt nghiệp|chuẩn đầu ra)\s+(?:của\s+)?(?:khoa\s+)?luật\b', msg_clean):
+                        return FACULTY_NOT_SUPPORTED_RESPONSE, "other_faculty"
+                else:
+                    if f"khoa {fac_vi}" in msg_clean or f"ngành {fac_vi}" in msg_clean:
+                        return FACULTY_NOT_SUPPORTED_RESPONSE, "other_faculty"
+                    if fac_vi in ["kinh tế", "du lịch"] and f" {fac_vi}" in msg_clean and any(w in msg_clean for w in ["tốt nghiệp", "điều kiện", "xét", "chuẩn đầu ra", "ngoại ngữ"]):
+                        return FACULTY_NOT_SUPPORTED_RESPONSE, "other_faculty"
+        else:
+            # Phân nhánh 2: Câu KHÔNG DẤU -> chỉ chặn khi cụm đứng như tên khoa (không theo sau bởi động từ học vụ)
+            # Điểm đánh đổi: các câu mơ hồ như "khoa duoc tot nghiep..." nếu không chặn sẽ đi tiếp vào RAG;
+            # vì hệ thống chỉ lưu tài liệu Khoa CNTT nên tối đa chatbot sẽ báo không có dữ liệu, không gây hại.
+            for fac_vi, fac_ascii in other_faculties_map:
+                for prefix in ["khoa ", "nganh ", "sinh vien khoa "]:
+                    target_phrase = f"{prefix}{fac_ascii}"
+                    if target_phrase in msg_unaccent:
+                        pattern = rf'\b{re.escape(target_phrase)}\s+(\w+)'
+                        m = re.search(pattern, msg_unaccent)
+                        if m:
+                            next_word = m.group(1).lower()
+                            if next_word in ACADEMIC_ACTION_VERBS:
+                                # Trợ động từ hoặc hành động học vụ đi liền sau (ví dụ: 'khoa được xét', 'khoa được tổ chức')
+                                continue
+                        return FACULTY_NOT_SUPPORTED_RESPONSE, "other_faculty"
+
+                if fac_ascii in ["du lich", "kinh te"]:
+                    if f" {fac_ascii}" in msg_unaccent and any(w in msg_unaccent for w in ["tot nghiep", "dieu kien", "xet", "chuan dau ra", "ngoai ngu"]):
+                        return FACULTY_NOT_SUPPORTED_RESPONSE, "other_faculty"
 
     return None
 
@@ -340,7 +401,7 @@ def get_student_academic_and_ocr_context(db: Session, user_id: int) -> tuple[str
                 student_code = stu_nested.get("student_code") or stu_row.student_code
 
                 total_credits_passed = grad.get("total_credits_passed", grad.get("total_credits_earned", 0))
-                required_credits = grad.get("required_credits", grad.get("total_credits_required", 120))
+                required_credits = grad.get("required_credits", grad.get("total_credits_required", settings.REQUIRED_CREDITS))
                 credits_missing = grad.get("credits_missing", max(0, required_credits - total_credits_passed))
                 total_credits_failed = grad.get("total_credits_failed", 0)
                 notes = grad.get("notes", "Chưa đủ điều kiện tốt nghiệp")
@@ -377,7 +438,8 @@ SAFE_MIXED_WORDS = {
     "powerpoint", "javascript", "elearning", "typescript", "iphone", "phd",
     "mssv", "github", "linkedin", "chatgpt", "openai", "youtube", "facebook",
     "tiktok", "nodejs", "reactjs", "vuejs", "nextjs", "gitlab", "bitbucket",
-    "vscode", "devops", "fastapi", "sqlserver", "postgresql", "mongodb"
+    "vscode", "devops", "fastapi", "sqlserver", "postgresql", "mongodb",
+    "appme", "zalo", "vstep", "cefr", "toefl", "ielts", "google", "gmail"
 }
 VIETNAMESE_ACCENTED_CHARS = "àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ"
 
@@ -386,13 +448,16 @@ def has_stuck_mixed_language(text: str) -> bool:
     """Kiểm tra từ bị dính chữ thường và chữ hoa (như việcDismissal).
     Chỉ coi là lỗi khi ký tự trước là chữ có dấu tiếng Việt hoặc cả cụm
     vừa dính nhau vừa nằm ngoài danh sách an toàn (PowerPoint, JavaScript...).
+    Bỏ qua liên kết URL (thường chứa chuỗi ngẫu nhiên hoa thường).
     """
+    text_no_url = re.sub(r"https?://\S+", "", text)
+
     # 1. Ký tự ngay trước chữ hoa là chữ có dấu tiếng Việt (vd: kỹNăng, đồÁn...)
-    if re.search(rf"[{VIETNAMESE_ACCENTED_CHARS}][A-Z]", text):
+    if re.search(rf"[{VIETNAMESE_ACCENTED_CHARS}][A-Z]", text_no_url):
         return True
 
     # 2. Cả cụm vừa dính nhau ([a-z][A-Z]) vừa nằm ngoài danh sách an toàn
-    words = re.findall(r"\b[a-zA-Z0-9_à-ỹÀ-Ỹ]*[a-z][A-Z][a-zA-Z0-9_à-ỹÀ-Ỹ]*\b", text)
+    words = re.findall(r"\b[a-zA-Z0-9_à-ỹÀ-Ỹ]*[a-z][A-Z][a-zA-Z0-9_à-ỹÀ-Ỹ]*\b", text_no_url)
     for w in words:
         clean_w = re.sub(r"[^a-zA-Z0-9à-ỹÀ-Ỹ]", "", w).strip()
         if clean_w.lower() not in SAFE_MIXED_WORDS:
@@ -440,6 +505,155 @@ def format_course_grade_source(item: dict) -> str:
     return f"{name_str}{code_str}: {grade_info}"
 
 
+def format_failed_course_guidance(course: dict) -> str:
+    """
+    Phân loại hướng dẫn xử lý môn không đạt thành 3 nhánh theo Quy chế đào tạo (Chương III – Điều 19 & Chương II – Điều 12):
+    1. Bị cấm thi (vắng > 20% hoặc điểm thành phần < 2.0 hoặc có ghi chú cấm thi):
+       -> 'Bị cấm thi, cần đăng ký học lại (không được thi lần 2)'
+    2. Đủ điều kiện dự thi (điểm không đạt nhưng đủ điều kiện dự thi):
+       -> 'Được đăng ký thi lần 2 (đầu học kỳ sau) hoặc học lại'
+    3. Không đủ dữ liệu để phân biệt:
+       -> 'Cần học lại hoặc thi lại (xem chi tiết trên cổng sinh viên hoặc liên hệ giáo vụ)'
+    """
+    from backend.grade_filter import classify_failure_reason
+    reason = classify_failure_reason(course)
+    if reason == "Bị cấm thi, cần đăng ký học lại":
+        return "Bị cấm thi, cần đăng ký học lại (không được thi lần 2)"
+    elif reason == "Được đăng ký thi lần 2 (đầu học kỳ sau) hoặc học lại":
+        return "Được đăng ký thi lần 2 (đầu học kỳ sau) hoặc học lại"
+    else:
+        return "Cần học lại hoặc thi lại (xem chi tiết trên cổng sinh viên hoặc liên hệ giáo vụ)"
+
+
+REGISTRATION_LINKS_NOTE = (
+    "Lưu ý: Điểm chuyên cần và kiểm tra giữa kỳ không có thi lần 2. "
+    "Link đăng ký học lại: https://forms.gle/iBk3hNwG4SCGKMEFA, "
+    "group Zalo hỗ trợ: https://zalo.me/g/ar6b85p9opfxctwhxwpd"
+)
+
+
+def clean_academic_regulation_answer(answer: str, user_message: str) -> str:
+    """
+    Hậu kiểm chống bịa khi trả lời quy chế:
+    - Câu điều kiện xét tốt nghiệp: loại bỏ các ý tự thêm về hạnh kiểm, học phí ngoài văn bản Điều 27.
+    - Câu cấm thi: chỉ trả 2 lý do (vắng quá 20% số tiết, điểm thành phần dưới 2.0). Không trộn cảnh báo học vụ.
+    - Câu học vét: không tự định nghĩa; nói rõ chưa có văn bản riêng về lớp học vét, hướng dẫn đăng ký học lại theo chunk.
+    """
+    msg_l = (user_message or "").lower()
+
+    # 1. Câu hỏi cấm thi
+    if "cấm thi" in msg_l or "cam thi" in msg_l:
+        lines = answer.split("\n")
+        kept = []
+        for line in lines:
+            line_l = line.lower()
+            if any(k in line_l for k in ["cảnh báo học vụ", "canh bao hoc vu", "buộc thôi học", "buoc thoi hoc", "dưới ngưỡng quy định", "2 học kỳ"]):
+                continue
+            kept.append(line)
+        cleaned = "\n".join(kept).strip()
+        cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+        if len(cleaned) > 20:
+            answer = cleaned
+
+    # 2. Câu hỏi điều kiện xét tốt nghiệp (không phải cá nhân hoá điểm)
+    if any(k in msg_l for k in ["điều kiện xét tốt nghiệp", "dieu kien xet tot nghiep", "điều kiện tốt nghiệp", "dieu kien tot nghiep"]) and not any(k in msg_l for k in ["của tôi", "của em", "tôi cần", "em cần"]):
+        lines = answer.split("\n")
+        kept = []
+        for line in lines:
+            line_l = line.lower()
+            if any(k in line_l for k in ["hạnh kiểm", "hanh kiem", "học phí", "hoc phi"]):
+                continue
+            kept.append(line)
+        cleaned = "\n".join(kept).strip()
+        cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+        if len(cleaned) > 20:
+            answer = cleaned
+
+    # 3. Câu hỏi về học vét
+    if "học vét" in msg_l or "hoc vet" in msg_l:
+        note_prefix = "Hiện tại Nhà trường chưa có văn bản quy định riêng về lớp học vét; sinh viên có nhu cầu học lại/học vét thực hiện theo quy trình đăng ký học lại thông thường."
+        if "chưa có văn bản" not in answer.lower():
+            # Thay thế định nghĩa tự sáng tác nếu có
+            answer = re.sub(r"^Học vét là[^\.\n]+\.", note_prefix, answer, flags=re.IGNORECASE)
+            if note_prefix not in answer:
+                answer = f"{note_prefix}\n\n{answer}"
+
+    # 4. Câu hỏi về kỹ năng mềm
+    if any(k in msg_l for k in ["kỹ năng mềm", "ky nang mem", "kĩ năng mềm", "ki nang mem"]):
+        # Bỏ cụm "của Khoa CNTT" / "của Khoa Công nghệ thông tin", vì docx không nói đây là quy định riêng của khoa
+        answer = re.sub(r",?\s*(?:của|thuộc)\s*Khoa\s*(?:Công nghệ thông tin|CNTT),?", "", answer, flags=re.IGNORECASE)
+        answer = re.sub(r"\bKhoa\s*(?:Công nghệ thông tin|CNTT)\s*–?\s*", "", answer, flags=re.IGNORECASE)
+        # Đảm bảo kỹ năng thứ 3 đúng nguyên văn chunk, không tự điền
+        answer = re.sub(
+            r"Kỹ năng viết CV điện tử và (?:trả lời phỏng vấn|phỏng vấn tìm việc làm|phỏng vấn xin việc|phỏng vấn)",
+            "Kỹ năng viết CV điện tử và trả (văn bản gốc bị cắt, chưa xác nhận tên đầy đủ)",
+            answer,
+            flags=re.IGNORECASE
+        )
+        if "Kỹ năng viết CV điện tử và trả" in answer and "chưa xác nhận tên đầy đủ" not in answer:
+            answer = re.sub(
+                r"Kỹ năng viết CV điện tử và trả(?:\s*\[.*?\])?",
+                "Kỹ năng viết CV điện tử và trả (văn bản gốc bị cắt, chưa xác nhận tên đầy đủ)",
+                answer,
+                flags=re.IGNORECASE
+            )
+
+    return answer
+
+
+def check_deadline(now: Optional[datetime] = None, deadline: Optional[datetime] = None) -> bool:
+    """
+    Kiểm tra xem đã quá hạn đăng ký môn học hay chưa (Việc 3).
+    - Trả về True nếu ĐÃ QUÁ HẠN (now > deadline).
+    - Trả về False nếu CÒN HẠN.
+    - Placeholder: nếu chưa cấu hình deadline cụ thể, mặc định trả về True để hướng dẫn quy trình trễ hạn.
+    """
+    if deadline is None:
+        return True
+    if now is None:
+        now = datetime.now()
+    return now > deadline
+
+
+REGISTRATION_OVERDUE_RESPONSE = (
+    "Thời hạn đăng ký môn học được thực hiện theo thông báo cụ thể của Phòng Đào tạo cho từng học kỳ.\n\n"
+    "Nếu đã quá thời hạn đăng ký trực tuyến, bạn cần thực hiện như sau:\n"
+    "1. Theo dõi thông báo về đợt học lại tiếp theo trên app ME.\n"
+    "2. Tham gia Group Zalo để biết thêm chi tiết: https://zalo.me/g/ar6b85p9opfxctwhxwpd\n"
+    "3. Liên hệ Văn phòng Khoa Công nghệ thông tin để được hỗ trợ:\n"
+    "   - Số điện thoại: 02513.952.251\n"
+    "   - Email: cntt@lhu.edu.vn\n"
+    "   - Địa chỉ: Phòng B301 - B302, Cơ sở 1 (Số 10 Huỳnh Văn Nghệ, Biên Hòa, Đồng Nai)\n"
+    "   - Giờ làm việc: Thứ Hai - Thứ Sáu (Sáng: 7h30 – 11h30 | Chiều: 13h00 – 16h30 / 17h00)\n\n"
+    "[Văn bản quy định học vụ, Khoa Công nghệ thông tin – Hướng dẫn đăng ký học vụ]"
+)
+
+REGISTRATION_OVERDUE_SOURCES = [
+    {
+        "document_id": 9001,
+        "title": "Quy chế đào tạo & Quy định học vụ",
+        "section": "Hướng dẫn đăng ký học vụ",
+        "chunk_index": 5,
+        "score": 1.0,
+        "snippet": "Nếu mẫu đơn đã quá thời hạn đăng ký, vui lòng theo dõi trên app ME về đợt học lại tiếp theo. Sinh viên tham gia Group Zalo https://zalo.me/g/ar6b85p9opfxctwhxwpd và liên hệ Khoa CNTT (02513.952.251, B301-B302 CS1, Số 10 Huỳnh Văn Nghệ, Biên Hòa, Đồng Nai).",
+        "url": "http://cs.lhu.edu.vn",
+        "so_hieu": "Quy chế đào tạo LHU"
+    }
+]
+
+
+def is_registration_deadline_query(message: str) -> bool:
+    """Nhận diện câu hỏi về trễ hạn / hết hạn / quá hạn đăng ký môn học / học phần / học lại."""
+    msg = (message or "").lower()
+    has_register = any(k in msg for k in ["đăng ký", "dang ky", "đk môn", "dk mon", "đk học phần", "dk hoc phan", "học lại", "hoc lai", "học vét", "hoc vet", "môn học", "học phần"])
+    has_overdue = any(k in msg for k in [
+        "hết hạn", "het han", "quá hạn", "qua han", "trễ hạn", "tre han", "muộn", "muon",
+        "hạn chót", "han chot", "thời hạn", "thoi han", "hết đợt", "het dot", "bỏ lỡ", "bo lo",
+        "chưa kịp đăng ký", "chua kip dang ky", "không kịp đăng ký", "khong kip dang ky"
+    ])
+    return has_register and has_overdue
+
+
 def build_verified_academic_data(grad_info: Optional[dict], ocr_info: Optional[dict] = None) -> dict:
     """Xây dựng khối dữ liệu học vụ xác thực từ graduation-check và OCR.
     - Gộp môn trùng khi hợp nhất dữ liệu hệ thống và OCR: chuẩn hoá tên và mã môn để nhận ra cùng một môn.
@@ -455,7 +669,7 @@ def build_verified_academic_data(grad_info: Optional[dict], ocr_info: Optional[d
     student_code = stu.get("student_code", "")
 
     total_credits_passed = grad_info.get("total_credits_passed", grad_info.get("total_credits_earned", 0))
-    required_credits = grad_info.get("required_credits", grad_info.get("total_credits_required", 120))
+    required_credits = grad_info.get("required_credits", grad_info.get("total_credits_required", settings.REQUIRED_CREDITS))
     credits_missing = grad_info.get("credits_missing", max(0, required_credits - total_credits_passed))
     total_credits_failed = grad_info.get("total_credits_failed", 0)
     notes = grad_info.get("notes", "Chưa đủ điều kiện tốt nghiệp")
@@ -511,7 +725,11 @@ def build_verified_academic_data(grad_info: Optional[dict], ocr_info: Optional[d
                 "ocr_grade": ocr_g,
                 "grade": s_grade if s_grade is not None else ocr_g,
                 "is_red_marked": bool(matched_ocr.get("is_red_marked")),
-                "filter_reason": matched_ocr.get("filter_reason", ""),
+                "filter_reason": matched_ocr.get("filter_reason", "") or s.get("filter_reason", ""),
+                "cam_thi": matched_ocr.get("cam_thi") if matched_ocr.get("cam_thi") is not None else s.get("cam_thi"),
+                "vang_qua_20": matched_ocr.get("vang_qua_20") if matched_ocr.get("vang_qua_20") is not None else s.get("vang_qua_20"),
+                "duoc_thi_lai": matched_ocr.get("duoc_thi_lai") if matched_ocr.get("duoc_thi_lai") is not None else s.get("duoc_thi_lai"),
+                "diem_thanh_phan": matched_ocr.get("diem_thanh_phan") or s.get("diem_thanh_phan") or matched_ocr.get("diem_qua_trinh"),
                 "sources": ["hệ thống", "OCR"],
                 "is_differing_grades": is_diff
             })
@@ -524,7 +742,11 @@ def build_verified_academic_data(grad_info: Optional[dict], ocr_info: Optional[d
                 "ocr_grade": None,
                 "grade": s_grade,
                 "is_red_marked": False,
-                "filter_reason": "",
+                "filter_reason": s.get("filter_reason", ""),
+                "cam_thi": s.get("cam_thi"),
+                "vang_qua_20": s.get("vang_qua_20"),
+                "duoc_thi_lai": s.get("duoc_thi_lai"),
+                "diem_thanh_phan": s.get("diem_thanh_phan") or s.get("diem_qua_trinh"),
                 "sources": ["hệ thống"],
                 "is_differing_grades": False
             })
@@ -543,6 +765,10 @@ def build_verified_academic_data(grad_info: Optional[dict], ocr_info: Optional[d
             "grade": ocr_g,
             "is_red_marked": bool(o.get("is_red_marked")),
             "filter_reason": o.get("filter_reason", ""),
+            "cam_thi": o.get("cam_thi"),
+            "vang_qua_20": o.get("vang_qua_20"),
+            "duoc_thi_lai": o.get("duoc_thi_lai"),
+            "diem_thanh_phan": o.get("diem_thanh_phan") or o.get("diem_qua_trinh"),
             "sources": ["OCR"],
             "is_differing_grades": False
         })
@@ -631,7 +857,7 @@ def generate_verified_academic_template(verified: dict, user_message: str = "") 
     red_marked_courses_ge_4 = verified.get("red_marked_courses_ge_4", [])
     unstudied_courses = verified.get("unstudied_courses", [])
     credits_passed = verified.get("total_credits_passed", 0)
-    credits_required = verified.get("required_credits", 120)
+    credits_required = verified.get("required_credits", settings.REQUIRED_CREDITS)
     credits_missing = verified.get("credits_missing", 0)
     certs = verified.get("certificates", {})
 
@@ -646,7 +872,9 @@ def generate_verified_academic_template(verified: dict, user_message: str = "") 
             lines.append(f"\n1. Môn chưa đạt (điểm < 4.0) cần học lại / thi lại ({len(failed_courses_under_4)} môn):")
             for f in failed_courses_under_4:
                 c_line = format_course_grade_source(f)
-                lines.append(f"- {c_line}. Hướng dẫn: Cần đăng ký học lại hoặc thi lại trong học kỳ tiếp theo để cải thiện điểm.")
+                guidance = format_failed_course_guidance(f)
+                lines.append(f"- {c_line}. Hướng dẫn: {guidance}.")
+            lines.append(f"\n{REGISTRATION_LINKS_NOTE}")
 
         if red_marked_courses_ge_4:
             lines.append(f"\n2. Môn bị đánh dấu đỏ trên bảng điểm (điểm ≥ 4.0) cần xác nhận với giáo vụ ({len(red_marked_courses_ge_4)} môn):")
@@ -670,7 +898,9 @@ def generate_verified_academic_template(verified: dict, user_message: str = "") 
     if failed_courses_under_4:
         for f in failed_courses_under_4:
             c_line = format_course_grade_source(f)
-            lines.append(f"- {c_line} - Cần đăng ký học lại hoặc thi lại trong học kỳ tiếp theo để cải thiện điểm.")
+            guidance = format_failed_course_guidance(f)
+            lines.append(f"- {c_line} - {guidance}.")
+        lines.append(f"- {REGISTRATION_LINKS_NOTE}")
     else:
         lines.append("- Bạn không có môn nào bị rớt hoặc nợ điểm (điểm < 4.0).")
 
@@ -737,7 +967,7 @@ def validate_academic_answer(answer: str, verified: dict) -> bool:
 
     # 2. Không dùng từ "đủ" khi tín chỉ tích luỹ < yêu cầu
     credits_passed = verified.get("total_credits_passed", 0)
-    credits_required = verified.get("required_credits", 120)
+    credits_required = verified.get("required_credits", settings.REQUIRED_CREDITS)
     if credits_passed < credits_required:
         if re.search(r"(?:tích lũy|đạt|có)\s+đủ\s+\d+", ans_lower) or re.search(r"đủ\s+\d+/\d+", ans_lower) or re.search(r"đủ\s+\d+\s*(?:tín chỉ|tc)", ans_lower):
             logger.warning("Academic answer validation failed: says 'đủ' while credits < required (%d < %d)", credits_passed, credits_required)
@@ -799,6 +1029,20 @@ def validate_academic_answer(answer: str, verified: dict) -> bool:
     return True
 
 
+def _build_ollama_options() -> dict:
+    """Tạo dictionary options cho Ollama, hỗ trợ cấu hình num_thread, num_batch và num_ctx."""
+    opts = {
+        "temperature": 0.0,
+        "top_p": 0.9,
+        "num_predict": settings.OLLAMA_NUM_PREDICT,
+        "num_ctx": settings.OLLAMA_NUM_CTX,
+    }
+    if getattr(settings, "OLLAMA_NUM_THREAD", None):
+        opts["num_thread"] = settings.OLLAMA_NUM_THREAD
+    if getattr(settings, "OLLAMA_NUM_BATCH", None):
+        opts["num_batch"] = settings.OLLAMA_NUM_BATCH
+    return opts
+
 def _call_ollama(messages: list, timeout: int) -> str:
     """Gọi Ollama và trả về nội dung trả lời. Ném HTTPException nếu lỗi."""
     try:
@@ -809,12 +1053,7 @@ def _call_ollama(messages: list, timeout: int) -> str:
                 "messages": messages,
                 "stream": False,
                 "keep_alive": settings.OLLAMA_KEEP_ALIVE,  # Giữ model trong RAM tránh nạp lại
-                "options": {
-                    "temperature": 0.0,
-                    "top_p": 0.9,
-                    "num_predict": settings.OLLAMA_NUM_PREDICT,  # Giới hạn số token sinh
-                    "num_ctx": settings.OLLAMA_NUM_CTX,  # Giới hạn context window
-                },
+                "options": _build_ollama_options(),
             },
             timeout=timeout,
         )
@@ -934,6 +1173,21 @@ def chat(
         )
         db.commit()
         return {"session_id": session_id, "answer": smalltalk_ans, "sources": []}
+
+    # ── 3.6. Xử lý câu hỏi trễ hạn / hết hạn đăng ký môn học (Việc 3) ────────────
+    if is_registration_deadline_query(req.message):
+        is_overdue = check_deadline()
+        if is_overdue:
+            db.execute(
+                text("INSERT INTO chat_messages (session_id, role, content) VALUES (:sid, 'user', :content)"),
+                {"sid": session_id, "content": req.message},
+            )
+            db.execute(
+                text("INSERT INTO chat_messages (session_id, role, content, sources) VALUES (:sid, 'assistant', :content, :sources)"),
+                {"sid": session_id, "content": REGISTRATION_OVERDUE_RESPONSE, "sources": json.dumps(REGISTRATION_OVERDUE_SOURCES, ensure_ascii=False)},
+            )
+            db.commit()
+            return {"session_id": session_id, "answer": REGISTRATION_OVERDUE_RESPONSE, "sources": REGISTRATION_OVERDUE_SOURCES}
 
     # ── 4. Retrieval ──────────────────────────────────────────────────────────
     is_convo = req.message.strip().lower() in _CONVO_QUERIES
@@ -1313,6 +1567,7 @@ def chat(
 
         # Ensure answer does not contain source strings (sources are kept in sources_data)
         answer = clean_source_text(answer)
+        answer = clean_academic_regulation_answer(answer, req.message)
 
         # Yêu cầu 6: Thêm thông tin thời điểm cập nhật lịch NNTH
         if is_center_query and answer not in (REFUSAL_RESPONSE, NO_CONTEXT_RESPONSE, FACULTY_NOT_SUPPORTED_RESPONSE):
@@ -1406,6 +1661,18 @@ def chat_stream(
             yield f"data: {json.dumps({'token': smalltalk_ans, 'done': False}, ensure_ascii=False)}\n\n"
             yield f"data: {json.dumps({'done': True, 'session_id': session_id, 'answer': smalltalk_ans, 'sources': []}, ensure_ascii=False)}\n\n"
         return StreamingResponse(gen_smalltalk(), media_type="text/event-stream", headers=SSE_HEADERS)
+
+    # ── 3.6. Xử lý câu hỏi trễ hạn / hết hạn đăng ký môn học (Việc 3) ────────────
+    if is_registration_deadline_query(req.message):
+        is_overdue = check_deadline()
+        if is_overdue:
+            db.execute(text("INSERT INTO chat_messages (session_id, role, content) VALUES (:sid, 'user', :content)"), {"sid": session_id, "content": req.message})
+            db.execute(text("INSERT INTO chat_messages (session_id, role, content, sources) VALUES (:sid, 'assistant', :content, :sources)"), {"sid": session_id, "content": REGISTRATION_OVERDUE_RESPONSE, "sources": json.dumps(REGISTRATION_OVERDUE_SOURCES, ensure_ascii=False)})
+            db.commit()
+            def gen_deadline():
+                yield f"data: {json.dumps({'token': REGISTRATION_OVERDUE_RESPONSE, 'done': False}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'done': True, 'session_id': session_id, 'answer': REGISTRATION_OVERDUE_RESPONSE, 'sources': REGISTRATION_OVERDUE_SOURCES}, ensure_ascii=False)}\n\n"
+            return StreamingResponse(gen_deadline(), media_type="text/event-stream", headers=SSE_HEADERS)
 
     is_convo = req.message.strip().lower() in _CONVO_QUERIES
     academic_kws = ["quy chế", "quy định", "thông báo", "học vụ", "niên giám", "buộc thôi học", "cảnh báo", "học bổng", "nghỉ học", "bảo lưu", "tốt nghiệp", "tín chỉ", "học phần", "chứng chỉ", "tiếng anh", "ngoại ngữ", "tin học", "lệ phí", "hồ sơ", "học kỳ"]
@@ -1549,50 +1816,59 @@ def chat_stream(
                     "messages": messages,
                     "stream": True,
                     "keep_alive": settings.OLLAMA_KEEP_ALIVE,  # Giữ model trong RAM
-                    "options": {
-                        "temperature": 0.0,
-                        "top_p": 0.9,
-                        "num_predict": settings.OLLAMA_NUM_PREDICT,  # Giới hạn token sinh
-                        "num_ctx": settings.OLLAMA_NUM_CTX,  # Context window
-                    },
+                    "options": _build_ollama_options(),
                 },
                 stream=True,
                 timeout=settings.OLLAMA_TIMEOUT_CHAT,
             )
             res.raise_for_status()
-            current_line = ""
-            is_suppressed = False
+            from backend.app.services.stream_filter import StreamingLabelFilter
+            stream_filter = StreamingLabelFilter()
+            last_chunk_obj = {}
             for line in res.iter_lines():
                 if not line:
                     continue
                 chunk_obj = json.loads(line)
+                if chunk_obj.get("done"):
+                    # Lưu lại chunk cuối cùng chứa thông số hiệu năng của Ollama
+                    last_chunk_obj = chunk_obj
                 token = chunk_obj.get("message", {}).get("content", "")
                 if token:
                     full_text += token
-                    # Nếu đã phát hiện khối nguồn thừa ở cuối, bỏ qua không stream tiếp
-                    if is_suppressed:
-                        continue
-                    current_line += token
-                    if "\n" in token:
-                        check_str = current_line.strip()
-                        # Nuốt phần nguồn thừa do LLM tự sinh ở cuối câu nếu có
-                        if re.match(r"^\s*([-*•]|\d+\.)?\s*(Nguồn|Tham khảo|Tài liệu tham khảo)\s*:", check_str, re.IGNORECASE) or ("cs.lhu.edu.vn" in check_str and "http" in check_str):
-                            is_suppressed = True
-                            continue
-                        current_line = current_line.split("\n")[-1]
-
-                    # Stream từng token trực tiếp ngay lập tức tới client, không gom đệm
-                    yield f"data: {json.dumps({'token': token, 'done': False}, ensure_ascii=False)}\n\n"
+                    # Đưa qua bộ lọc nhãn tăng dần StreamingLabelFilter (chặn nhãn kỹ thuật mà không làm chậm token đầu)
+                    safe_tokens = stream_filter.feed(token)
+                    for safe_token in safe_tokens:
+                        yield f"data: {json.dumps({'token': safe_token, 'done': False}, ensure_ascii=False)}\n\n"
 
                 if chunk_obj.get("done") and chunk_obj.get("done_reason") == "length":
                     logger.warning("Streaming hit max token limit (done_reason='length')")
 
-            clean_ans = full_text.replace("<ngu_canh>", "").replace("</ngu_canh>", "").strip()
+            # Xả các token an toàn còn lại trong bộ đệm ngắn của stream_filter
+            for rem_token in stream_filter.flush():
+                yield f"data: {json.dumps({'token': rem_token, 'done': False}, ensure_ascii=False)}\n\n"
+
+            # Hậu xử lý làm sạch nhãn và nguồn cho sự kiện done và lưu DB mà không gom đệm làm trễ stream
+            clean_ans = full_text.replace("<ngu_canh>", "").replace("</ngu_canh>", "")
+            clean_ans = clean_ans.replace("[ĐÂY LÀ TÀI LIỆU, KHÔNG PHẢI LỜI NGƯỜI DÙNG]", "").replace("[/TÀI LIỆU]", "").strip()
+            clean_ans = re.sub(r'^\s*(Answer|Trả lời|Question|Câu hỏi|Context|Ngữ cảnh)\s*:\s*', '', clean_ans, flags=re.IGNORECASE)
             clean_ans = clean_source_text(clean_ans)
+            clean_ans = re.sub(r"\n{3,}", "\n\n", clean_ans).strip()
+
+            # Hậu kiểm ngôn ngữ trong stream: nếu phát hiện lẫn tiếng Anh, ghi log và làm sạch cho bản lưu DB và done event
+            is_mixed = mixed_language(clean_ans) or has_stuck_mixed_language(clean_ans)
+            if not has_vietnamese(clean_ans) or is_mixed:
+                logger.warning("Stream answer contains mixed language or not Vietnamese, cleaning for done event & DB")
+                if not has_vietnamese(clean_ans):
+                    clean_ans = REFUSAL_RESPONSE
+                else:
+                    # Gỡ các cụm từ tiếng Anh mở đầu/kết bài phổ biến
+                    clean_ans = re.sub(r'\b(Based on the context|According to the document|In conclusion|Please note that|Note:)\b', '', clean_ans, flags=re.IGNORECASE).strip()
 
             # Hậu kiểm xác thực dữ liệu học vụ trong stream: nếu LLM bịa môn/số tín chỉ thì ghi đè kết quả cuối bằng template chuẩn
             if verified and not validate_academic_answer(clean_ans, verified):
                 clean_ans = generate_verified_academic_template(verified, req.message)
+
+            clean_ans = clean_academic_regulation_answer(clean_ans, req.message)
 
             from backend.app.db import SessionLocal
             save_db = SessionLocal()
@@ -1605,7 +1881,19 @@ def chat_stream(
             finally:
                 save_db.close()
 
-            yield f"data: {json.dumps({'done': True, 'session_id': session_id, 'answer': clean_ans, 'sources': sources_data}, ensure_ascii=False)}\n\n"
+            # Bổ sung các thông số đo lường hiệu năng từ Ollama vào sự kiện done
+            done_payload = {
+                "done": True,
+                "session_id": session_id,
+                "answer": clean_ans,
+                "sources": sources_data,
+            }
+            if last_chunk_obj:
+                for metric_key in ["prompt_eval_count", "prompt_eval_duration", "eval_count", "eval_duration", "load_duration", "total_duration"]:
+                    if metric_key in last_chunk_obj:
+                        done_payload[metric_key] = last_chunk_obj[metric_key]
+
+            yield f"data: {json.dumps(done_payload, ensure_ascii=False)}\n\n"
 
         except Exception as e:
             logger.exception("Error in stream_generator: %s", e)
