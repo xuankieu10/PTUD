@@ -33,10 +33,13 @@ env/
 venv/
 ENV/
 
-# Local Databases
+# Local & Server Databases
 *.db
 *.sqlite
 *.sqlite3
+*.mdf
+*.ldf
+*.bak
 
 # Node / Frontend
 node_modules/
@@ -52,6 +55,12 @@ frontend/*.local
 Thumbs.db
 desktop.ini
 scripts/_scratch/
+
+# Office Temporary / Lock files
+~$*
+
+# Archive directory for scratch / one-off scripts & benchmarks
+_archive/
 
 # Ignore root-level generated/downloaded PDFs only
 /*.pdf
