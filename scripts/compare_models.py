@@ -180,39 +180,63 @@ def check_keywords_score(answer: str, required_keywords: List[str]) -> Tuple[int
     ratio = matched / total if total > 0 else 1.0
     return matched, total, ratio
 
+def normalize_number(num_str: str) -> str:
+    """Chuẩn hoá số: 100.000 hoặc 100,000 -> 100000; giữ nguyên số thập phân như 5.0."""
+    return re.sub(r'(?<=\d)[.,](?=\d{3}(?:\D|$))', '', num_str)
+
+def clean_url_entity(url: str) -> str:
+    """Bỏ dấu câu cuối URL (. , ; : ) ] và dấu / thừa) và hạ chữ thường."""
+    u = url.strip()
+    u = re.sub(r'[\.,;:)\/\\]+$', '', u)
+    u = u.rstrip('/').lower()
+    return u
+
 def check_hallucinations(answer: str, rag_context: str) -> Tuple[bool, List[str]]:
     """
     Trích mọi con số, mã phòng, địa chỉ web, email trong câu trả lời.
     Kiểm tra có xuất hiện trong ngữ cảnh RAG đã đưa vào prompt hay không.
+    Đã chuẩn hoá:
+    1. Bỏ dấu câu cuối URL (. , ; : ) ] và dấu / thừa), hạ chữ thường.
+    2. Chuẩn hoá số (100.000 và 100000 coi như nhau).
     """
     if not rag_context:
-        # Nếu không có context (ví dụ câu từ chối hoặc ngoài lề), không tính hallucination từ context
         return False, []
 
     ans_clean = answer
     # Bỏ qua các số thứ tự dạng gạch đầu dòng "1.", "2.", "3."
     ans_clean = re.sub(r'^\s*\d+\.\s*', '', ans_clean, flags=re.MULTILINE)
-    
-    # 1. Trích số nguyên / số thực >= 2 chữ số hoặc số có dấu chấm (như 5.0, 100.000, 150)
-    numbers = re.findall(r'\b\d+(?:[.,]\d+)+\b|\b\d{2,}\b', ans_clean)
-    # 2. Mã phòng (B101, A202...)
+
+    raw_numbers = re.findall(r'\b\d+(?:[.,]\d+)+\b|\b\d{2,}\b', ans_clean)
     rooms = re.findall(r'\b[A-Za-z]\d{3}\b', ans_clean)
-    # 3. Địa chỉ web / domain
-    urls = re.findall(r'(?:https?://\S+|www\.\S+|\b[a-zA-Z0-9.-]+\.edu\.vn\b)', ans_clean)
-    # 4. Email
+    raw_urls = re.findall(r'(?:https?://\S+|www\.\S+|\b[a-zA-Z0-9.-]+\.edu\.vn\b)', ans_clean)
     emails = re.findall(r'[\w.-]+@[\w.-]+\.\w+', ans_clean)
 
-    entities = set(numbers + rooms + urls + emails)
+    urls = [clean_url_entity(u) for u in raw_urls if len(clean_url_entity(u)) > 3]
+
     rag_lower = rag_context.lower()
+    rag_norm_numbers = normalize_number(rag_lower)
 
     unsupported_entities = []
-    for ent in entities:
-        ent_lower = ent.lower()
-        if ent_lower not in rag_lower:
-            # Ngoại lệ hợp lệ: các số nhỏ dưới 10 xuất hiện do diễn giải ngôn ngữ
-            if ent in ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"] and ent in answer:
-                continue
-            unsupported_entities.append(ent)
+
+    for url in set(urls):
+        domain = re.sub(r'^https?://', '', url).split('/')[0]
+        if (url not in rag_lower) and (domain not in rag_lower):
+            unsupported_entities.append(url)
+
+    for r in set(rooms):
+        if r.lower() not in rag_lower:
+            unsupported_entities.append(r)
+
+    for em in set(emails):
+        if em.lower() not in rag_lower:
+            unsupported_entities.append(em)
+
+    for n in set(raw_numbers):
+        norm_n = normalize_number(n)
+        if norm_n.isdigit() and int(norm_n) <= 10:
+            continue
+        if (n.lower() not in rag_lower) and (norm_n not in rag_norm_numbers):
+            unsupported_entities.append(n)
 
     has_flag = len(unsupported_entities) > 0
     return has_flag, unsupported_entities

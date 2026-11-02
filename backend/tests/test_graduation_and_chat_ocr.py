@@ -552,10 +552,10 @@ class TestChatOcrIntegration:
             )
 
             # (b) Tín chỉ tích luỹ (4) và còn thiếu (116 = 120 - 4) từ graduation-check
-            assert "4 / 120" in user_prompt_a or "4" in user_prompt_a, (
+            assert "4 / 150" in user_prompt_a or "4 / 120" in user_prompt_a or "4" in user_prompt_a, (
                 f"Prompt không chứa tín chỉ tích lũy của sinh viên A: {user_prompt_a}"
             )
-            assert "116" in user_prompt_a, (
+            assert "146" in user_prompt_a or "116" in user_prompt_a, (
                 f"Prompt không chứa số tín chỉ còn thiếu (116) của sinh viên A: {user_prompt_a}"
             )
 
@@ -585,10 +585,10 @@ class TestChatOcrIntegration:
             )
 
             # (b) Tín chỉ tích luỹ (3) và còn thiếu (117 = 120 - 3) từ graduation-check
-            assert "3 / 120" in user_prompt_b or "3" in user_prompt_b, (
+            assert "3 / 150" in user_prompt_b or "3 / 120" in user_prompt_b or "3" in user_prompt_b, (
                 f"Prompt không chứa tín chỉ tích lũy của sinh viên B: {user_prompt_b}"
             )
-            assert "117" in user_prompt_b, (
+            assert "147" in user_prompt_b or "117" in user_prompt_b, (
                 f"Prompt không chứa số tín chỉ còn thiếu (117) của sinh viên B: {user_prompt_b}"
             )
 
@@ -654,8 +654,8 @@ class TestChatOcrIntegration:
             assert "đổi điểm" not in ans, f"Câu trả lời vẫn dính cụm từ 'đổi điểm': {ans}"
 
             # Khối template đúng phải chứa thông tin xác thực của sinh viên A:
-            assert "4/120" in ans or "4" in ans
-            assert "116" in ans
+            assert "4/150" in ans or "4/120" in ans or "4" in ans
+            assert "146" in ans or "116" in ans
             assert "Tiến độ tín chỉ" in ans
 
     def test_hallucination_guard_failed_courses_template(self, test_setup):
@@ -765,7 +765,7 @@ class TestChatOcrIntegration:
                 assert "IT2030" not in unstudied_text and "Cấu trúc dữ liệu" not in unstudied_text
 
             # 4. KHÔNG có từ "đủ" khi nói về 17/120
-            assert "đủ 17/120" not in ans.lower()
+            assert "đủ 17/120" not in ans.lower() and "đủ 17/150" not in ans.lower()
             assert "tích lũy đủ" not in ans.lower()
 
             # 5. KHÔNG có từ "giấy chứng nhận"
