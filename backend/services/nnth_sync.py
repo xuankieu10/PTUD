@@ -46,16 +46,53 @@ def _parse_vn_date(date_str: Optional[str]) -> Optional[date]:
 
 
 def _classify_subject(name: str, desc: str = "") -> str:
-    """Xác định loại: Ngoại ngữ hay Tin học dựa vào tên lớp/môn và mô tả."""
+    """
+    Xác định loại: Ngoại ngữ, Tin học hoặc Khác dựa vào tên lớp/môn và mô tả.
+    Ưu tiên kiểm tra lập trình trước, regex từ ngắn với ranh giới từ \b.
+    Không tự ý đoán là 'Tin học'.
+    """
+    import re
     combined = f"{name} {desc}".lower()
-    nn_keywords = ["tiếng anh", "ngôn ngữ anh", "ngoại ngữ", "ngôn ngữ", "vstep", "toeic", "ielts", "cefr", "english"]
-    th_keywords = ["tin học", "cntt", "công nghệ thông tin", "máy tính", "word", "excel", "powerpoint", "ứng dụng cntt"]
-    
-    if any(k in combined for k in nn_keywords):
-        return "Ngoại ngữ"
-    if any(k in combined for k in th_keywords):
+
+    # 1. ƯU TIÊN KIỂM TRA LẬP TRÌNH VÀ TIN HỌC TRƯỚC
+    # Tránh các trường hợp như "Lập trình Python cho người học tiếng Anh" hay "Ngôn ngữ lập trình" bị gán nhầm sang Ngoại ngữ
+    if "lập trình" in combined:
         return "Tin học"
-    return "Ngoại ngữ" if "vstep" in combined else "Tin học"
+
+    th_phrases = [
+        "tin học", "công nghệ thông tin", "máy tính", "ứng dụng cntt",
+        "khoa học dữ liệu", "trí tuệ nhân tạo"
+    ]
+    if any(p in combined for p in th_phrases):
+        return "Tin học"
+
+    # Từ ngắn tin học: word, excel, powerpoint, cntt, mos, ic3 (dùng \b để 'password' không bị dính 'word')
+    th_regex = r"\b(cntt|word|excel|powerpoint|ic3|mos)\b"
+    if re.search(th_regex, combined):
+        return "Tin học"
+
+    # 2. KIỂM TRA NGOẠI NGỮ
+    # 2.1. Cụm từ dài ngoại ngữ (đã loại bỏ từ 'ngôn ngữ' đứng riêng và các địa danh quốc gia 'hàn quốc', 'nhật bản')
+    nn_phrases = [
+        "tiếng anh", "ngôn ngữ anh", "ngoại ngữ",
+        "tiếng hàn", "tiếng nhật", "tiếng trung", "tiếng hoa",
+        "tiếng pháp", "tiếng đức"
+    ]
+    if any(p in combined for p in nn_phrases):
+        return "Ngoại ngữ"
+
+    # 2.2. Từ ngắn/chứng chỉ ngoại ngữ với ranh giới từ (\b)
+    # n1..n5 chỉ được xem là ngoại ngữ khi đi kèm tiền tố jlpt hoặc trong ngữ cảnh tiếng nhật
+    if re.search(r"\bjlpt\s*n[1-5]\b", combined) or (("tiếng nhật" in combined or "nhật" in combined) and re.search(r"\bn[1-5]\b", combined)):
+        return "Ngoại ngữ"
+
+    nn_regex = r"\b(vstep|toeic|ielts|cefr|english|topik|jlpt|hsk|hskk|chinese|mandarin|delf|dalf|tcf|french|goethe|testdaf|german)\b"
+    if re.search(nn_regex, combined):
+        return "Ngoại ngữ"
+
+    # 3. KHÔNG KHỚP TỪ KHÓA NÀO -> Gán nhãn 'Khác' và ghi warning để rà soát
+    logger.warning("Không thể tự động phân loại môn học/kỳ thi, gán nhãn 'Khác': name='%s', desc='%s'", name, desc)
+    return "Khác"
 
 
 def call_nnth_api(url: str, timeout: int = 15, max_retries: int = 2) -> List[Dict[str, Any]]:

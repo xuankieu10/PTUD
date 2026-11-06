@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import Optional, List, Dict, Any
+from datetime import datetime
 
 from backend.app.db import get_db
 from backend.app.deps import get_current_user
@@ -640,6 +641,70 @@ REGISTRATION_OVERDUE_SOURCES = [
         "so_hieu": "Quy chế đào tạo LHU"
     }
 ]
+
+
+def check_and_build_center_context(
+    message: str, db: Session
+) -> tuple[bool, str, list[dict[str, Any]]]:
+    """
+    Kiểm tra truy vấn người dùng có liên quan đến Lịch học / Lịch thi của Trung tâm NNTH hay không.
+    Nếu có, truy vấn lịch sắp tới từ database nội bộ và dựng chuỗi ngữ cảnh cùng thông tin nguồn.
+    """
+    msg_lower = message.lower()
+    is_center_query = (
+        any(k in msg_lower for k in [
+            "lịch khai giảng", "lịch mở lớp", "khóa học ngoại ngữ", "khóa học tin học",
+            "luyện thi vstep", "lớp vstep", "lớp tin học", "lịch thi tin học", "lịch thi ngoại ngữ",
+            "lịch thi vstep", "lịch thi cntt", "kỳ thi tin học", "kỳ thi vstep", "kỳ thi ngoại ngữ",
+            "lịch thi chứng chỉ", "lịch thi trung tâm", "trung tâm ngoại ngữ", "nnth"
+        ]) or (
+            ("lịch thi" in msg_lower or "lịch học" in msg_lower or "khai giảng" in msg_lower)
+            and any(sub in msg_lower for sub in ["tin học", "ngoại ngữ", "tiếng anh", "vstep", "cntt", "chứng chỉ", "trung tâm", "nnth"])
+        )
+    )
+
+    if not is_center_query:
+        return False, "", []
+
+    center_schedules = get_upcoming_schedules(db, from_today=True)
+    center_exams = get_upcoming_exams(db, from_today=True)
+
+    is_asking_exam = any(k in msg_lower for k in ["lịch thi", "kỳ thi", "ngày thi", "thi chứng chỉ", "hạn đăng ký", "lệ phí thi"])
+    is_asking_course = any(k in msg_lower for k in ["khai giảng", "mở lớp", "khóa học", "lớp học", "luyện thi", "học phí"])
+
+    center_lines = ["\n--- THÔNG TIN LỊCH TRUNG TÂM NGOẠI NGỮ - TIN HỌC (NNTH) LẠC HỒNG ---"]
+    if (is_asking_course or not is_asking_exam) and center_schedules:
+        center_lines.append("CÁC KHÓA HỌC / LỚP HỌC SẮP KHAI GIẢNG:")
+        for s in center_schedules:
+            center_lines.append(f"+ [{s['loai']}] {s['ten_khoa_hoc']}: Khai giảng {s['ngay_khai_giang_str']}, học {s['lich_hoc']}, hình thức {s['hinh_thuc']}, học phí {s['hoc_phi']} VNĐ, kỳ thi dự kiến {s['ky_thi_du_kien']}")
+    if (is_asking_exam or not is_asking_course) and center_exams:
+        center_lines.append("\nCÁC KỲ THI CHỨNG CHỈ SẮP DIỄN RA:")
+        for ex in center_exams:
+            status_dk = "Dự kiến" if ex["is_du_kien"] else "Chính thức"
+            center_lines.append(f"+ [{ex['loai']} - {status_dk}] {ex['ten_ky_thi']}: Ngày thi {ex['ngay_thi_str']}, hạn đăng ký {ex['han_dang_ky']}, tình trạng: {ex['tinh_trang']}, lệ phí: {ex['le_phi_thi']} VNĐ")
+
+    center_ctx = "\n".join(center_lines) + "\n"
+    sources_data = [{
+        "document_id": 9999,
+        "title": "Trung tâm Ngoại ngữ - Tin học Lạc Hồng",
+        "section": "Lịch học & Lịch thi",
+        "chunk_index": 0,
+        "score": 1.0,
+        "snippet": center_ctx[:200],
+        "url": "https://nnth.lhu.edu.vn",
+        "so_hieu": "NNTH"
+    }]
+
+    return True, center_ctx, sources_data
+
+
+def get_center_sync_note(db: Session) -> str:
+    """Tạo ghi chú nguồn và thời gian đồng bộ dữ liệu NNTH gần nhất."""
+    sync_info = get_last_sync_info(db)
+    synced_time = sync_info.get("formatted_time", "chưa xác định")
+    if sync_info.get("status") == "ERROR":
+        return f"Hệ thống chưa lấy được lịch mới nhất từ trung tâm. Dữ liệu cập nhật lúc {synced_time}, xem lịch mới nhất tại nnth.lhu.edu.vn."
+    return f"Dữ liệu cập nhật lúc {synced_time}, xem lịch mới nhất tại nnth.lhu.edu.vn."
 
 
 def is_registration_deadline_query(message: str) -> bool:
@@ -1415,60 +1480,14 @@ def chat(
         context_text += f"\n--- Tài liệu: {title} (Mục {section or 'Chung'}) ---\n{chunk_content}\n"
 
     # ── 3.6. Kiểm tra truy vấn Lịch học / Lịch thi Trung tâm NNTH ────────────
-    is_center_query = (
-        any(k in msg_lower for k in [
-            "lịch khai giảng", "lịch mở lớp", "khóa học ngoại ngữ", "khóa học tin học",
-            "luyện thi vstep", "lớp vstep", "lớp tin học", "lịch thi tin học", "lịch thi ngoại ngữ",
-            "lịch thi vstep", "lịch thi cntt", "kỳ thi tin học", "kỳ thi vstep", "kỳ thi ngoại ngữ",
-            "lịch thi chứng chỉ", "lịch thi trung tâm", "trung tâm ngoại ngữ", "nnth"
-        ]) or (
-            ("lịch thi" in msg_lower or "lịch học" in msg_lower or "khai giảng" in msg_lower)
-            and any(sub in msg_lower for sub in ["tin học", "ngoại ngữ", "tiếng anh", "vstep", "cntt", "chứng chỉ", "trung tâm", "nnth"])
-        )
-    )
-
-    center_ctx = ""
+    is_center_query, center_ctx, center_sources = check_and_build_center_context(req.message, db)
     if is_center_query:
         # Khi hỏi về lịch trung tâm, xóa chunks quy chế để prompt ngắn gọn, phản hồi nhanh
         chunks = []
-        sources_data = []
-        seen_sources = []
+        sources_data = list(center_sources)
+        seen_sources = ["Trung tâm Ngoại ngữ - Tin học Lạc Hồng (https://nnth.lhu.edu.vn)"]
         seen_keys = set()
-        context_text = ""
-
-        center_schedules = get_upcoming_schedules(db, from_today=True)
-        center_exams = get_upcoming_exams(db, from_today=True)
-
-        is_asking_exam = any(k in msg_lower for k in ["lịch thi", "kỳ thi", "ngày thi", "thi chứng chỉ", "hạn đăng ký", "lệ phí thi"])
-        is_asking_course = any(k in msg_lower for k in ["khai giảng", "mở lớp", "khóa học", "lớp học", "luyện thi", "học phí"])
-
-        center_lines = ["\n--- THÔNG TIN LỊCH TRUNG TÂM NGOẠI NGỮ - TIN HỌC (NNTH) LẠC HỒNG ---"]
-        if (is_asking_course or not is_asking_exam) and center_schedules:
-            center_lines.append("CÁC KHÓA HỌC / LỚP HỌC SẮP KHAI GIẢNG:")
-            for s in center_schedules:
-                center_lines.append(f"+ [{s['loai']}] {s['ten_khoa_hoc']}: Khai giảng {s['ngay_khai_giang_str']}, học {s['lich_hoc']}, hình thức {s['hinh_thuc']}, học phí {s['hoc_phi']} VNĐ, kỳ thi dự kiến {s['ky_thi_du_kien']}")
-        if (is_asking_exam or not is_asking_course) and center_exams:
-            center_lines.append("\nCÁC KỲ THI CHỨNG CHỈ SẮP DIỄN RA:")
-            for ex in center_exams:
-                status_dk = "Dự kiến" if ex["is_du_kien"] else "Chính thức"
-                center_lines.append(f"+ [{ex['loai']} - {status_dk}] {ex['ten_ky_thi']}: Ngày thi {ex['ngay_thi_str']}, hạn đăng ký {ex['han_dang_ky']}, tình trạng: {ex['tinh_trang']}, lệ phí: {ex['le_phi_thi']} VNĐ")
-
-        center_ctx = "\n".join(center_lines) + "\n"
         context_text = center_ctx
-
-        src_label = "Trung tâm Ngoại ngữ - Tin học Lạc Hồng (https://nnth.lhu.edu.vn)"
-        if src_label not in seen_sources:
-            seen_sources.append(src_label)
-            sources_data.append({
-                "document_id": 9999,
-                "title": "Trung tâm Ngoại ngữ - Tin học Lạc Hồng",
-                "section": "Lịch học & Lịch thi",
-                "chunk_index": 0,
-                "score": 1.0,
-                "snippet": center_ctx[:200],
-                "url": "https://nnth.lhu.edu.vn",
-                "so_hieu": "NNTH"
-            })
 
     # ── 4. Lưu câu hỏi gốc vào DB ────────────────────────────────────────────
     db.execute(
@@ -1571,13 +1590,7 @@ def chat(
 
         # Yêu cầu 6: Thêm thông tin thời điểm cập nhật lịch NNTH
         if is_center_query and answer not in (REFUSAL_RESPONSE, NO_CONTEXT_RESPONSE, FACULTY_NOT_SUPPORTED_RESPONSE):
-            sync_info = get_last_sync_info(db)
-            synced_time = sync_info.get("formatted_time", "chưa xác định")
-            if sync_info.get("status") == "ERROR":
-                sync_note = f"Hệ thống chưa lấy được lịch mới nhất từ trung tâm. Dữ liệu cập nhật lúc {synced_time}, xem lịch mới nhất tại nnth.lhu.edu.vn."
-            else:
-                sync_note = f"Dữ liệu cập nhật lúc {synced_time}, xem lịch mới nhất tại nnth.lhu.edu.vn."
-            
+            sync_note = get_center_sync_note(db)
             if "Dữ liệu cập nhật lúc" not in answer:
                 answer = f"{answer}\n\n*{sync_note}*"
 
@@ -1702,14 +1715,18 @@ def chat_stream(
         student_ctx, ocr_info, grad_info = get_student_academic_and_ocr_context(db, user_id)
         verified = build_verified_academic_data(grad_info, ocr_info)
 
+    # Kiểm tra truy vấn Lịch học / Lịch thi Trung tâm NNTH và tính sẵn sync_note khi db session còn mở
+    is_center_query, center_ctx, center_sources = check_and_build_center_context(req.message, db)
+    center_sync_note = get_center_sync_note(db) if is_center_query else ""
+
     query_to_search = (req.message + " quy định học lại điểm F đăng ký học kỳ hè tốt nghiệp") if is_personal_query else req.message
-    chunks = [] if is_convo else search_chunks(db, query_to_search)
+    chunks = [] if (is_convo or is_center_query) else search_chunks(db, query_to_search)
 
     # Save user message
     db.execute(text("INSERT INTO chat_messages (session_id, role, content) VALUES (:sid, 'user', :content)"), {"sid": session_id, "content": req.message})
     db.commit()
 
-    if not chunks and not is_convo and not has_acad_kw and not student_ctx:
+    if not chunks and not is_convo and not has_acad_kw and not student_ctx and not is_center_query:
         answer = NO_CONTEXT_RESPONSE
         db.execute(text("INSERT INTO chat_messages (session_id, role, content, sources) VALUES (:sid, 'assistant', :content, :sources)"), {"sid": session_id, "content": answer, "sources": "[]"})
         db.commit()
@@ -1718,7 +1735,7 @@ def chat_stream(
             yield f"data: {json.dumps({'done': True, 'session_id': session_id, 'answer': answer, 'sources': []}, ensure_ascii=False)}\n\n"
         return StreamingResponse(gen_noc(), media_type="text/event-stream", headers=SSE_HEADERS)
 
-    sources_data = []
+    sources_data = list(center_sources) if is_center_query else []
     context_text = ""
     seen_sources = []
     seen_keys = set()
@@ -1737,6 +1754,10 @@ def chat_stream(
 
     if student_ctx:
         context_text += student_ctx + "\n\n"
+
+    # Nối thêm center_ctx vào context_text thay vì ghi đè student_ctx
+    if is_center_query:
+        context_text += center_ctx + "\n\n"
 
     for c in chunks:
         title = c["title"]
@@ -1846,6 +1867,12 @@ def chat_stream(
             # Xả các token an toàn còn lại trong bộ đệm ngắn của stream_filter
             for rem_token in stream_filter.flush():
                 yield f"data: {json.dumps({'token': rem_token, 'done': False}, ensure_ascii=False)}\n\n"
+
+            # Bổ sung token ghi chú thời điểm đồng bộ cho client trước event done (nếu là truy vấn lịch trung tâm)
+            if is_center_query and center_sync_note and "Dữ liệu cập nhật lúc" not in full_text:
+                note_token = f"\n\n*{center_sync_note}*"
+                yield f"data: {json.dumps({'token': note_token, 'done': False}, ensure_ascii=False)}\n\n"
+                full_text += note_token
 
             # Hậu xử lý làm sạch nhãn và nguồn cho sự kiện done và lưu DB mà không gom đệm làm trễ stream
             clean_ans = full_text.replace("<ngu_canh>", "").replace("</ngu_canh>", "")
