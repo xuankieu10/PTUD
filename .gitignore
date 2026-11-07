@@ -73,3 +73,5 @@ mapping_private.csv
 *private*.xlsx
 05_sinh_vien_an_danh.xlsx
 06_lich_trung_tam.xlsx
+*.backup.xlsx
+exports/
