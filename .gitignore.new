@@ -1,0 +1,152 @@
+# ==============================================================================
+# .gitignore - HocVuAI Project (FastAPI + React TypeScript + SQL Server + Ollama)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. THÔNG TIN NHẠY CẢM & MÔI TRƯỜNG (Sensitive & Environments)
+# ------------------------------------------------------------------------------
+.env
+.env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.example
+
+# Khóa bí mật, chứng chỉ số
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
+*.keystore
+*credentials*.json
+*service_account*.json
+
+# ------------------------------------------------------------------------------
+# 2. DEPENDENCIES & PACKAGE MANAGERS
+# ------------------------------------------------------------------------------
+# Python Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Node.js
+node_modules/
+frontend/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ------------------------------------------------------------------------------
+# 3. BUILD ARTIFACTS, BYTECODE & CACHES
+# ------------------------------------------------------------------------------
+# Python Bytecode & Packaging
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Frontend Build Output
+frontend/dist/
+frontend/dist-ssr/
+frontend/*.local
+dist/
+build/
+out/
+
+# Testing & Coverage
+.pytest_cache/
+backend/tests/.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+test_screenshots/
+
+# Logs & Debug Runs
+*.log
+task-*.log
+last_run.log
+backend/tests/last_run.log
+
+# ------------------------------------------------------------------------------
+# 4. FILE TẠM, DỮ LIỆU CỤC BỘ & UPLOADS CỦA HỆ THỐNG
+# ------------------------------------------------------------------------------
+# Thư mục xử lý ảnh OCR và file tải lên của người dùng
+output/
+temp_uploads/
+uploads/
+tmp_downloads/
+
+# Cơ sở dữ liệu cục bộ & bản backup
+*.db
+*.sqlite
+*.sqlite3
+*.mdf
+*.ldf
+*.bak
+*.backup.xlsx
+
+# Thư mục lưu trữ mã tạm, bài kiểm thử cũ & exports
+_archive/
+exports/
+scripts/_scratch/
+
+# File kết quả kiểm thử đơn lẻ trong quá trình phát triển
+chat_15_raw_results.json
+db_test_result.txt
+test_chat_results.md
+test.txt
+test2.txt
+
+# ------------------------------------------------------------------------------
+# 5. DỮ LIỆU SINH VIÊN NHẠY CẢM (Student Data Privacy)
+# ------------------------------------------------------------------------------
+mapping_private.csv
+*mapping_private.csv
+*sinh_vien_that*.xlsx
+*du_lieu_that*.xlsx
+*private*.xlsx
+05_sinh_vien_an_danh.xlsx
+06_lich_trung_tam.xlsx
+database/seed_data/05_sinh_vien_an_danh.xlsx
+database/seed_data/06_lich_trung_tam.xlsx
+
+# ------------------------------------------------------------------------------
+# 6. IDE, HỆ ĐIỀU HÀNH & CÔNG CỤ AI
+# ------------------------------------------------------------------------------
+# Hệ điều hành
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE & Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# File tạm Microsoft Office
+~$*.xlsx
+~$*.docx
+~$*.pptx
+
+# AI Assistant & Local Agent Tooling
+.gemini/
+.antigravity/
+.claude/
+.cursor/
+
