@@ -24,9 +24,9 @@ from backend.app.config import settings
 logger = logging.getLogger(__name__)
 
 DEFAULT_OLLAMA_HOST = "http://localhost:11434"
-DEFAULT_VISION_MODEL = "llama3.2-vision"
+DEFAULT_VISION_MODEL = getattr(settings, "OLLAMA_VISION_MODEL", "qwen2.5vl:3b")
 
-DEFAULT_TIMEOUT = getattr(settings, "OLLAMA_TIMEOUT_OCR", 180)
+DEFAULT_TIMEOUT = getattr(settings, "OCR_TIMEOUT_SECONDS", getattr(settings, "OLLAMA_TIMEOUT_OCR", 300))
 
 PRIMARY_PROMPT = (
     "Bạn là trợ lý AI chuyên đọc bảng điểm học sinh / sinh viên từ ảnh.\n"
@@ -52,10 +52,10 @@ RETRY_PROMPT = (
 )
 
 
-def optimize_image_for_vision(img: Image.Image, max_dim: int = 1024) -> Image.Image:
+def optimize_image_for_vision(img: Image.Image, max_dim: int = 1600) -> Image.Image:
     """
     Thu nhỏ ảnh nếu quá lớn để tăng tốc độ suy luận của mô hình Vision trên CPU/GPU.
-    Mức 1024px đảm bảo giữ nguyên độ sắc nét của bảng nhiều dòng.
+    Mức 1600px đảm bảo giữ nguyên độ sắc nét của bảng nhiều dòng và tối ưu VRAM.
     """
     w, h = img.size
     if max(w, h) > max_dim:
@@ -65,7 +65,7 @@ def optimize_image_for_vision(img: Image.Image, max_dim: int = 1024) -> Image.Im
     return img
 
 
-def encode_image_to_base64(image_input: Union[str, Image.Image, np.ndarray], max_dim: int = 1024) -> str:
+def encode_image_to_base64(image_input: Union[str, Image.Image, np.ndarray], max_dim: int = 1600) -> str:
     """
     Chuyển đổi file ảnh, đối tượng PIL Image hoặc numpy BGR array sang chuỗi base64.
     """
@@ -221,20 +221,21 @@ def _normalize_subject_list(raw_list: List[Dict[str, Any]]) -> List[Dict[str, An
 
 
 def resolve_vision_model(model_name: str, host: str = DEFAULT_OLLAMA_HOST) -> str:
-    """Tự động chọn mô hình Vision khả dụng trong Ollama (ưu tiên model có sẵn như qwen2.5vl:7b nếu llama3.2-vision chưa pull)"""
-    if not model_name or model_name == "llama3.2-vision":
-        try:
-            r = requests.get(f"{host.rstrip('/')}/api/tags", timeout=2)
-            if r.status_code == 200:
-                installed = [m.get("name", "") for m in r.json().get("models", [])]
-                if not any("llama3.2-vision" in m for m in installed):
-                    for fallback in ["qwen2.5vl:7b", "qwen2.5vl", "llava"]:
-                        for m in installed:
-                            if fallback in m:
-                                return m
-        except Exception:
-            pass
-    return model_name or DEFAULT_VISION_MODEL
+    """Tự động chọn mô hình Vision khả dụng trong Ollama (ưu tiên model có sẵn theo cấu hình OLLAMA_VISION_MODEL)"""
+    target = model_name or DEFAULT_VISION_MODEL
+    try:
+        r = requests.get(f"{host.rstrip('/')}/api/tags", timeout=2)
+        if r.status_code == 200:
+            installed = [m.get("name", "") for m in r.json().get("models", [])]
+            if any(target in m for m in installed):
+                return target
+            for fallback in [DEFAULT_VISION_MODEL, "qwen2.5vl:3b", "qwen2.5vl:7b", "qwen2.5vl", "llava"]:
+                for m in installed:
+                    if fallback in m:
+                        return m
+    except Exception:
+        pass
+    return target
 
 
 def query_ollama(
@@ -261,7 +262,8 @@ def query_ollama(
         "options": {
             "num_thread": num_threads,
             "num_predict": 1500,
-            "temperature": 0.1
+            "temperature": 0.1,
+            "num_ctx": 2048
         }
     }
 
@@ -274,7 +276,7 @@ def query_ollama(
                 err_detail = response.text
             raise FileNotFoundError(
                 f"Mô hình '{model}' chưa được tải về Ollama ({err_detail}). "
-                f"Vui lòng mở terminal chạy lệnh: 'ollama pull {model}' hoặc chọn mô hình đã có sẵn trên máy (ví dụ: qwen2.5vl:7b)."
+                f"Vui lòng mở terminal chạy lệnh: 'ollama pull {model}' hoặc chọn mô hình đã có sẵn trên máy (ví dụ: {DEFAULT_VISION_MODEL})."
             )
         response.raise_for_status()
         res_json = response.json()
@@ -287,7 +289,7 @@ def query_ollama(
             "Vui lòng kiểm tra xem Ollama đã được khởi chạy chưa (ollama serve)."
         )
     except requests.exceptions.Timeout:
-        raise TimeoutError(f"Hết thời gian chờ phản hồi từ Ollama ({timeout}s).")
+        raise TimeoutError("Quá thời gian xử lý khi đọc bảng điểm. Hãy dùng ảnh rõ nét, dưới 2MB, hoặc chỉ gửi trang có bảng điểm.")
     except Exception as e:
         raise RuntimeError(f"Lỗi khi gọi Ollama API: {e}")
 

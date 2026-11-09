@@ -196,7 +196,8 @@ def query_ollama_certificate(
         "options": {
             "num_thread": num_threads,
             "num_predict": 600,
-            "temperature": 0.1
+            "temperature": 0.1,
+            "num_ctx": 2048
         }
     }
 
@@ -247,7 +248,7 @@ def extract_certificate_from_image(
     4. Thử parse JSON, nếu lỗi thì log và retry 1 lần với prompt nhấn mạnh
     5. Trả về dict chuẩn hoá
     """
-    image_b64 = encode_image_to_base64(image_input, max_dim=1024)
+    image_b64 = encode_image_to_base64(image_input, max_dim=1600)
 
     target_model = model or DEFAULT_VISION_MODEL
     target_model = resolve_model(target_model, host=host)

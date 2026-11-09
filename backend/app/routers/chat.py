@@ -2295,11 +2295,11 @@ async def chat_upload(
                     except TimeoutError as timeout_err:
                         logger.error(f"Quá thời gian chạy OCR bảng điểm cho file '{f.filename}': {timeout_err}")
                         err_msg = (
-                            f"⏱️ Quá thời gian xử lý khi đọc bảng điểm '{f.filename}' (timeout). "
-                            "Quá trình đọc ảnh có thể mất nhiều thời gian hơn dự kiến, bạn vui lòng kiểm tra lại chất lượng ảnh (rõ nét, kích thước vừa phải) hoặc thử lại sau ít phút."
+                            f"⏱️ Quá thời gian xử lý khi đọc bảng điểm '{f.filename}'. "
+                            "Hãy dùng ảnh rõ nét, dưới 2MB, hoặc chỉ gửi trang có bảng điểm."
                         )
                         transcript_confirm_messages.append(err_msg)
-                        summary = f"⚠️ Bảng điểm '{f.filename}': Quá thời gian phản hồi từ hệ thống đọc ảnh (timeout)."
+                        summary = f"⚠️ Bảng điểm '{f.filename}': Quá thời gian xử lý khi đọc bảng điểm. Hãy dùng ảnh rõ nét, dưới 2MB, hoặc chỉ gửi trang có bảng điểm."
                         file_type = "transcript"
                     except ConnectionError as conn_err:
                         logger.error(f"Lỗi kết nối dịch vụ OCR cho file '{f.filename}': {conn_err}")

@@ -14,9 +14,11 @@ class Settings(BaseSettings):
     SIMILARITY_THRESHOLD: float = 0.35
     MIN_SCORE_THRESHOLD: float = 0.6
     REQUIRED_CREDITS: int = 150
+    OLLAMA_VISION_MODEL: str = "qwen2.5vl:3b"
+    OCR_TIMEOUT_SECONDS: int = 300
     OLLAMA_TIMEOUT_EMBED: int = 180
     OLLAMA_TIMEOUT_CHAT: int = 300
-    OLLAMA_TIMEOUT_OCR: int = 180
+    OLLAMA_TIMEOUT_OCR: int = 300
     OLLAMA_KEEP_ALIVE: str = "30m"  # Giữ model trong RAM tránh load lại nhiều lần
     OLLAMA_NUM_CTX: int = 4096  # Context window phù hợp ngữ cảnh học vụ
     OLLAMA_NUM_PREDICT: int = 300  # Giới hạn độ dài token phản hồi

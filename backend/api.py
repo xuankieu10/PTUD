@@ -383,7 +383,7 @@ async def process_transcript(
         logger.error(f"Quá thời gian xử lý bảng điểm: {timeout_err}")
         raise HTTPException(
             status_code=504,
-            detail="Quá thời gian phản hồi từ hệ thống đọc ảnh (timeout). Vui lòng thử lại với hình ảnh có độ phân giải phù hợp hơn."
+            detail="Quá thời gian xử lý khi đọc bảng điểm. Hãy dùng ảnh rõ nét, dưới 2MB, hoặc chỉ gửi trang có bảng điểm."
         )
     except ConnectionError as conn_err:
         logger.error(f"Lỗi kết nối Ollama: {conn_err}")

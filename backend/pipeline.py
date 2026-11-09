@@ -46,7 +46,7 @@ import requests
 def resolve_model(requested_model: str, host: str) -> str:
     """
     Kiểm tra xem mô hình được yêu cầu có sẵn trong Ollama chưa.
-    Nếu chưa, tự động chuyển sang mô hình vision có sẵn (ví dụ: qwen2.5vl:7b) thay vì báo lỗi 404.
+    Nếu chưa, tự động chuyển sang mô hình vision có sẵn (ví dụ: qwen2.5vl:3b) thay vì báo lỗi 404.
     """
     try:
         res = requests.get(f"{host.rstrip('/')}/api/tags", timeout=3)
@@ -146,7 +146,7 @@ def run_pipeline(
                 all_red_regions.extend(red_boxes)
         else:
             logger.info("-> PDF scan không có text layer: Chuyển đổi các trang sang ảnh và dùng Ollama Vision.")
-            pil_pages = convert_pdf_to_images(input_path)
+            pil_pages = convert_pdf_to_images(input_path, max_pages=3)[:3]
             for p_idx, pil_img in enumerate(pil_pages):
                 cv_img = load_image(pil_img)
                 processed_images.append(cv_img)

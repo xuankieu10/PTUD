@@ -45,9 +45,10 @@ def has_text_layer(pdf_path: str, min_chars: int = 30) -> bool:
         return False
 
 
-def convert_pdf_to_images(pdf_path: str, dpi: int = 200) -> List[Image.Image]:
+def convert_pdf_to_images(pdf_path: str, dpi: int = 200, max_pages: int = 3) -> List[Image.Image]:
     """
     Chuyển đổi từng trang của file PDF sang ảnh (PIL Image).
+    Chỉ xử lý tối đa max_pages trang đầu (mặc định 3 trang) để tiết kiệm tài nguyên và tăng tốc độ.
     Ưu tiên sử dụng pdf2image theo yêu cầu bài toán.
     Tự động fallback sang pypdfium2 nếu Windows chưa cài đặt Poppler.
     """
@@ -57,6 +58,9 @@ def convert_pdf_to_images(pdf_path: str, dpi: int = 200) -> List[Image.Image]:
     try:
         from pdf2image import convert_from_path
         images = convert_from_path(pdf_path, dpi=dpi)
+        if max_pages and len(images) > max_pages:
+            logger.info(f"Chỉ xử lý tối đa {max_pages} trang đầu của PDF ({len(images)} trang).")
+            images = images[:max_pages]
         logger.info(f"pdf2image: Đã chuyển đổi thành công {len(images)} trang ảnh.")
         return images
     except Exception as err:
@@ -70,7 +74,8 @@ def convert_pdf_to_images(pdf_path: str, dpi: int = 200) -> List[Image.Image]:
         import pypdfium2 as pdfium
         pdf = pdfium.PdfDocument(pdf_path)
         images = []
-        for page_idx in range(len(pdf)):
+        total_pages = min(len(pdf), max_pages) if max_pages else len(pdf)
+        for page_idx in range(total_pages):
             page = pdf[page_idx]
             # Render trang ở scale tương ứng DPI 200 (200 / 72 ≈ 2.77)
             scale = dpi / 72.0
@@ -83,19 +88,20 @@ def convert_pdf_to_images(pdf_path: str, dpi: int = 200) -> List[Image.Image]:
         raise RuntimeError(f"Không thể chuyển đổi PDF sang ảnh bằng cả pdf2image lẫn pypdfium2: {fallback_err}")
 
 
-def extract_grades_from_pdf_text_layer(pdf_path: str) -> Tuple[List[Dict[str, Any]], List[Image.Image]]:
+def extract_grades_from_pdf_text_layer(pdf_path: str, max_pages: int = 3) -> Tuple[List[Dict[str, Any]], List[Image.Image]]:
     """
-    Trích xuất danh sách môn học và điểm trực tiếp từ text layer của PDF bằng pdfplumber.
+    Trích xuất danh sách môn học và điểm trực tiếp từ text layer của PDF bằng pdfplumber (tối đa max_pages trang đầu).
     Đồng thời kết xuất ảnh của từng trang để phục vụ việc nhận diện màu đỏ (OpenCV).
     
     Returns:
         Tuple gồm (danh sách môn kèm điểm và bbox, danh sách ảnh các trang tương ứng).
     """
     subjects: List[Dict[str, Any]] = []
-    page_images = convert_pdf_to_images(pdf_path)
+    page_images = convert_pdf_to_images(pdf_path, max_pages=max_pages)
 
     with pdfplumber.open(pdf_path) as pdf:
-        for page_idx, page in enumerate(pdf.pages):
+        pages_to_process = pdf.pages[:max_pages] if max_pages else pdf.pages
+        for page_idx, page in enumerate(pages_to_process):
             # 1. Thử trích xuất theo bảng biểu (Tables)
             tables = page.extract_tables()
             table_parsed = False
