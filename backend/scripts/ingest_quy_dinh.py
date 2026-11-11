@@ -1,8 +1,9 @@
 """
 backend/scripts/ingest_quy_dinh.py
-Script nạp văn bản quy định đào tạo tín chỉ và học vụ từ file 'văn_bản_quy_định.docx' vào hệ thống RAG (bảng documents và document_chunks).
+Script nạp văn bản quy chế đào tạo và quy định học vụ hợp nhất từ file 'Tong_hop_quy_che_dao_tao_hoc_vu_LHU.docx' vào hệ thống RAG (bảng documents và document_chunks).
 Sử dụng mô hình bge-m3 (1024 chiều) để sinh embedding.
-Đảm bảo tính idempotent: chạy lại không bị trùng lặp chunk (xóa chunk cũ của document_id 9001 trước khi chèn mới).
+Đảm bảo tính idempotent: xóa chunk cũ của document_id 9001 trước khi chèn mới.
+Mỗi chunk mang metadata nguồn (VB1 / VB2) và cờ verified (True cho VB1 chính thức, False cho VB2 chưa kiểm chứng).
 """
 
 import os
@@ -22,24 +23,24 @@ from backend.app.services.embedding import get_embeddings_batch
 
 
 DOCUMENT_ID_QUY_DINH = 9001
-DOCUMENT_TITLE = "Quy chế đào tạo & Quy định học vụ"
-DOCUMENT_SOURCE = "văn_bản_quy_định.docx"
-DOCUMENT_SO_HIEU = "Quy chế đào tạo LHU"
+DOCUMENT_TITLE = "Tổng hợp quy chế đào tạo và quy định học vụ LHU"
+DOCUMENT_SOURCE = "Tong_hop_quy_che_dao_tao_hoc_vu_LHU.docx"
+DOCUMENT_SO_HIEU = "QĐ 22/QĐ-ĐHLH & Quy định học vụ"
 DOCUMENT_URL = "http://cs.lhu.edu.vn"
 
 
 def find_docx_file() -> str:
-    """Tìm đường dẫn tới file docx quy định trong thư mục dự án."""
+    """Tìm đường dẫn tới file docx quy chế hợp nhất trong thư mục dự án."""
     candidates = [
-        "văn_bản_quy_định.docx",
-        "văn bản quy định.docx",
-        os.path.join("database", "seed_data", "văn bản quy định.docx"),
+        os.path.join("database", "seed_data", "Tong_hop_quy_che_dao_tao_hoc_vu_LHU.docx"),
+        "Tong_hop_quy_che_dao_tao_hoc_vu_LHU.docx",
         os.path.join("database", "seed_data", "văn_bản_quy_định.docx"),
+        "văn_bản_quy_định.docx",
     ]
     for c in candidates:
         if os.path.exists(c):
             return os.path.abspath(c)
-    raise FileNotFoundError("Không tìm thấy tệp văn_bản_quy_định.docx trong thư mục gốc hoặc database/seed_data.")
+    raise FileNotFoundError("Không tìm thấy tệp Tong_hop_quy_che_dao_tao_hoc_vu_LHU.docx trong database/seed_data hoặc thư mục gốc.")
 
 
 def clean_google_urls(text: str) -> str:
@@ -49,272 +50,343 @@ def clean_google_urls(text: str) -> str:
 
 def parse_docx_chunks(docx_path: str) -> list[dict]:
     """
-    Đọc tệp docx và tách thành 16 chunk quy chuẩn:
-    - Mỗi chunk gồm: tiêu đề, nội dung, nguồn (Quy chế đào tạo, Chương X – Điều Y), từ khóa.
-    - Giữ nguyên các link hợp lệ (Google Forms, Zalo, Google Sheets, Calen, CS LHU).
-    - Bỏ qua các URL google.com/url rác.
-    - TODO: Mục 'Bảng quy đổi Hình 1 và 2' trong file không có nội dung nên không tạo chunk, cần bổ sung khi có ảnh/văn bản cụ thể.
+    Đọc tệp quy chế đào tạo hợp nhất và tách thành 17 chunk quy chuẩn theo 9 mục của văn bản:
+    - Nguồn VB1 (Niên giám 2023, QĐ 22/QĐ-ĐHLH): verified = True.
+    - Nguồn VB2 (Bản tóm tắt quy định học vụ có mốc 2025): verified = False (gắn nhãn [VB2 – chưa kiểm chứng]).
+    - Các điểm xung đột ở Mục 8: trình bày ưu tiên theo VB1 và ghi rõ điểm khác biệt của VB2 để SV đối chiếu.
     """
     if not os.path.exists(docx_path):
         raise FileNotFoundError(f"Tệp không tồn tại: {docx_path}")
 
-    # TODO: Bảng quy đổi chứng chỉ ngoại ngữ, tin học tương đương (nội dung Hình 1 và 2) hiện không có nội dung chi tiết trong file docx, chỉ có tiêu đề nên không tạo chunk.
-
     chunks = [
-        # 1. Điều kiện xét tốt nghiệp (Điều 27)
+        # Chunk 0: Mục 1 - Thang điểm, cơ cấu điểm và điểm 0 (VB1)
         {
             "chunk_index": 0,
-            "section": "Chương IV – Điều 27",
-            "title": "Điều kiện xét tốt nghiệp đại học",
-            "source": "Quy chế đào tạo, Chương IV – Điều 27",
-            "keywords": "xét tốt nghiệp, điều kiện tốt nghiệp, chuẩn đầu ra, 150 tín chỉ, 8 học kỳ, Mác Lênin, GDQP, GDTC",
+            "section": "Mục 1 – Thang điểm và điểm 0",
+            "title": "Thang điểm 10, thang chữ, thang 4 và các trường hợp bị điểm 0",
+            "source": "VB1 – QĐ 22/QĐ-ĐHLH, Điều 11 Khoản 5, Điều 12 Khoản 2",
+            "verified": True,
+            "keywords": "thang điểm, thang 10, thang chữ, thang 4, điểm F, điểm D, điểm P, điểm liệt, cơ cấu điểm, điểm 0",
             "content": (
-                "[Văn bản: Quy chế đào tạo tín chỉ | Nguồn: Quy chế đào tạo, Chương IV – Điều 27 | Mục: Điều kiện xét tốt nghiệp]\n"
-                "Điều kiện xét tốt nghiệp đại học (Chương IV – Điều 27):\n"
-                "- Cho đến thời điểm xét tốt nghiệp, sinh viên không đang trong thời gian bị truy cứu trách nhiệm hình sự.\n"
-                "- Tích lũy đủ số học phần quy định cho chương trình, không còn học phần bị điểm dưới 5.\n"
-                "- Được xếp loại đạt ở kỳ thi tốt nghiệp các môn khoa học Mác-Lênin, Tư tưởng Hồ Chí Minh.\n"
-                "- Có các Chứng chỉ Giáo dục quốc phòng và Giáo dục thể chất đối với các ngành đào tạo không chuyên về quân sự và thể dục thể thao.\n"
-                "- Đạt chuẩn đầu ra của Trường (bao gồm 8 học kỳ với 150 tín chỉ)."
+                "[Nguồn: VB1 – QĐ 22/QĐ-ĐHLH, Điều 11 Khoản 5, Điều 12 Khoản 2 | Trạng thái: Chính thức]\n"
+                "Quy định thang điểm và đánh giá kết quả học tập:\n"
+                "1. Thang điểm đánh giá học phần:\n"
+                "- Điểm A (8.5 – 10.0, thang 4: 4.0): Đạt (Xuất sắc / Giỏi)\n"
+                "- Điểm B+ (8.0 – 8.4, thang 4: 3.5): Đạt (Khá giỏi)\n"
+                "- Điểm B (7.0 – 7.9, thang 4: 3.0): Đạt (Khá)\n"
+                "- Điểm C+ (6.5 – 6.9, thang 4: 2.5): Đạt (Trung bình khá)\n"
+                "- Điểm C (5.5 – 6.4, thang 4: 2.0): Đạt (Trung bình)\n"
+                "- Điểm D+ (5.0 – 5.4, thang 4: 1.5): Đạt (Trung bình yếu)\n"
+                "- Điểm D (4.0 – 4.9, thang 4: 1.0): Đạt\n"
+                "- Điểm F (Dưới 4.0, thang 4: 0.0): Không đạt (phải học lại hoặc thi lại)\n"
+                "2. Điểm đặc biệt:\n"
+                "- Điểm P: Đạt, không phân mức (từ 5.0 trở lên), dùng cho học phần chỉ yêu cầu đạt (như Giáo dục thể chất), không tính vào điểm trung bình.\n"
+                "- Điểm I (chưa hoàn thiện do hoãn thi), X (chưa đủ dữ liệu), R (được miễn học và công nhận tín chỉ).\n"
+                "3. Cơ cấu điểm học phần: Quá trình 30%, Giữa kỳ 30%, Cuối kỳ 40%. Điểm liệt của từng điểm thành phần là 0.\n"
+                "4. Các trường hợp bị điểm 0: Tự ý bỏ học; rút bớt học phần không đúng thời hạn 2 tuần; vắng thi, vắng đánh giá không có lý do chính đáng; gian lận trong thi cử."
             )
         },
-        # 2. Điều kiện cấm thi (Điều 19)
+        # Chunk 1: Mục 2 - Điều kiện cấm thi (VB2 - Chưa kiểm chứng)
         {
             "chunk_index": 1,
-            "section": "Chương III – Điều 19",
+            "section": "Mục 2 – Điều kiện cấm thi",
             "title": "Điều kiện cấm thi kết thúc học phần",
-            "source": "Quy chế đào tạo, Chương III – Điều 19",
-            "keywords": "cấm thi, vắng quá 20%, điểm thành phần dưới 2.0, chuyên cần, giữa kỳ, điểm quá trình",
+            "source": "[VB2 – chưa kiểm chứng]",
+            "verified": False,
+            "keywords": "cấm thi, vắng quá 20%, điểm thành phần dưới 2.0, chuyên cần, giữa kỳ, không được dự thi",
             "content": (
-                "[Văn bản: Quy chế đào tạo tín chỉ | Nguồn: Quy chế đào tạo, Chương III – Điều 19 | Mục: Điều kiện cấm thi]\n"
-                "Điều kiện cấm thi kết thúc học phần (Chương III – Điều 19):\n"
-                "- Vắng mặt: Sinh viên vắng mặt quá 20% số tiết của học phần (lý thuyết hoặc thực hành) sẽ không được dự thi kết thúc học phần đó và phải nhận điểm 0 ở phần thi kết thúc học phần (hoặc bị cấm thi tùy theo quy định cụ thể về điểm thành phần).\n"
-                "- Điểm thành phần (Điểm quá trình/giữa kỳ): Điểm đánh giá bộ phận (điểm chuyên cần, kiểm tra giữa kỳ) đạt điểm dưới 2,0 (theo thang điểm 10) thì không đủ điều kiện dự thi kết thúc học phần (bị cấm thi)."
+                "[Nguồn: VB2 – Văn bản tóm tắt quy định học vụ | Trạng thái: [VB2 – chưa kiểm chứng]]\n"
+                "Điều kiện cấm thi kết thúc học phần:\n"
+                "(Lưu ý: Thông tin này chưa được xác nhận chính thức trong Niên giám chính thức VB1; bạn nên hỏi giáo vụ khoa để được hướng dẫn chính xác nhất):\n"
+                "1. Vắng mặt: Sinh viên vắng mặt quá 20% số tiết của học phần (lý thuyết hoặc thực hành) sẽ không được dự thi kết thúc học phần đó và phải nhận điểm 0 ở phần thi kết thúc học phần hoặc bị cấm thi tùy quy định cụ thể.\n"
+                "2. Điểm thành phần: Điểm đánh giá bộ phận (điểm chuyên cần, kiểm tra giữa kỳ) đạt điểm dưới 2.0 (thang 10) thì không đủ điều kiện dự thi kết thúc học phần (bị cấm thi)."
             )
         },
-        # 3. Quy định học lại (Điều 12)
+        # Chunk 2: Mục 3.1 - Học lại (VB1)
         {
             "chunk_index": 2,
-            "section": "Chương II – Điều 12",
-            "title": "Quy định học lại",
-            "source": "Quy chế đào tạo, Chương II – Điều 12",
-            "keywords": "học lại, điểm dưới 5, học phần bắt buộc, học phần tự chọn, thi cải thiện điểm",
+            "section": "Mục 3.1 – Học lại",
+            "title": "Quy định học lại học phần và tính điểm học lại",
+            "source": "VB1 – QĐ 22, Điều 3 K1, Điều 7 K5, Điều 9 K1, Điều 11 K5đ",
+            "verified": True,
+            "keywords": "học lại, điểm F, dưới 4.0, học phần bắt buộc, học phần tự chọn, lần học cuối",
             "content": (
-                "[Văn bản: Quy chế đào tạo tín chỉ | Nguồn: Quy chế đào tạo, Chương II – Điều 12 | Mục: Quy định học lại]\n"
-                "Quy định học lại học phần (Chương II – Điều 12):\n"
-                "- Sinh viên có học phần bắt buộc bị điểm < 5 phải đăng ký học lại học phần đó ở một trong các học kỳ tiếp theo cho đến khi đạt điểm ≥ 5.\n"
-                "- Sinh viên có học phần tự chọn bị điểm < 5 phải đăng ký học lại học phần đó hoặc học đổi sang học phần tự chọn tương đương khác.\n"
-                "- Sinh viên được quyền đăng ký thi cải thiện điểm tại lần thi thứ 2 của học phần, khi đó điểm thi lần thứ nhất sẽ bị hủy."
+                "[Nguồn: VB1 – QĐ 22/QĐ-ĐHLH, Điều 3 K1, Điều 7 K5, Điều 9 K1, Điều 11 K5đ | Trạng thái: Chính thức]\n"
+                "Quy định học lại học phần:\n"
+                "1. Học phần bắt buộc bị điểm F (dưới 4.0): Phải đăng ký học lại, hoặc học phần tương đương/thay thế, ở các học kỳ tiếp theo cho đến khi đạt (từ điểm D / 4.0 trở lên).\n"
+                "2. Học phần tự chọn bị điểm F: Sinh viên học lại học phần đó hoặc đổi sang học phần tự chọn tương đương khác theo quy định CTĐT.\n"
+                "3. Cách tính điểm: Điểm của lần học cuối là điểm chính thức của học phần (không quy định lấy điểm cao nhất). Không quy định giới hạn số lần học lại tối đa.\n"
+                "Lưu ý điểm xung đột (Mục 8): Theo Niên giám chính thức (VB1), điểm F là dưới 4.0 và tính điểm lần học cuối; tuy nhiên có văn bản khác (VB2) ghi dưới 5 phải học lại và tính điểm cao nhất các lần học. Thông tin này cần xác nhận lại với giáo vụ khoa."
             )
         },
-        # 4. Cải thiện điểm (Điều 20)
+        # Chunk 3: Mục 3.2 - Thi lại (Kỳ thi phụ) (VB1 & VB2)
         {
             "chunk_index": 3,
-            "section": "Chương III – Điều 20",
-            "title": "Quy định cải thiện điểm",
-            "source": "Quy chế đào tạo, Chương III – Điều 20",
-            "keywords": "cải thiện điểm, học lại cải thiện, điểm cao nhất, nâng điểm",
+            "section": "Mục 3.2 – Thi lại (kỳ thi phụ)",
+            "title": "Quy định thi lại và kỳ thi phụ cuối kỳ",
+            "source": "VB1 – QĐ 22 & [VB2 – chưa kiểm chứng]",
+            "verified": True,
+            "keywords": "thi lại, kỳ thi phụ, thi lần 2, vắng thi, điểm F, 2 tuần sau thi chính, đầu học kỳ mới",
             "content": (
-                "[Văn bản: Quy chế đào tạo tín chỉ | Nguồn: Quy chế đào tạo, Chương III – Điều 20 | Mục: Cải thiện điểm]\n"
-                "Cải thiện điểm học phần (Chương III – Điều 20):\n"
-                "- Sinh viên đã có điểm tổng kết học phần đạt (từ 5,0 điểm trở lên) nhưng muốn cải thiện điểm số có thể đăng ký học lại học phần đó vào các học kỳ tiếp theo khi có lớp.\n"
-                "- Điểm lấy để tính vào kết quả học tập chính thức sẽ là điểm cao nhất trong các lần học."
+                "[Nguồn: VB1 – QĐ 22/QĐ-ĐHLH Điều 11 K5đ & [VB2 – chưa kiểm chứng]]\n"
+                "Quy định thi lại (kỳ thi phụ):\n"
+                "1. Theo VB1 (Niên giám chính thức):\n"
+                "- Kỳ thi phụ tổ chức cho sinh viên không dự kỳ thi chính hoặc có điểm học phần dưới 4.0 (điểm F) ở kỳ thi chính.\n"
+                "- Thời gian: Kỳ thi phụ được tổ chức sớm nhất 02 tuần sau kỳ thi chính.\n"
+                "- Vắng thi chính có lý do chính đáng: Được dự thi phụ ngay sau đó và điểm thi phụ được tính là điểm thi lần đầu.\n"
+                "2. Theo [VB2 – chưa kiểm chứng]:\n"
+                "- Kỳ thi lần 2 tổ chức vào đầu học kỳ mới cho học phần dưới 5; điểm chuyên cần và giữa kỳ KHÔNG có thi lần 2.\n"
+                "Lưu ý điểm xung đột (Mục 8): VB1 tổ chức thi phụ sớm nhất 2 tuần sau thi chính cho môn điểm < 4.0; VB2 ghi thi lần 2 vào đầu học kỳ mới cho môn điểm < 5. Sinh viên nên theo dõi thông báo chính thức của Phòng Đào tạo hoặc hỏi giáo vụ khoa."
             )
         },
-        # 5. Cảnh báo học vụ và buộc thôi học (Điều 24)
+        # Chunk 4: Mục 3.3 - Cải thiện điểm (VB1 & VB2)
         {
             "chunk_index": 4,
-            "section": "Chương IV – Điều 24",
-            "title": "Cảnh báo học vụ và buộc thôi học",
-            "source": "Quy chế đào tạo, Chương IV – Điều 24",
-            "keywords": "cảnh báo học vụ, buộc thôi học, điểm trung bình chung tích lũy, quá thời hạn, kỷ luật",
+            "section": "Mục 3.3 – Cải thiện điểm",
+            "title": "Quy định cải thiện điểm học phần",
+            "source": "VB1 & [VB2 – chưa kiểm chứng]",
+            "verified": True,
+            "keywords": "cải thiện điểm, nâng điểm, học lại cải thiện, thi cải thiện, điểm cao nhất",
             "content": (
-                "[Văn bản: Quy chế đào tạo tín chỉ | Nguồn: Quy chế đào tạo, Chương IV – Điều 24 | Mục: Cảnh báo học vụ và buộc thôi học]\n"
-                "Quy định cảnh báo học vụ và buộc thôi học (Chương IV – Điều 24):\n"
-                "1. Mức cảnh báo học vụ:\n"
-                "- Điểm trung bình chung tích lũy đạt dưới ngưỡng quy định: dưới 1,2 đối với năm thứ nhất; dưới 1,4 đối với năm thứ hai; dưới 1,6 đối với năm thứ ba; dưới 1,8 đối với các năm tiếp theo; hoặc tổng số tín chỉ không đạt quá giới hạn cho phép của trường trong học kỳ.\n"
-                "2. Buộc thôi học:\n"
-                "- Sinh viên bị buộc thôi học nếu rơi vào các trường hợp:\n"
-                "  + Bị cảnh báo học vụ liên tiếp trong 2 học kỳ chính (hoặc quá số lần cảnh báo tối đa theo quy định của trường).\n"
-                "  + Quá thời hạn tối đa hoàn thành chương trình học toàn khóa (quá 12 đến 13 học kỳ tùy theo ngành).\n"
-                "  + Vi phạm kỷ luật ở mức độ bị kỷ luật buộc thôi học."
+                "[Nguồn: VB1 – Niên giám 2023 & [VB2 – chưa kiểm chứng]]\n"
+                "Quy định cải thiện điểm học phần:\n"
+                "1. Theo VB1 (Chính thức): Sinh viên đã có điểm học phần đạt được đăng ký học hoặc thi để cải thiện theo quy định thi cải thiện điểm hiện hành của Trường (quy chế riêng của trường).\n"
+                "2. Theo [VB2 – chưa kiểm chứng]: Sinh viên học lại để cải thiện khi có lớp ở các học kỳ tiếp theo; cách tính điểm ghi là lấy điểm cao nhất các lần học (mâu thuẫn với VB1 quy định lấy điểm lần cuối). Thông tin cách tính điểm cao nhất này chưa được xác nhận chính thức, bạn nên hỏi giáo vụ khoa."
             )
         },
-        # 6. Hướng dẫn đăng ký học lại, thi lại, học vét
+        # Chunk 5: Mục 4 - Cảnh báo học vụ và buộc thôi học (VB1 & VB2)
         {
             "chunk_index": 5,
-            "section": "Hướng dẫn đăng ký học vụ",
-            "title": "Hướng dẫn đăng ký học lại, học vét và chi phí",
-            "source": "Văn bản quy định học vụ, Khoa Công nghệ thông tin",
-            "keywords": "học lại, học vét, đăng ký trực tuyến, mẫu đơn học lại, app ME, group Zalo, chi phí học lại",
+            "section": "Mục 4 – Cảnh báo học vụ, dừng học và buộc thôi học",
+            "title": "Cảnh báo học vụ, tạm ngừng học và buộc thôi học",
+            "source": "VB1 – QĐ 22, Điều 13, 19, 21 & [VB2 – chưa kiểm chứng]",
+            "verified": True,
+            "keywords": "cảnh báo học vụ, dừng học, buộc thôi học, rèn luyện yếu, thi hộ, bằng giả, 1.2, 1.4, 1.6, 1.8",
             "content": (
-                "[Văn bản: Hướng dẫn đăng ký học vụ | Nguồn: Khoa Công nghệ thông tin | Mục: Đăng ký học lại, học vét]\n"
-                "Hướng dẫn đăng ký học lại, học vét:\n"
-                "- Hiện tại Nhà trường chưa có văn bản quy định riêng về lớp học vét; sinh viên có nhu cầu học lại/học vét thực hiện theo quy trình đăng ký học lại thông thường.\n"
-                "- Hình thức đăng ký học lại: Đăng ký trực tuyến.\n"
-                "- Mẫu đơn đăng ký học lại: https://forms.gle/iBk3hNwG4SCGKMEFA\n"
-                "- Lưu ý về thời hạn: Nếu mẫu đơn đã quá thời hạn đăng ký, vui lòng theo dõi trên app ME về đợt học lại tiếp theo.\n"
-                "- Sinh viên tham gia Group Zalo để biết thêm chi tiết: https://zalo.me/g/ar6b85p9opfxctwhxwpd\n"
-                "- Danh sách môn học lại tham khảo và chi phí học lại: https://docs.google.com/spreadsheets/d/1LBSioDaeoHSclt4R4yXpO0aFR-6kkTk9/edit?usp=sharing&ouid=103838733389649116635&rtpof=true&sd=true"
+                "[Nguồn: VB1 – Điều 13, 19, 21; QĐ 840 Điều 13 & [VB2 – chưa kiểm chứng]]\n"
+                "Quy định cảnh báo học vụ, tạm ngừng học và buộc thôi học:\n"
+                "1. Theo VB1 (Chính thức):\n"
+                "- Cảnh báo học vụ thực hiện theo từng học kỳ để sinh viên biết và lập phương án học tập. Ngưỡng cảnh báo cụ thể theo quy định xử lý học vụ riêng của Trường.\n"
+                "- Dừng học chương trình thứ hai: Sinh viên học cùng lúc 2 chương trình nếu điểm trung bình tích lũy chương trình 1 dưới 5.0 hoặc thuộc diện cảnh báo thì phải dừng học chương trình 2 ở học kỳ tiếp theo.\n"
+                "- Rèn luyện yếu/kém 2 học kỳ liên tiếp: Tạm ngừng học ít nhất 01 năm; lặp lại lần 2 thì buộc thôi học.\n"
+                "- Thi hộ / nhờ thi hộ: Đình chỉ học tập 01 năm (lần 1); buộc thôi học (lần 2).\n"
+                "- Dùng hồ sơ, văn bằng, chứng chỉ giả: Buộc thôi học, văn bằng đã cấp bị thu hồi.\n"
+                "2. Theo [VB2 – chưa kiểm chứng]: Điểm trung bình tích lũy dưới ngưỡng 'thường là' dưới 1.2 (năm 1), 1.4 (năm 2), 1.6 (năm 3), 1.8 (các năm sau); Buộc thôi học nếu cảnh báo liên tiếp 2 học kỳ chính hoặc quá 12–13 học kỳ (thông tin này chưa được xác nhận chính thức trong văn bản gốc)."
             )
         },
-        # 7. Hình thức thi lại lần 2
+        # Chunk 6: Mục 5 - Điều kiện xét tốt nghiệp đại học (VB1)
         {
             "chunk_index": 6,
-            "section": "Chương III – Điều 13 đến 23",
-            "title": "Hình thức thi lại lần 2 cuối kỳ",
-            "source": "Quy chế đào tạo, Chương III – Điều 13 đến 23",
-            "keywords": "thi lại lần 2, thi lần 2, thi cuối kỳ, điểm dưới 5, chuyên cần, giữa kỳ không thi lại",
+            "section": "Mục 5 – Điều kiện xét tốt nghiệp",
+            "title": "Điều kiện xét tốt nghiệp đại học ngành CNTT",
+            "source": "VB1 – QĐ 22, Điều 15 K1đ, K2; Điều 4 K2a; Điều 11 K5b",
+            "verified": True,
+            "keywords": "xét tốt nghiệp, điều kiện tốt nghiệp, 150 tín chỉ, 8 học kỳ, chuẩn đầu ra, gdqp, gdtc, tin học, ngoại ngữ, kỹ năng mềm",
             "content": (
-                "[Văn bản: Quy chế đào tạo tín chỉ | Nguồn: Quy chế đào tạo, Chương III – Điều 13 đến 23 | Mục: Hình thức thi lại lần 2]\n"
-                "Hình thức thi lại lần 2 cuối kỳ:\n"
-                "- Cuối mỗi học kỳ, trường tổ chức thi lần 1 cuối kỳ của các học phần.\n"
-                "- Đầu học kỳ mới, trường tổ chức thi lần 2 cuối kỳ của các học phần dành cho những sinh viên không tham dự lần 1 hoặc có học phần bị điểm < 5 ở kỳ thi lần 1.\n"
-                "- LƯU Ý QUAN TRỌNG: Điểm chuyên cần và kiểm tra giữa kỳ KHÔNG có thi lần 2."
+                "[Nguồn: VB1 – QĐ 22/QĐ-ĐHLH, Điều 15 K1đ, Khoản 2; Điều 4 K2a; Điều 11 K5b | Trạng thái: Chính thức]\n"
+                "Điều kiện xét tốt nghiệp đại học chính thức (VB1 – Điều 15):\n"
+                "1. Tích lũy đủ 150 tín chỉ của chương trình đào tạo (8 học kỳ), không còn học phần không đạt (không còn môn điểm F dưới 4.0).\n"
+                "2. Có Chứng chỉ Giáo dục quốc phòng – an ninh và hoàn thành 3 học phần Giáo dục thể chất (đạt điểm P, từ 5.0 trở lên).\n"
+                "3. Đạt chuẩn trình độ tin học – ngoại ngữ theo quy định của Trường.\n"
+                "4. Hoàn thành chương trình đào tạo Kỹ năng mềm.\n"
+                "5. Cấp bằng tốt nghiệp trong vòng 03 tháng kể từ khi sinh viên đủ điều kiện.\n"
+                "Theo [VB2 – chưa kiểm chứng]: Không đang bị truy cứu trách nhiệm hình sự; đạt các môn Mác-Lênin, Tư tưởng Hồ Chí Minh; nhà trường xét tốt nghiệp sau mỗi học kỳ theo thông báo của Phòng Đào tạo.\n"
+                "Lưu ý điểm xung đột (Mục 8): VB1 không có kỳ thi tốt nghiệp riêng cho các môn Mác-Lênin hay Tư tưởng HCM mà đây là các môn học bình thường trong CTĐT; đồng thời VB1 bắt buộc chuẩn Ngoại ngữ, Tin học, Kỹ năng mềm."
             )
         },
-        # 8. Các đợt đăng ký học phần
+        # Chunk 7: Mục 6.1, 6.2 - Hệ thống đăng ký và cổng thông tin trực tuyến (VB1)
         {
             "chunk_index": 7,
-            "section": "Chương II – Điều 10",
-            "title": "Các đợt đăng ký học phần",
-            "source": "Quy chế đào tạo, Chương II – Điều 10",
-            "keywords": "đăng ký học phần, đợt đăng ký, khối lượng học tập, kế hoạch năm học, phòng đào tạo",
+            "section": "Mục 6.1, 6.2 – Cổng thông tin và đăng ký môn học",
+            "title": "Hệ thống đăng ký môn học và các cổng thông tin sinh viên LHU",
+            "source": "VB1 – Điều 7 K1; Niên giám 2023 tr. 128–138",
+            "verified": True,
+            "keywords": "dkmh.lhu.edu.vn, app.lhu.edu.vn, me.lhu.edu.vn, hocphi.lhu.edu.vn, mssv, sms, rút học phần, 2 tuần",
             "content": (
-                "[Văn bản: Quy chế đào tạo tín chỉ | Nguồn: Quy chế đào tạo, Chương II – Điều 10 | Mục: Đăng ký học phần]\n"
-                "Các đợt đăng ký học phần:\n"
-                "- Việc đăng ký khối lượng học tập (đăng ký học phần) cho từng học kỳ được thực hiện vào đầu mỗi học kỳ theo kế hoạch chung và thông báo cụ thể của Phòng Đào tạo.\n"
-                "- Thời gian đăng ký học lại / học cải thiện điểm được thực hiện theo các học kỳ chính hoặc học kỳ phụ (hè) do nhà trường ấn định thời hạn cụ thể trên cổng thông tin sinh viên và phòng đào tạo từng năm học."
+                "[Nguồn: VB1 – Điều 7 K1; Niên giám 2023 tr. 128–138 | Trạng thái: Chính thức]\n"
+                "Hệ thống trực tuyến và đăng ký môn học:\n"
+                "1. Cổng đăng ký môn học trực tuyến chính thức: https://dkmh.lhu.edu.vn (thực hiện theo kế hoạch của Phòng Đào tạo trước/đầu mỗi học kỳ).\n"
+                "2. Trang thông tin cá nhân: https://app.lhu.edu.vn hoặc http://me.lhu.edu.vn (Me App).\n"
+                "3. Đăng nhập: Tên đăng nhập là Mã số sinh viên (MSSV). Mật khẩu ban đầu gửi qua SMS đến số điện thoại trong hồ sơ nhập học hoặc in trên hóa đơn học phí. Sinh viên phải cập nhật đầy đủ số điện thoại và email trên Me App trước khi sử dụng.\n"
+                "4. Tra cứu nợ học phí: https://hocphi.lhu.edu.vn.\n"
+                "5. Rút bớt học phần: Thời hạn 2 tuần kể từ khi học phần được triển khai; ngoài thời hạn sinh viên tự ý bỏ học sẽ bị điểm 0.\n"
+                "6. Thời gian đăng ký học lại / cải thiện điểm thực hiện theo các học kỳ chính hoặc học kỳ phụ (hè) do Trường ấn định trên cổng thông tin sinh viên."
             )
         },
-        # 9. Xét tốt nghiệp và hạn nộp hồ sơ
+        # Chunk 8: Mục 6.3 - Đăng ký học lại, học vét qua Google Form (VB2 - Chưa kiểm chứng)
         {
             "chunk_index": 8,
-            "section": "Chương V",
-            "title": "Xét tốt nghiệp và thời hạn nộp hồ sơ",
-            "source": "Quy chế đào tạo, Chương V",
-            "keywords": "xét tốt nghiệp, hạn nộp hồ sơ, đợt xét tốt nghiệp, nộp đơn xét tốt nghiệp",
+            "section": "Mục 6.3 – Đăng ký học lại, học vét",
+            "title": "Kênh đăng ký học lại, học vét và chi phí tham khảo",
+            "source": "[VB2 – chưa kiểm chứng]",
+            "verified": False,
+            "keywords": "học lại, học vét, google form, zalo, app me, chi phí học lại, forms.gle",
             "content": (
-                "[Văn bản: Quy chế đào tạo tín chỉ | Nguồn: Quy chế đào tạo, Chương V | Mục: Xét tốt nghiệp và hạn nộp hồ sơ]\n"
-                "Xét tốt nghiệp và hạn nộp hồ sơ:\n"
-                "- Xét tốt nghiệp: Nhà trường tổ chức xét và công nhận tốt nghiệp cho sinh viên sau mỗi học kỳ (thường có nhiều đợt xét tốt nghiệp trong năm học).\n"
-                "- Hạn nộp hồ sơ: Sinh viên đủ điều kiện tốt nghiệp phải nộp đơn và hồ sơ xét tốt nghiệp theo thời hạn cụ thể do Phòng Đào tạo thông báo trước mỗi đợt xét tốt nghiệp của trường.\n"
-                "- Thời hạn nộp chứng chỉ tiếng Anh: Sinh viên cần hoàn thành và nộp chứng chỉ tiếng Anh trước ngày xét tốt nghiệp tối thiểu 1 tháng để Hội đồng xét tốt nghiệp kịp thời thẩm định và cập nhật vào hệ thống."
+                "[Nguồn: VB2 – Văn bản tóm tắt quy định học vụ | Trạng thái: [VB2 – chưa kiểm chứng]]\n"
+                "Kênh đăng ký học lại, học vét và chi phí tham khảo:\n"
+                "(Lưu ý: VB1 Niên giám quy định đăng ký hoàn toàn trực tuyến trên dkmh.lhu.edu.vn; kênh Google Form/Zalo dưới đây là kênh phụ trợ từ văn bản tóm tắt chưa được xác nhận chính thức, bạn nên hỏi giáo vụ khoa để được hướng dẫn chính xác):\n"
+                "1. Hiện tại Nhà trường chưa có văn bản quy định riêng về lớp học vét; sinh viên có nhu cầu học lại/học vét thực hiện theo quy trình đăng ký học lại thông thường.\n"
+                "2. Hình thức đăng ký học lại: Đăng ký trực tuyến qua Google Form: https://forms.gle/iBk3hNwG4SCGKMEFA\n"
+                "3. Nhóm Zalo hỗ trợ: https://zalo.me/g/ar6b85p9opfxctwhxwpd\n"
+                "4. Bảng danh sách môn học lại và chi phí tham khảo: https://docs.google.com/spreadsheets/d/1LBSioDaeoHSclt4R4yXpO0aFR-6kkTk9/edit?usp=sharing&ouid=103838733389649116635&rtpof=true&sd=true\n"
+                "5. Nếu mẫu đơn đã quá thời hạn đăng ký, sinh viên vui lòng theo dõi trên app ME về đợt học lại tiếp theo."
             )
         },
-        # 10. Lệ phí chứng chỉ ngoại ngữ và tin học
+        # Chunk 9: Mục 6.6 & Bảng 1 - Các thủ tục và mẫu đơn hành chính (VB1)
         {
             "chunk_index": 9,
-            "section": "Lệ phí thi chứng chỉ",
-            "title": "Lệ phí thi chứng chỉ ngoại ngữ và tin học",
-            "source": "Quy định chứng chỉ chuẩn đầu ra, Trung tâm Ngoại ngữ - Tin học Lạc Hồng",
-            "keywords": "lệ phí thi, vstep, cefr, tin học, ứng dụng công nghệ thông tin, lệ phí ngoại ngữ",
+            "section": "Mục 6.6 – Thủ tục hành chính và mẫu đơn",
+            "title": "Thủ tục hành chính, cấp giấy chứng nhận online và Phòng Công tác sinh viên",
+            "source": "VB1 – QĐ 22, Điều 16 K3; QĐ 406 tr. 118–120, 135",
+            "verified": True,
+            "keywords": "giấy chứng nhận online, vay vốn, miễn giảm học phí, phòng ctsv, D201, cơ sở 2, certification.lhu.edu.vn, sinhviendanghoc.lhu.edu.vn",
             "content": (
-                "[Văn bản: Quy định chứng chỉ chuẩn đầu ra | Nguồn: Trung tâm Ngoại ngữ - Tin học Lạc Hồng | Mục: Lệ phí thi chứng chỉ]\n"
-                "Lệ phí thi các chứng chỉ ngoại ngữ và tin học tại trường:\n"
-                "1. Chứng chỉ ngoại ngữ:\n"
-                "- Chứng chỉ Ngoại ngữ 6 bậc (Vstep): 2.000.000 VNĐ / thí sinh / kỳ thi.\n"
-                "- Chứng nhận đánh giá năng lực tiếng Anh (CEFR): 1.100.000 VNĐ / thí sinh / kỳ thi.\n"
-                "2. Chứng chỉ tin học:\n"
-                "- Chứng chỉ Ứng dụng công nghệ thông tin: 600.000 VNĐ / thí sinh / kỳ thi."
+                "[Nguồn: VB1 – QĐ 22 Điều 16 K3; QĐ 406 tr. 118–120, 135 | Trạng thái: Chính thức]\n"
+                "Thủ tục hành chính và dịch vụ sinh viên:\n"
+                "1. Cấp giấy chứng nhận online: Đăng ký trực tuyến tại http://certification.lhu.edu.vn theo hướng dẫn trên hệ thống.\n"
+                "2. Giấy xác nhận vay vốn sinh viên (Mẫu 01-TDSV theo QĐ 157/2007/QĐ-TTg): Nộp trực tuyến tại https://sinhviendanghoc.lhu.edu.vn hoặc nộp trực tiếp tại Phòng Công tác sinh viên (Phòng D201, Cơ sở 2). Kèm thẻ SV, CCCD, biên lai học phí kỳ gần nhất.\n"
+                "3. Miễn giảm học phí, ưu đãi giáo dục (Mẫu 41 / Phụ lục VIII NĐ 81/2021): Nộp tại Phòng Công tác sinh viên (Phòng D201, Cơ sở 2); viết bút xanh, không tẩy xóa. Kèm thẻ SV, CCCD, biên lai học phí.\n"
+                "4. Xin trở lại học sau nghỉ tạm thời: Đơn viết gửi Hiệu trưởng, nộp tại Trường trước kỳ học mới ít nhất 1 tuần."
             )
         },
-        # 11. Đối tượng miễn thi ngoại ngữ
+        # Chunk 10: Mục 7.1 - Chương trình đào tạo CNTT 150 tín chỉ (VB1)
         {
             "chunk_index": 10,
-            "section": "Miễn thi ngoại ngữ",
-            "title": "Đối tượng được miễn thi chứng chỉ ngoại ngữ",
-            "source": "Quy định chuẩn đầu ra ngoại ngữ, Trường Đại học Lạc Hồng",
-            "keywords": "miễn thi, miễn ngoại ngữ, toefl, ielts, bằng tiếng anh, đại học nước ngoài",
+            "section": "Mục 7.1 – CTĐT ngành CNTT 150 tín chỉ",
+            "title": "Khung chương trình đào tạo ngành Công nghệ thông tin (150 tín chỉ, 8 học kỳ)",
+            "source": "VB1 – Niên giám 2023 (Khóa 2023–2027)",
+            "verified": True,
+            "keywords": "chương trình đào tạo, ctđt cntt, 150 tín chỉ, 8 học kỳ, danh mục môn học, mã học phần, tiên quyết, bắt buộc, tự chọn",
             "content": (
-                "[Văn bản: Quy định chuẩn đầu ra ngoại ngữ | Nguồn: Trường Đại học Lạc Hồng | Mục: Đối tượng miễn thi]\n"
-                "Đối tượng được miễn thi chứng chỉ ngoại ngữ:\n"
-                "- Có bằng tốt nghiệp đại học chính quy ngành tiếng Anh; hoặc có bằng tốt nghiệp đại học tại nước ngoài mà ngôn ngữ dùng trong đào tạo là tiếng Anh.\n"
-                "- Có bằng tốt nghiệp đại học tại các chương trình đào tạo trong nước mà ngôn ngữ dùng trong toàn bộ chương trình đào tạo là tiếng Anh không qua phiên dịch.\n"
-                "- Có chứng chỉ TOEFL ITP 400, iBT 32 hoặc IELTS 4.5 trở lên trong thời hạn 2 năm kể từ ngày cấp chứng chỉ đến ngày nộp hồ sơ.\n"
-                "- Có chứng chỉ ngoại ngữ do các cơ sở đào tạo ngoại ngữ được Bộ Giáo dục và Đào tạo giao nhiệm vụ và công nhận tương đương trình độ tiếng Anh TOEFL ITP 400, iBT 32 hoặc IELTS 4.5."
+                "[Nguồn: VB1 – Niên giám 2023 | Trạng thái: Chính thức]\n"
+                "Chương trình đào tạo ngành Công nghệ thông tin (Mã ngành: 7480201) – Niên khóa 2023–2027 (Tổng cộng 150 tín chỉ, 8 học kỳ):\n"
+                "- Học kỳ 1 (17 TC): Giáo dục quốc phòng (-), 102002 Giáo dục thể chất 1 (0 TC), 102073 Toán cao cấp 1 (4 TC), 102074 English 1 (3 TC), 111094 Nhập môn lập trình (2 TC), 111001 Cấu trúc và lắp ráp máy tính (3 TC), 111080 Phần mềm mã nguồn mở (2 TC), 111055 Nhập môn Công nghệ thông tin (1 TC), 111053 Nhập môn Phát triển dự án kỹ thuật (2 TC).\n"
+                "- Học kỳ 2 (20 TC): 102003 Giáo dục thể chất 2 (0 TC), 102087 Xác suất thống kê (2 TC), 102075 English 2 (4 TC), 102014 Tin học đại cương (3 TC), 111046 Vật lý thực hành (3 TC), 111047 Điện tử cơ bản (2 TC), 111056 Thiết kế UI/UX (2 TC), 111058 Kỹ thuật lập trình (2 TC), 112061 Mạng máy tính (2 TC).\n"
+                "- Học kỳ 3 (25 TC): 102004 Giáo dục thể chất 3 (0 TC), 102063 Triết học Mác - Lênin (3 TC), 102064 Kinh tế chính trị Mác - Lênin (2 TC), 102065 Chủ nghĩa xã hội khoa học (2 TC), 102076 English 3 (4 TC), 111010 Toán rời rạc (3 TC), 111062 Cấu trúc dữ liệu và giải thuật (3 TC), 111048 Tín hiệu số cơ bản (2 TC), 111059 Cơ sở dữ liệu (3 TC), 112064 Mạng máy tính nâng cao (3 TC).\n"
+                "- Học kỳ 4 (21 TC): 102033 Tư tưởng Hồ Chí Minh (2 TC), 102006 Pháp luật đại cương (2 TC), 102077 English 4 (4 TC), 111036 Dịch vụ mạng (3 TC), 111070 Lập trình hướng đối tượng (3 TC), 111060 Hệ quản trị CSDL (3 TC), 111067 Lập trình Front-End (2 TC), 111081 Kiến tập (2 TC).\n"
+                "- Học kỳ 5 (20 TC): 102066 Lịch sử Đảng (2 TC), 102078 English 5 (4 TC), 111057 Nguyên lý thống kê (2 TC), 112065 Thiết kế hệ thống mạng (3 TC), 111066 Lập trình Back-End (3 TC), 111072 Lập trình Windows (3 TC), Tự chọn 3 TC (111043 PT&TK HT HĐT hoặc 111089 PT&TK HT HQR).\n"
+                "- Học kỳ 6 (16 TC): 102079 English 6 (4 TC), 112068 Thiết kế HT mạng nâng cao (2 TC), 111069 Lập trình giao tiếp thiết bị (2 TC), 111082 Lập trình ứng dụng di động (3 TC), 111083 Lập trình ứng dụng web (3 TC), Tự chọn 2 TC (111071 Python cho học máy hoặc 111084 Python thị giác MT).\n"
+                "- Học kỳ 7 (21 TC): 102080 English 7 (4 TC), 111065 Kiểm thử & ĐBCLPM (3 TC), 111085 Quản trị website trên VPS (2 TC), 111038 Phát triển ứng dụng (9 TC), Tự chọn 3 TC (111088 Trí tuệ nhân tạo hoặc 111061 Công nghệ Blockchain).\n"
+                "- Học kỳ 8 (10 TC): 111049 Thực tập (2 TC), 33333 Tốt nghiệp (8 TC).\n"
+                "Ghi chú: GDQP không tính tín chỉ; GDTC gồm 3 học phần 0 tín chỉ (điểm P từ 5.0 trở lên); tổng toàn khóa đúng 150 tín chỉ."
             )
         },
-        # 12. Sát hạch tin học
+        # Chunk 11: Mục 7.3 - Lệ phí và sát hạch Tin học, Ngoại ngữ (VB2 - Chưa kiểm chứng)
         {
             "chunk_index": 11,
-            "section": "Sát hạch tin học",
-            "title": "Quy định và lớp ôn sát hạch tin học",
-            "source": "Quy định sát hạch tin học, Khoa CNTT & Trung tâm NNTH",
-            "keywords": "sát hạch tin học, mức phí ôn luyện, lớp ôn tin học, group Zalo, form đăng ký, app ME",
+            "section": "Mục 7.3 – Lệ phí thi chứng chỉ và sát hạch",
+            "title": "Lệ phí thi chứng chỉ Ngoại ngữ, Tin học và ôn thi sát hạch",
+            "source": "[VB2 – chưa kiểm chứng]",
+            "verified": False,
+            "keywords": "lệ phí thi, vstep, cefr, tin học, sát hạch tin học, 2.000.000, 1.100.000, 600.000, 90.000, forms.gle",
             "content": (
-                "[Văn bản: Quy định sát hạch tin học | Nguồn: Khoa CNTT & Trung tâm NNTH | Mục: Sát hạch tin học]\n"
-                "Quy định ôn luyện và đăng ký sát hạch tin học:\n"
-                "- Mức phí ôn luyện: 90.000 VNĐ / sinh viên.\n"
-                "- Đường link đăng ký tham gia lớp ôn: https://forms.gle/WtUpfZbPiWAq3RqK6\n"
-                "- Sinh viên tham gia Group Zalo để biết thêm thông tin: https://zalo.me/g/g2elp3xxzxexl5lqjlc0\n"
-                "- Lưu ý: Nếu đã quá thời hạn đăng ký, vui lòng theo dõi trên app ME về đợt mở đăng ký tiếp theo."
+                "[Nguồn: VB2 – Văn bản tóm tắt quy định học vụ | Trạng thái: [VB2 – chưa kiểm chứng]]\n"
+                "Lệ phí thi chứng chỉ và sát hạch Ngoại ngữ - Tin học:\n"
+                "(Lưu ý: VB1 Niên giám chỉ quy định sinh viên phải đạt chuẩn tin học - ngoại ngữ của Trường mà không có bảng lệ phí chi tiết; thông tin này chưa được xác nhận chính thức, bạn nên hỏi giáo vụ khoa hoặc Trung tâm NNTH):\n"
+                "1. Lệ phí thi chứng chỉ ngoại ngữ và tin học:\n"
+                "- Chứng chỉ Ngoại ngữ 6 bậc (VSTEP): 2.000.000 VNĐ / thí sinh / kỳ thi.\n"
+                "- Chứng nhận đánh giá năng lực tiếng Anh (CEFR): 1.100.000 VNĐ / thí sinh / kỳ thi.\n"
+                "- Chứng chỉ Ứng dụng công nghệ thông tin: 600.000 VNĐ / thí sinh / kỳ thi.\n"
+                "2. Sát hạch tin học:\n"
+                "- Phí ôn luyện: 90.000 VNĐ / sinh viên.\n"
+                "- Link đăng ký lớp ôn: https://forms.gle/WtUpfZbPiWAq3RqK6\n"
+                "- Nhóm Zalo hỗ trợ: https://zalo.me/g/g2elp3xxzxexl5lqjlc0\n"
+                "- Nếu quá hạn đăng ký, sinh viên theo dõi trên App ME về đợt tiếp theo."
             )
         },
-        # 13. GDQP - Giáo dục quốc phòng
+        # Chunk 12: Mục 7.3 - Đối tượng miễn thi ngoại ngữ (VB2 - Chưa kiểm chứng)
         {
             "chunk_index": 12,
-            "section": "Giáo dục quốc phòng",
-            "title": "Quy định và lịch học Giáo dục quốc phòng",
-            "source": "Quy định học phần Giáo dục quốc phòng - An ninh",
-            "keywords": "giáo dục quốc phòng, gdqp, quân sự, lịch học gdqp, calen.lhu.edu.vn, 1 năm 1 lần",
+            "section": "Mục 7.3 – Miễn thi ngoại ngữ",
+            "title": "Đối tượng miễn thi chứng chỉ ngoại ngữ chuẩn đầu ra",
+            "source": "[VB2 – chưa kiểm chứng]",
+            "verified": False,
+            "keywords": "miễn thi ngoại ngữ, toefl, ielts, bằng tiếng anh, đại học nước ngoài, 4.5, itp 400, ibt 32",
             "content": (
-                "[Văn bản: Quy định GDQP-AN | Nguồn: Quy định học phần Giáo dục quốc phòng - An ninh | Mục: Giáo dục quốc phòng]\n"
-                "Quy định và lịch học Giáo dục quốc phòng (GDQP):\n"
-                "- Lịch học: Dời sang bắt đầu ngày 28/7/2025 (lịch cũ là 14/7/2025).\n"
-                "- Tra cứu lịch học chi tiết: Sinh viên tra cứu tại trang thông tin https://calen.lhu.edu.vn\n"
-                "- LƯU Ý ĐẶC BIỆT: Lịch Giáo dục quốc phòng chỉ mở 1 năm / 1 lần. Nếu đã quá thời gian đăng ký, xin vui lòng đăng ký lại vào năm sau."
+                "[Nguồn: VB2 – Văn bản tóm tắt quy định học vụ | Trạng thái: [VB2 – chưa kiểm chứng]]\n"
+                "Đối tượng được miễn thi chứng chỉ ngoại ngữ chuẩn đầu ra:\n"
+                "(CẢNH BÁO QUAN TRỌNG: Danh mục miễn thi này dẫn từ thông báo tuyển sinh cao học 2010, chưa được xác nhận chính thức có áp dụng cho chuẩn đầu ra đại học hay không. Sinh viên bắt buộc phải hỏi phòng Đào tạo hoặc Trung tâm NNTH để xác nhận):\n"
+                "1. Có bằng tốt nghiệp đại học chính quy ngành tiếng Anh; hoặc có bằng tốt nghiệp đại học tại nước ngoài mà ngôn ngữ dùng trong đào tạo là tiếng Anh.\n"
+                "2. Có bằng tốt nghiệp đại học tại các chương trình đào tạo trong nước mà ngôn ngữ dùng trong toàn bộ chương trình là tiếng Anh không qua phiên dịch.\n"
+                "3. Có chứng chỉ TOEFL ITP 400, iBT 32 hoặc IELTS 4.5 trở lên trong thời hạn 2 năm kể từ ngày cấp đến ngày nộp hồ sơ.\n"
+                "4. Có chứng chỉ do các cơ sở đào tạo ngoại ngữ được Bộ Giáo dục và Đào tạo giao nhiệm vụ và công nhận tương đương các mức trên."
             )
         },
-        # 14. GDTC - Giáo dục thể chất
+        # Chunk 13: Mục 7.4 - Giáo dục quốc phòng – an ninh và Thể chất (VB1 & VB2)
         {
             "chunk_index": 13,
-            "section": "Giáo dục thể chất",
-            "title": "Quy định chứng chỉ Giáo dục thể chất",
-            "source": "Quy định học phần Giáo dục thể chất",
-            "keywords": "giáo dục thể chất, gdtc, thể dục, chứng chỉ thể chất, điều kiện tốt nghiệp",
+            "section": "Mục 7.4 – GDQP-AN và Giáo dục thể chất",
+            "title": "Quy định hoàn thành Giáo dục quốc phòng - An ninh và Giáo dục thể chất",
+            "source": "VB1 – QĐ 22 Điều 4, 11, 15 & [VB2 – chưa kiểm chứng]",
+            "verified": True,
+            "keywords": "giáo dục quốc phòng, gdqp, giáo dục thể chất, gdtc, 102002, 102003, 102004, điểm P, calen.lhu.edu.vn, 28/7/2025",
             "content": (
-                "[Văn bản: Quy định GDTC | Nguồn: Quy định học phần Giáo dục thể chất | Mục: Giáo dục thể chất]\n"
-                "Quy định về Giáo dục thể chất (GDTC):\n"
-                "- Sinh viên phải hoàn thành và tích lũy đủ các học phần Giáo dục thể chất theo chương trình đào tạo của trường.\n"
-                "- Có Chứng chỉ Giáo dục thể chất là điều kiện bắt buộc để được xét công nhận tốt nghiệp đại học đối với các ngành không chuyên về thể dục thể thao."
+                "[Nguồn: VB1 – QĐ 22/QĐ-ĐHLH & [VB2 – chưa kiểm chứng]]\n"
+                "Quy định Giáo dục quốc phòng – an ninh và Giáo dục thể chất:\n"
+                "1. Theo VB1 (Chính thức):\n"
+                "- Giáo dục quốc phòng – an ninh (GDQP-AN): Bắt buộc để xét tốt nghiệp đại học; học tập trung đầu khóa / học kỳ 1 (VB1 không nêu điều kiện miễn).\n"
+                "- Giáo dục thể chất (GDTC): Gồm 3 học phần (102002 GDTC 1, 102003 GDTC 2, 102004 GDTC 3), 0 tín chỉ trong CTĐT. Điều kiện đạt là điểm P (từ 5.0 trở lên); không tính vào điểm trung bình nhưng bắt buộc hoàn thành đủ cả 3 học phần để được xét tốt nghiệp.\n"
+                "2. Theo [VB2 – chưa kiểm chứng]: Lịch học GDQP-AN bắt đầu dời sang ngày 28/7/2025 (lịch cũ là 14/7/2025), tra cứu tại https://calen.lhu.edu.vn; lịch GDQP chỉ mở 1 năm/lần, quá hạn phải đăng ký vào năm sau (thông tin lịch học cụ thể cần tra cứu lại trên calen.lhu.edu.vn)."
             )
         },
-        # 15. Kỹ năng mềm
+        # Chunk 14: Mục 7.4 - Quy định 4 kỹ năng mềm (VB1 & VB2 - Chưa kiểm chứng)
         {
             "chunk_index": 14,
-            "section": "Kỹ năng mềm",
-            "title": "Quy định 4 kỹ năng mềm và học phí qua AppMe",
-            "source": "Quy định chứng chỉ kỹ năng mềm, Trường Đại học Lạc Hồng",
-            "keywords": "kỹ năng mềm, 4 kỹ năng, giải quyết vấn đề, thuyết trình, viết cv, khởi nghiệp, 500.000đ, AppMe",
+            "section": "Mục 7.4 – Kỹ năng mềm",
+            "title": "Quy định 4 kỹ năng mềm bắt buộc chuẩn đầu ra và học phí",
+            "source": "VB1 – Điều 15 K1đ & [VB2 – chưa kiểm chứng]",
+            "verified": False,
+            "keywords": "kỹ năng mềm, 4 kỹ năng, giải quyết vấn đề, thuyết trình, viết cv, khởi nghiệp, 500.000, AppMe",
             "content": (
-                "[Văn bản: Quy định chuẩn kỹ năng mềm | Nguồn: Trường Đại học Lạc Hồng | Mục: Kỹ năng mềm]\n"
-                "Quy định 4 kỹ năng mềm bắt buộc chuẩn đầu ra và học phí:\n"
-                "1. Danh mục 4 kỹ năng mềm:\n"
-                "- Kỹ năng giải quyết vấn đề và ra quyết định\n"
-                "- Kỹ năng thuyết trình hiệu quả\n"
-                "- Kỹ năng viết CV điện tử và trả (văn bản gốc bị cắt, chưa xác nhận tên đầy đủ)\n"
-                "- Kỹ năng khởi nghiệp\n"
-                "2. Mức học phí:\n"
-                "- Sinh viên Khóa 2023, Khóa 2024 và Khóa 2025: 500.000 đồng / môn.\n"
-                "- Hình thức đóng tiền: Sinh viên đóng tiền trực tiếp trên AppMe theo hướng dẫn."
+                "[Nguồn: VB1 – Điều 15 K1đ & [VB2 – chưa kiểm chứng]]\n"
+                "Quy định chuẩn đầu ra Kỹ năng mềm:\n"
+                "(Lưu ý: VB1 Niên giám chỉ quy định hoàn thành Kỹ năng mềm là điều kiện bắt buộc tốt nghiệp mà không có danh mục tên môn cụ thể; danh mục 4 môn dưới đây là quy định chung của trường từ văn bản tóm tắt chưa được kiểm chứng chính thức, bạn nên hỏi giáo vụ khoa để được hướng dẫn):\n"
+                "1. Danh mục 4 môn kỹ năng mềm:\n"
+                "- (1) Kỹ năng giải quyết vấn đề và ra quyết định\n"
+                "- (2) Kỹ năng thuyết trình hiệu quả\n"
+                "- (3) Kỹ năng viết CV điện tử và trả… (văn bản gốc bị cắt dở chữ 'và trả...', chưa xác nhận tên đầy đủ)\n"
+                "- (4) Kỹ năng khởi nghiệp\n"
+                "2. Mức học phí: Khóa 2023, 2024, 2025 là 500.000 VNĐ / môn.\n"
+                "3. Hình thức đóng tiền: Sinh viên đóng tiền trực tiếp trên AppMe theo hướng dẫn đính kèm."
             )
         },
-        # 16. Danh bạ Khoa CNTT
+        # Chunk 15: Mục 7.5 - Danh bạ liên hệ Khoa CNTT (VB2 - Chưa kiểm chứng)
         {
             "chunk_index": 15,
-            "section": "Danh bạ liên hệ",
-            "title": "Danh bạ liên hệ Khoa Công nghệ thông tin",
-            "source": "Thông tin liên hệ, Khoa Công nghệ thông tin LHU",
+            "section": "Mục 7.5 – Danh bạ liên hệ Khoa CNTT",
+            "title": "Thông tin liên hệ Khoa Công nghệ thông tin LHU",
+            "source": "[VB2 – chưa kiểm chứng]",
+            "verified": False,
             "keywords": "danh bạ, liên hệ, khoa công nghệ thông tin, cntt@lhu.edu.vn, 02513.952.251, B301, B302, cơ sở 1",
             "content": (
-                "[Văn bản: Thông tin liên hệ | Nguồn: Khoa Công nghệ thông tin LHU | Mục: Danh bạ liên hệ Khoa CNTT]\n"
-                "Thông tin liên hệ chuyên ngành Công nghệ thông tin (Mã ngành: 7480201):\n"
+                "[Nguồn: VB2 – Văn bản tóm tắt quy định học vụ | Trạng thái: [VB2 – chưa kiểm chứng]]\n"
+                "Thông tin liên hệ Khoa Công nghệ thông tin (Mã ngành: 7480201):\n"
                 "- Số điện thoại liên hệ: 02513.952.251\n"
                 "- Email: cntt@lhu.edu.vn\n"
                 "- Website: http://cs.lhu.edu.vn\n"
-                "- Văn phòng Khoa: Phòng B301 - B302, Cơ sở 1, Số 10 Huỳnh Văn Nghệ, Biên Hòa, Đồng Nai.\n"
-                "- Giờ làm việc: Thứ Hai đến Thứ Sáu (Sáng: 7h30 – 11h30 | Chiều: 13h00 – 16h30 / 17h00)."
+                "- Văn phòng Khoa: Phòng B301 - B302, Cơ sở 1, Số 10 Huỳnh Văn Nghệ, P. Bửu Long, TP. Biên Hòa, Tỉnh Đồng Nai.\n"
+                "- Giờ làm việc: Thứ Hai đến Thứ Sáu (Sáng: 7h30 – 11h30 | Chiều: 13h00 – 16h30 / 17h00).\n"
+                "Phòng Công tác sinh viên (VB1): Phòng D201, Cơ sở 2 (tiếp nhận xác nhận vay vốn và miễn giảm học phí)."
+            )
+        },
+        # Chunk 16: Mục 8 - Tổng hợp điểm xung đột giữa VB1 và VB2 (Chính thức)
+        {
+            "chunk_index": 16,
+            "section": "Mục 8 – Điểm xung đột giữa VB1 và VB2",
+            "title": "Các điểm xung đột quy định học vụ giữa VB1 và VB2 và nguyên tắc xử lý",
+            "source": "Hợp nhất quy chế LHU",
+            "verified": True,
+            "keywords": "xung đột, so sánh, điểm F, dưới 4.0, dưới 5.0, điểm cao nhất, điểm lần cuối, thi lại, dkmh.lhu.edu.vn, google form, điều 15, điều 27",
+            "content": (
+                "[Nguồn: Tổng hợp đối chiếu Quy chế đào tạo tín chỉ LHU | Trạng thái: Nguyên tắc xử lý xung đột]\n"
+                "Nguyên tắc: Khi hai văn bản có mâu thuẫn thì ưu tiên áp dụng Niên giám chính thức (VB1). Sinh viên cần liên hệ giáo vụ khoa để xác nhận khi gặp các trường hợp sau:\n"
+                "1. Ngưỡng đạt / học lại: VB1 quy định F là dưới 4.0, điểm D (4.0–4.9) vẫn đạt; VB2 ghi dưới 5 phải học lại.\n"
+                "2. Điểm khi học lại: VB1 tính điểm của lần học cuối là điểm chính thức; VB2 ghi tính điểm cao nhất các lần học.\n"
+                "3. Thi lại (kỳ thi phụ): VB1 tổ chức sớm nhất 02 tuần sau kỳ thi chính (cho điểm < 4.0); VB2 ghi thi lần 2 vào đầu học kỳ mới (cho điểm < 5).\n"
+                "4. Kênh đăng ký học lại: VB1 quy định trực tuyến trên dkmh.lhu.edu.vn, không có mẫu đơn giấy; VB2 ghi đăng ký qua Google Form, App ME và nhóm Zalo.\n"
+                "5. Điều kiện tốt nghiệp: VB1 (Điều 15) yêu cầu chuẩn Tin học – Ngoại ngữ, Kỹ năng mềm, GDQP-AN, 3 môn GDTC (không có kỳ thi riêng Mác-Lênin/TTHCM); VB2 (Điều 27) ghi kỳ thi tốt nghiệp Mác-Lênin/TTHCM nhưng thiếu chuẩn NN-TH và KNM.\n"
+                "6. Đăng ký học phần: VB1 thực hiện trước khi bắt đầu mỗi học kỳ; VB2 ghi đầu mỗi học kỳ.\n"
+                "7. Rút bớt học phần: VB1 quy định thời hạn 2 tuần kể từ khi triển khai, ngoài thời hạn nhận điểm 0."
             )
         }
     ]
@@ -323,7 +395,7 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
 
 
 def ingest_quy_dinh(docx_path: str = None, dry_run: bool = False) -> int:
-    """Nạp các chunk quy định vào cơ sở dữ liệu (idempotent)."""
+    """Nạp các chunk quy định vào cơ sở dữ liệu (idempotent, chỉ xóa và nạp lại document_id 9001)."""
     if docx_path is None:
         docx_path = find_docx_file()
 
@@ -349,51 +421,38 @@ def ingest_quy_dinh(docx_path: str = None, dry_run: bool = False) -> int:
         ).fetchone()
 
         if not doc_exists:
-            # Kiểm tra xem có bản ghi theo title không
-            doc_by_title = conn.execute(
-                text("SELECT id FROM documents WHERE title = :t"),
-                {"t": DOCUMENT_TITLE}
-            ).fetchone()
-            if doc_by_title:
-                target_doc_id = doc_by_title.id
+            target_doc_id = DOCUMENT_ID_QUY_DINH
+            try:
+                conn.execute(text("SET IDENTITY_INSERT documents ON"))
                 conn.execute(
-                    text("UPDATE documents SET status = 'indexed', source = :src, so_hieu = :sh, url = :url WHERE id = :id"),
-                    {"src": DOCUMENT_SOURCE, "sh": DOCUMENT_SO_HIEU, "url": DOCUMENT_URL, "id": target_doc_id}
+                    text("""
+                        INSERT INTO documents (id, title, source, status, so_hieu, url)
+                        VALUES (:id, :title, :source, 'indexed', :so_hieu, :url)
+                    """),
+                    {
+                        "id": target_doc_id,
+                        "title": DOCUMENT_TITLE,
+                        "source": DOCUMENT_SOURCE,
+                        "so_hieu": DOCUMENT_SO_HIEU,
+                        "url": DOCUMENT_URL
+                    }
                 )
-            else:
-                target_doc_id = DOCUMENT_ID_QUY_DINH
-                try:
-                    conn.execute(text("SET IDENTITY_INSERT documents ON"))
-                    conn.execute(
-                        text("""
-                            INSERT INTO documents (id, title, source, status, so_hieu, url)
-                            VALUES (:id, :title, :source, 'indexed', :so_hieu, :url)
-                        """),
-                        {
-                            "id": target_doc_id,
-                            "title": DOCUMENT_TITLE,
-                            "source": DOCUMENT_SOURCE,
-                            "so_hieu": DOCUMENT_SO_HIEU,
-                            "url": DOCUMENT_URL
-                        }
-                    )
-                    conn.execute(text("SET IDENTITY_INSERT documents OFF"))
-                except Exception as e:
-                    # Fallback nếu không bật được IDENTITY_INSERT
-                    res_ins = conn.execute(
-                        text("""
-                            INSERT INTO documents (title, source, status, so_hieu, url)
-                            OUTPUT INSERTED.id
-                            VALUES (:title, :source, 'indexed', :so_hieu, :url)
-                        """),
-                        {
-                            "title": DOCUMENT_TITLE,
-                            "source": DOCUMENT_SOURCE,
-                            "so_hieu": DOCUMENT_SO_HIEU,
-                            "url": DOCUMENT_URL
-                        }
-                    )
-                    target_doc_id = res_ins.scalar()
+                conn.execute(text("SET IDENTITY_INSERT documents OFF"))
+            except Exception:
+                res_ins = conn.execute(
+                    text("""
+                        INSERT INTO documents (title, source, status, so_hieu, url)
+                        OUTPUT INSERTED.id
+                        VALUES (:title, :source, 'indexed', :so_hieu, :url)
+                    """),
+                    {
+                        "title": DOCUMENT_TITLE,
+                        "source": DOCUMENT_SOURCE,
+                        "so_hieu": DOCUMENT_SO_HIEU,
+                        "url": DOCUMENT_URL
+                    }
+                )
+                target_doc_id = res_ins.scalar()
         else:
             target_doc_id = DOCUMENT_ID_QUY_DINH
             conn.execute(
@@ -407,25 +466,26 @@ def ingest_quy_dinh(docx_path: str = None, dry_run: bool = False) -> int:
                 }
             )
 
-        # 2. Xóa các chunk cũ của document này để đảm bảo idempotent khi chạy lại
+        # 2. Xóa CHỈ các chunk cũ của document 9001 để đảm bảo idempotent
         conn.execute(
             text("DELETE FROM document_chunks WHERE document_id = :did"),
             {"did": target_doc_id}
         )
 
-        # 3. Chèn các chunk mới kèm embedding
+        # 3. Chèn các chunk mới kèm embedding và cờ verified
         for idx, c in enumerate(chunks):
             conn.execute(
                 text("""
-                    INSERT INTO document_chunks (document_id, chunk_index, content, embedding, section)
-                    VALUES (:did, :idx, :content, :emb, :sec)
+                    INSERT INTO document_chunks (document_id, chunk_index, content, embedding, section, verified)
+                    VALUES (:did, :idx, :content, :emb, :sec, :ver)
                 """),
                 {
                     "did": target_doc_id,
                     "idx": idx,
                     "content": c["content"],
                     "emb": embeddings[idx],
-                    "sec": c["section"]
+                    "sec": c["section"],
+                    "ver": 1 if c.get("verified", True) else 0
                 }
             )
 
@@ -434,7 +494,7 @@ def ingest_quy_dinh(docx_path: str = None, dry_run: bool = False) -> int:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Nạp văn bản quy định vào RAG (document_chunks)")
+    parser = argparse.ArgumentParser(description="Nạp văn bản quy chế đào tạo hợp nhất vào RAG")
     parser.add_argument("--dry-run", action="store_true", help="Chỉ phân tích và tạo embedding, không ghi vào database")
     args = parser.parse_args()
 
