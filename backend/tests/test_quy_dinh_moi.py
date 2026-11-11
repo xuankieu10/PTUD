@@ -119,3 +119,76 @@ def test_thi_ho_and_buoc_thoi_hoc_not_truncated():
     assert "buộc thôi học" in cleaned.lower()
 
 
+def test_cam_thi_answer_guarantees_both_conditions():
+    """
+    Câu hỏi điều kiện cấm thi: Luôn đảm bảo đủ cả 2 điều kiện
+    (1: vắng quá 20% số tiết, 2: điểm thành phần dưới 2.0).
+    """
+    # Trường hợp raw answer chỉ có 1 ý (vắng quá 20%), thiếu ý điểm thành phần
+    raw_answer_only_absent = "Sinh viên bị cấm thi khi vắng mặt quá 20% số tiết học phần."
+    cleaned = clean_academic_regulation_answer(raw_answer_only_absent, "Điều kiện bị cấm thi kết thúc học phần là gì?")
+    assert "20%" in cleaned
+    assert "2.0" in cleaned or "2,0" in cleaned
+    assert "thành phần" in cleaned.lower() or "bộ phận" in cleaned.lower()
+
+    # Trường hợp raw answer chỉ có ý điểm thành phần, thiếu ý vắng 20%
+    raw_answer_only_score = "Sinh viên bị cấm thi nếu điểm thành phần dưới 2.0."
+    cleaned2 = clean_academic_regulation_answer(raw_answer_only_score, "Điều kiện cấm thi là gì?")
+    assert "20%" in cleaned2
+    assert "2.0" in cleaned2 or "2,0" in cleaned2
+
+
+def test_hoc_vet_does_not_claim_nha_truong_chua_co_van_ban():
+    """
+    Câu hỏi học vét: Không được khẳng định 'Nhà trường chưa có văn bản',
+    phải dùng 'tài liệu hiện có không đề cập riêng'.
+    """
+    raw_answer = "Hiện tại Nhà trường chưa có văn bản quy định riêng về lớp học vét; sinh viên học lại theo quy trình."
+    cleaned = clean_academic_regulation_answer(raw_answer, "Lớp học vét là gì và đăng ký ở đâu?")
+    assert "chưa có văn bản" not in cleaned.lower()
+    assert "tài liệu hiện có không đề cập riêng" in cleaned.lower()
+
+
+def test_personal_vs_general_query_routing():
+    """
+    Kiểm tra phân loại và bảo toàn dữ liệu sinh viên:
+    - Câu hỏi cá nhân ('môn nào tôi đang bị F?', 'tôi còn thiếu bao nhiêu tín chỉ?'):
+      có dùng dữ liệu sinh viên (trả về môn IT2030 hoặc tín chỉ của student 1).
+    - Câu hỏi quy chế chung ('điều kiện tốt nghiệp là gì?'):
+      không bị chèn template dữ liệu cá nhân của sinh viên.
+    """
+    from fastapi.testclient import TestClient
+    from backend.api import app
+    from backend.app.security import create_access_token
+
+    client = TestClient(app)
+    # user_id = 2 là tài khoản sv01 (gắn với student_id = 1, MSSV 20210001)
+    token = create_access_token(subject=2, role="student")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 1. Câu hỏi cá nhân: "môn nào tôi đang bị F?" -> phải tra cứu dữ liệu cá nhân của student 1
+    res_f = client.post("/chat", json={"message": "môn nào tôi đang bị F?"}, headers=headers)
+    assert res_f.status_code == 200
+    ans_f = res_f.json().get("answer", "")
+    # Student 1 nợ môn IT2030 (Cấu trúc dữ liệu và giải thuật)
+    assert "it2030" in ans_f.lower() or "cấu trúc dữ liệu" in ans_f.lower() or "chưa đạt" in ans_f.lower() or "học phần" in ans_f.lower()
+
+    # 2. Câu hỏi cá nhân: "tôi còn thiếu bao nhiêu tín chỉ?" -> phải có thông tin tín chỉ của student 1
+    res_tc = client.post("/chat", json={"message": "tôi còn thiếu bao nhiêu tín chỉ?"}, headers=headers)
+    assert res_tc.status_code == 200
+    ans_tc = res_tc.json().get("answer", "")
+    assert "tín chỉ" in ans_tc.lower()
+    assert "17" in ans_tc or "133" in ans_tc or "thiếu" in ans_tc.lower()
+
+    # 3. Câu hỏi quy chế chung: "điều kiện tốt nghiệp là gì?" -> KHÔNG chèn hồ sơ cá nhân
+    res_gen = client.post("/chat", json={"message": "điều kiện tốt nghiệp là gì?"}, headers=headers)
+    assert res_gen.status_code == 200
+    ans_gen = res_gen.json().get("answer", "")
+    # Phải là quy chế chung (Điều 15 / 150 tín chỉ)
+    assert "150 tín chỉ" in ans_gen
+    # KHÔNG được chứa thông tin cá nhân cụ thể của student 1 (ví dụ MSSV 20210001, hoặc báo student 1 nợ IT2030)
+    assert "20210001" not in ans_gen
+    assert "bảng điểm ocr" not in ans_gen.lower()
+
+
+

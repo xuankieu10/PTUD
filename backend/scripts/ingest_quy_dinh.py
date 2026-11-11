@@ -225,7 +225,7 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
                 "[Nguồn: VB2 – Văn bản tóm tắt quy định học vụ | Trạng thái: [VB2 – chưa kiểm chứng]]\n"
                 "Kênh đăng ký học lại, học vét và chi phí tham khảo:\n"
                 "(Lưu ý: VB1 Niên giám quy định đăng ký hoàn toàn trực tuyến trên dkmh.lhu.edu.vn; kênh Google Form/Zalo dưới đây là kênh phụ trợ từ văn bản tóm tắt chưa được xác nhận chính thức, bạn nên hỏi giáo vụ khoa để được hướng dẫn chính xác):\n"
-                "1. Hiện tại Nhà trường chưa có văn bản quy định riêng về lớp học vét; sinh viên có nhu cầu học lại/học vét thực hiện theo quy trình đăng ký học lại thông thường.\n"
+                "1. Hiện tại tài liệu hiện có không đề cập riêng về lớp học vét; sinh viên có nhu cầu học lại thực hiện theo quy trình đăng ký học lại thông thường.\n"
                 "2. Hình thức đăng ký học lại: Đăng ký trực tuyến qua Google Form: https://forms.gle/iBk3hNwG4SCGKMEFA\n"
                 "3. Nhóm Zalo hỗ trợ: https://zalo.me/g/ar6b85p9opfxctwhxwpd\n"
                 "4. Bảng danh sách môn học lại và chi phí tham khảo: https://docs.google.com/spreadsheets/d/1LBSioDaeoHSclt4R4yXpO0aFR-6kkTk9/edit?usp=sharing&ouid=103838733389649116635&rtpof=true&sd=true\n"

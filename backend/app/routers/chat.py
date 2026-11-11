@@ -556,6 +556,20 @@ def clean_academic_regulation_answer(answer: str, user_message: str) -> str:
         cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
         if len(cleaned) > 20:
             answer = cleaned
+
+        # Đảm bảo nêu ĐỦ CẢ 2 ĐIỀU KIỆN cấm thi theo Chunk Mục 2
+        has_cond_absent = any(k in answer.lower() for k in ["20%", "vắng mặt", "vắng quá", "số tiết"])
+        has_cond_score = any(k in answer.lower() for k in ["2.0", "2,0", "thành phần", "bộ phận", "chuyên cần", "giữa kỳ"])
+        if not has_cond_score:
+            cond_score_text = "- Điểm đánh giá bộ phận / điểm thành phần (chuyên cần, kiểm tra giữa kỳ) dưới 2.0 (thang 10) thì không đủ điều kiện dự thi."
+            if "20%" in answer:
+                answer = re.sub(r"(.*20%[^\.\n]*[\.\n])", r"\1\n" + cond_score_text + "\n", answer, count=1)
+            else:
+                answer += f"\n{cond_score_text}"
+        if not has_cond_absent:
+            cond_absent_text = "- Vắng mặt quá 20% số tiết của học phần (lý thuyết hoặc thực hành)."
+            answer = f"{cond_absent_text}\n" + answer
+
         if "chưa được xác nhận chính thức" not in answer.lower() and "chưa kiểm chứng" not in answer.lower():
             answer += "\n\n(Lưu ý: Thông tin điều kiện cấm thi này chưa được xác nhận chính thức trong Niên giám, bạn nên hỏi giáo vụ khoa để được hướng dẫn chính xác nhất)."
 
@@ -590,8 +604,10 @@ def clean_academic_regulation_answer(answer: str, user_message: str) -> str:
 
     # 3. Câu hỏi về học vét
     if "học vét" in msg_l or "hoc vet" in msg_l:
-        note_prefix = "Hiện tại Nhà trường chưa có văn bản quy định riêng về lớp học vét; sinh viên có nhu cầu học lại/học vét thực hiện theo quy trình đăng ký học lại thông thường."
-        if "chưa có văn bản" not in answer.lower():
+        note_prefix = "Hiện tại tài liệu hiện có không đề cập riêng về lớp học vét; sinh viên có nhu cầu học lại thực hiện theo quy trình đăng ký học lại thông thường."
+        answer = re.sub(r"Hiện tại,? Nhà trường chưa có văn bản quy định riêng về lớp học vét", "Hiện tại tài liệu hiện có không đề cập riêng về lớp học vét", answer, flags=re.IGNORECASE)
+        answer = re.sub(r"Nhà trường chưa có văn bản quy định riêng về lớp học vét", "tài liệu hiện có không đề cập riêng về lớp học vét", answer, flags=re.IGNORECASE)
+        if "tài liệu hiện có không đề cập riêng" not in answer.lower():
             answer = re.sub(r"^Học vét là[^\.\n]+\.", note_prefix, answer, flags=re.IGNORECASE)
             if note_prefix not in answer:
                 answer = f"{note_prefix}\n\n{answer}"
@@ -631,13 +647,8 @@ def clean_academic_regulation_answer(answer: str, user_message: str) -> str:
         if "văn bản khác" not in answer.lower() and "2 tuần" in answer.lower() and "đầu học kỳ mới" not in answer.lower():
             answer += "\n\n(Lưu ý theo Mục 8: Niên giám chính thức VB1 quy định kỳ thi phụ tổ chức sớm nhất 02 tuần sau kỳ thi chính; có văn bản khác ghi thi lần 2 vào đầu học kỳ mới. Bạn nên theo dõi thông báo của Phòng Đào tạo hoặc hỏi giáo vụ khoa)."
 
-    # Cắt tỉa dòng cụt dở ở cuối nếu bị ngắt do giới hạn token LLM
-    ans_lines = answer.strip().split("\n")
-    if len(ans_lines) > 2:
-        last_l = ans_lines[-1].strip()
-        if last_l and not any(last_l.endswith(p) for p in [".", "!", "?", "...", ":", ")", "]"]):
-            ans_lines.pop()
-            answer = "\n".join(ans_lines).strip()
+    # 5c. Loại bỏ từ cụt dở ở cuối dòng mới nếu bị ngắt do giới hạn token LLM (ví dụ: dòng mới chỉ có 1 từ như "Đi")
+    answer = re.sub(r'\n{1,2}[A-Za-zÀ-ỹ]{1,4}\s*$', '', answer).strip()
 
     return answer
 
@@ -1301,7 +1312,7 @@ def chat(
 
     max_score = max((c["score"] for c in chunks), default=0.0)
 
-    academic_kws = ["quy chế", "quy định", "thông báo", "học vụ", "niên giám", "buộc thôi học", "cảnh báo", "học bổng", "nghỉ học", "bảo lưu", "tốt nghiệp", "tín chỉ", "học phần", "chứng chỉ", "tiếng anh", "ngoại ngữ", "tin học", "lệ phí", "hồ sơ", "học kỳ"]
+    academic_kws = ["quy chế", "quy định", "thông báo", "học vụ", "niên giám", "buộc thôi học", "cảnh báo", "học bổng", "nghỉ học", "bảo lưu", "tốt nghiệp", "tín chỉ", "học phần", "chứng chỉ", "tiếng anh", "ngoại ngữ", "tin học", "lệ phí", "hồ sơ", "học kỳ", "thi lại", "thi phụ", "cấm thi", "học lại", "học vét"]
     has_acad_kw = any(kw in msg_lower for kw in academic_kws)
 
     # Nhận diện câu hỏi liên quan đến hồ sơ cá nhân / điểm / môn rớt / tốt nghiệp
@@ -1312,16 +1323,19 @@ def chat(
         "tôi đã đủ điều kiện tốt nghiệp chưa", "em đã đủ điều kiện tốt nghiệp chưa",
         "kiểm tra tốt nghiệp cho tôi", "xét tốt nghiệp của tôi",
         "tôi rớt môn nào", "em rớt môn nào", "tôi nợ môn nào", "em nợ môn nào",
-        "tôi rớt môn", "em rớt môn", "hồ sơ của tôi", "hồ sơ của em"
+        "tôi rớt môn", "em rớt môn", "hồ sơ của tôi", "hồ sơ của em",
+        "môn nào tôi", "môn nào em", "tôi đang bị", "em đang bị", "tôi bị f", "em bị f",
+        "tôi còn thiếu", "em còn thiếu", "tôi thiếu bao nhiêu", "em thiếu bao nhiêu",
+        "thiếu bao nhiêu tín chỉ", "còn thiếu bao nhiêu tín chỉ"
     ]
     is_personal_query = any(p in msg_lower for p in personal_explicit) or (
-        any(kw in msg_lower for kw in ["rớt", "nợ", "chưa đạt", "không đạt", "điểm", "bảng điểm", "tốt nghiệp"]) and
-        any(sub in msg_lower for sub in ["tôi", "em", "mình", "của tôi", "của em", "làm gì"])
+        any(kw in msg_lower for kw in ["rớt", "nợ", "chưa đạt", "không đạt", "điểm", "bảng điểm", "tốt nghiệp", "tín chỉ", "bị f", "điểm f"]) and
+        any(sub in msg_lower for sub in ["tôi", "em", "mình", "của tôi", "của em"])
     )
-    # Phân biệt câu hỏi quy chế chung (ví dụ: "cách tính điểm khi học lại như thế nào?")
+    # Phân biệt câu hỏi quy chế chung (ví dụ: "cách tính điểm khi học lại như thế nào?", "điều kiện tốt nghiệp là gì?")
     is_general_reg = (
-        any(w in msg_lower for w in ["như thế nào", "thế nào", "mấy điểm", "là mấy", "cách tính", "quy định"]) and
-        not any(sub in msg_lower for sub in ["của tôi", "của em", "của mình", "bảng điểm của tôi", "bảng điểm của em", "tôi đã", "em đã", "cho tôi", "cho em"])
+        any(w in msg_lower for w in ["như thế nào", "thế nào", "mấy điểm", "là mấy", "cách tính", "quy định", "là gì"]) and
+        not any(sub in msg_lower for sub in ["của tôi", "của em", "của mình", "bảng điểm của tôi", "bảng điểm của em", "tôi đã", "em đã", "cho tôi", "cho em", "tôi còn", "em còn", "tôi đang", "em đang", "môn nào tôi", "môn nào em"])
     )
     if is_general_reg:
         is_personal_query = False
@@ -1734,7 +1748,7 @@ def chat_stream(
             return StreamingResponse(gen_deadline(), media_type="text/event-stream", headers=SSE_HEADERS)
 
     is_convo = req.message.strip().lower() in _CONVO_QUERIES
-    academic_kws = ["quy chế", "quy định", "thông báo", "học vụ", "niên giám", "buộc thôi học", "cảnh báo", "học bổng", "nghỉ học", "bảo lưu", "tốt nghiệp", "tín chỉ", "học phần", "chứng chỉ", "tiếng anh", "ngoại ngữ", "tin học", "lệ phí", "hồ sơ", "học kỳ"]
+    academic_kws = ["quy chế", "quy định", "thông báo", "học vụ", "niên giám", "buộc thôi học", "cảnh báo", "học bổng", "nghỉ học", "bảo lưu", "tốt nghiệp", "tín chỉ", "học phần", "chứng chỉ", "tiếng anh", "ngoại ngữ", "tin học", "lệ phí", "hồ sơ", "học kỳ", "thi lại", "thi phụ", "cấm thi", "học lại", "học vét"]
     has_acad_kw = any(kw in msg_lower for kw in academic_kws)
 
     # Nhận diện câu hỏi học vụ cá nhân / môn rớt / bảng điểm
