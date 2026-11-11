@@ -192,7 +192,7 @@ def compute_keyword_score(query: str, content: str, section: str = "", content_u
 def search_chunks(db: Session, query: str) -> list[dict]:
     # 1. Lấy toàn bộ chunks từ database
     sql = """
-        SELECT c.id, c.document_id, d.title, c.chunk_index, c.content, c.embedding, c.section, d.so_hieu, d.url
+        SELECT c.id, c.document_id, d.title, c.chunk_index, c.content, c.embedding, c.section, d.so_hieu, d.url, c.verified
         FROM document_chunks c
         JOIN documents d ON c.document_id = d.id
         WHERE d.status = 'indexed'
@@ -222,6 +222,7 @@ def search_chunks(db: Session, query: str) -> list[dict]:
             "section": getattr(row, "section", None),
             "so_hieu": getattr(row, "so_hieu", None),
             "url": getattr(row, "url", None),
+            "verified": bool(getattr(row, "verified", True) if getattr(row, "verified", None) is not None else True),
             "content_unaccent": content_unaccent,
         })
 
