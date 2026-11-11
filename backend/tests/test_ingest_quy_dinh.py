@@ -29,12 +29,12 @@ def test_clean_google_urls():
 
 
 def test_parse_docx_all_16_chunks():
-    """Đọc tệp docx và kiểm tra cấu trúc 17 chunks chuẩn hóa từ văn bản hợp nhất."""
+    """Đọc tệp docx và kiểm tra cấu trúc 36 chunks chuẩn hóa từ văn bản hợp nhất (mỗi chunk <= 600 ký tự)."""
     docx_path = find_docx_file()
     assert os.path.exists(docx_path)
 
     chunks = parse_docx_chunks(docx_path)
-    assert len(chunks) == 17, f"Mong đợi 17 chunks nhưng nhận được {len(chunks)}"
+    assert len(chunks) == 36, f"Mong đợi 36 chunks nhưng nhận được {len(chunks)}"
 
     # Kiểm tra các mục quan trọng theo yêu cầu đề bài
     sections = [c["section"] for c in chunks]
@@ -85,13 +85,13 @@ def test_ingest_quy_dinh_idempotent():
     """Kiểm tra tính idempotent của ingest: nạp lại không bị duplicate chunks."""
     # Chạy lần 1
     cnt1 = ingest_quy_dinh()
-    assert cnt1 == 17
+    assert cnt1 == 36
 
     # Chạy lần 2
     cnt2 = ingest_quy_dinh()
-    assert cnt2 == 17
+    assert cnt2 == 36
 
-    # Truy vấn DB xác nhận chính xác 17 chunks của DOCUMENT_ID_QUY_DINH
+    # Truy vấn DB xác nhận chính xác 36 chunks của DOCUMENT_ID_QUY_DINH
     with engine.connect() as conn:
         doc_count = conn.execute(
             text("SELECT COUNT(*) FROM documents WHERE id = :did"),
@@ -103,5 +103,5 @@ def test_ingest_quy_dinh_idempotent():
             text("SELECT COUNT(*) FROM document_chunks WHERE document_id = :did"),
             {"did": DOCUMENT_ID_QUY_DINH}
         ).scalar()
-        assert chunk_count == 17, f"Dữ liệu bị duplicate! Đếm được {chunk_count} chunks thay vì 17"
+        assert chunk_count == 36, f"Dữ liệu bị duplicate! Đếm được {chunk_count} chunks thay vì 36"
 

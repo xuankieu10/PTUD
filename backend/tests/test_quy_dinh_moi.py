@@ -15,31 +15,31 @@ from backend.app.routers.chat import clean_academic_regulation_answer
 
 
 def test_verified_flags_in_database():
-    """Kiểm tra cờ verified trong database: các chunk VB2 phải có verified=False."""
+    """Kiểm tra cờ verified trong database: các chunk VB2 phải có verified=False (tổng 36 chunks)."""
     with SessionLocal() as db:
         rows = db.execute(
             text("SELECT chunk_index, section, verified FROM document_chunks WHERE document_id = 9001 ORDER BY chunk_index")
         ).fetchall()
-        assert len(rows) == 17, f"Mong đợi 17 chunks cho doc 9001, nhận {len(rows)}"
+        assert len(rows) == 36, f"Mong đợi 36 chunks cho doc 9001, nhận {len(rows)}"
 
         verified_map = {r.chunk_index: bool(r.verified) for r in rows}
 
-        # Chunk 0 (Mục 1 Thang điểm): VB1 -> True
+        # Chunk 0 (Mục 1.1 Thang điểm): VB1 -> True
         assert verified_map[0] is True
-        # Chunk 1 (Mục 2 Cấm thi): VB2 -> False
-        assert verified_map[1] is False
-        # Chunk 2 (Mục 3.1 Học lại): VB1 -> True
-        assert verified_map[2] is True
-        # Chunk 6 (Mục 5 Tốt nghiệp): VB1 -> True
-        assert verified_map[6] is True
-        # Chunk 8 (Mục 6.3 Form học lại): VB2 -> False
-        assert verified_map[8] is False
-        # Chunk 11 (Mục 7.3 Lệ phí NN-TH): VB2 -> False
-        assert verified_map[11] is False
-        # Chunk 12 (Mục 7.3 Miễn ngoại ngữ): VB2 -> False
-        assert verified_map[12] is False
-        # Chunk 14 (Mục 7.4 Kỹ năng mềm): VB2 -> False
+        # Chunk 2 (Mục 2 Cấm thi): VB2 -> False
+        assert verified_map[2] is False
+        # Chunk 3 (Mục 3.1 Học lại): VB1 -> True
+        assert verified_map[3] is True
+        # Chunk 10 (Mục 5.1 Tốt nghiệp): VB1 -> True
+        assert verified_map[10] is True
+        # Chunk 14 (Mục 6.3 Form học lại): VB2 -> False
         assert verified_map[14] is False
+        # Chunk 25 (Mục 7.3 Lệ phí NN-TH): VB2 -> False
+        assert verified_map[25] is False
+        # Chunk 27 (Mục 7.3 Miễn ngoại ngữ): VB2 -> False
+        assert verified_map[27] is False
+        # Chunk 31 (Mục 7.4 Kỹ năng mềm): VB2 -> False
+        assert verified_map[31] is False
 
 
 def test_retrieval_returns_verified_field():
@@ -71,7 +71,7 @@ def test_graduation_conditions_content_in_rag():
     """Chunk xét tốt nghiệp trong RAG phải chứa đầy đủ Điều 15 (150 TC, GDQP-AN, GDTC điểm P >= 5.0)."""
     with SessionLocal() as db:
         row = db.execute(
-            text("SELECT content FROM document_chunks WHERE document_id = 9001 AND chunk_index = 6")
+            text("SELECT content FROM document_chunks WHERE document_id = 9001 AND chunk_index = 10")
         ).fetchone()
         assert row is not None
         content = row[0]
@@ -247,10 +247,10 @@ def test_google_form_url_not_truncated():
     assert "https://forms.gle/iBk3hNwG4SCGKMEFA" in cleaned
     assert "https://forms.gm" not in cleaned
 
-    # Đồng thời kiểm tra URL trong Chunk 8 ở DB
+    # Đồng thời kiểm tra URL trong Chunk 14 ở DB
     with SessionLocal() as db:
         content = db.execute(
-            text("SELECT content FROM document_chunks WHERE document_id = 9001 AND chunk_index = 8")
+            text("SELECT content FROM document_chunks WHERE document_id = 9001 AND chunk_index = 14")
         ).scalar()
         assert "https://forms.gle/iBk3hNwG4SCGKMEFA" in content
 
@@ -298,6 +298,48 @@ def test_personal_vs_general_routing_multi_expressions():
     assert is_personal_academic_query("cách tính điểm khi học lại như thế nào?") is False
     assert is_personal_academic_query("quy định cấm thi như thế nào?") is False
     assert is_personal_academic_query("quy định thi lại như thế nào?") is False
+
+
+def test_hoc_vet_not_registered_via_form_or_zalo():
+    """
+    Việc 2: Câu 'Lớp học vét đăng ký ở đâu?':
+    - Không được khẳng định lớp học vét được đăng ký qua Zalo / Google Form.
+    - Phải nói tài liệu không đề cập riêng về lớp học vét.
+    - Làm rõ các kênh Google Form / Zalo là kênh hỗ trợ dành cho đăng ký HỌC LẠI (VB2, chưa kiểm chứng).
+    """
+    raw_answer_wrong = (
+        "Lớp học vét được đăng ký thông qua các kênh hỗ trợ sau:\n"
+        "1. Nhóm Zalo hỗ trợ: https://zalo.me/g/ar6b85p9opfxctwhxwpd\n"
+        "2. Đăng ký trực tuyến qua Google Form: https://forms.gle/iBk3hNwG4SCGKMEFA"
+    )
+    cleaned = clean_academic_regulation_answer(raw_answer_wrong, "Lớp học vét đăng ký ở đâu?")
+    # Không được khẳng định lớp học vét được đăng ký qua Zalo / Google Form
+    assert "lớp học vét được đăng ký thông qua" not in cleaned.lower()
+    assert "lớp học vét được đăng ký qua" not in cleaned.lower()
+    # Phải nói tài liệu hiện có không đề cập riêng
+    assert "tài liệu hiện có không đề cập riêng về lớp học vét" in cleaned.lower()
+    # Phải nói rõ Google Form / Zalo là dành cho đăng ký HỌC LẠI
+    assert "dành cho đăng ký học lại" in cleaned.lower() or "hỗ trợ dành cho đăng ký học lại" in cleaned.lower()
+
+
+def test_quy_dinh_hoc_lai_prioritizes_dkmh_and_notes_conflict():
+    """
+    Việc 3: Câu 'Quy định học lại như thế nào?':
+    - Ưu tiên kênh dkmh.lhu.edu.vn (VB1) trước, Google Form / Zalo là kênh bổ sung (VB2, chưa kiểm chứng).
+    - Khôi phục ghi chú xung đột F < 4.0 (VB1) với 'dưới 5' (VB2).
+    """
+    raw_answer_no_portal = (
+        "Đối với việc học lại, học vụ trường quy định như sau:\n"
+        "1. Học phần bắt buộc bị điểm F (dưới 4.0): Sinh viên phải đăng ký học lại ở các học kỳ tiếp theo.\n"
+        "2. Cách tính điểm: Điểm của lần học cuối là điểm chính thức của học phần."
+    )
+    cleaned = clean_academic_regulation_answer(raw_answer_no_portal, "Quy định học lại như thế nào?")
+    # Ưu tiên kênh dkmh.lhu.edu.vn
+    assert "dkmh.lhu.edu.vn" in cleaned
+    # Khôi phục ghi chú xung đột F < 4.0 vs dưới 5 (Mục 8)
+    assert "dưới 5" in cleaned
+    assert "xung đột" in cleaned.lower() or "mục 8" in cleaned.lower()
+
 
 
 

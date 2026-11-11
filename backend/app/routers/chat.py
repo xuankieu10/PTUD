@@ -699,13 +699,42 @@ def clean_academic_regulation_answer(answer: str, user_message: str) -> str:
         # Xóa triệt để các định nghĩa tự suy đoán bên ngoài
         answer = re.sub(r'(?:lớp\s+học\s+vét|học\s+vét)\s+là\s+[^.\n]+[.\n]?', '', answer, flags=re.IGNORECASE)
         answer = re.sub(r'[^.\n]*(?:được tạo ra|mở ra cho|dành cho sinh viên chưa kịp|kỳ thi vét)[^.\n]*[\.\n]?', '', answer, flags=re.IGNORECASE)
-        
-        note_prefix = "Hiện tại tài liệu hiện có không đề cập riêng về lớp học vét; sinh viên có nhu cầu học lại thực hiện theo quy trình đăng ký học lại thông thường."
+        # TUYỆT ĐỐI KHÔNG khẳng định lớp học vét được đăng ký qua Google Form hay Zalo
+        lines = answer.split("\n")
+        kept = []
+        for line in lines:
+            line_l = line.lower()
+            if ("lớp học vét" in line_l or "học vét" in line_l) and any(w in line_l for w in ["được đăng ký", "đăng ký thông qua", "đăng ký qua", "đăng ký ở", "thông qua các kênh", "qua các kênh"]):
+                continue
+            kept.append(line)
+        answer = "\n".join(kept).strip()
+
+        hoc_vet_note = (
+            "Hiện tại tài liệu hiện có không đề cập riêng về lớp học vét; sinh viên có nhu cầu học lại thực hiện theo quy trình đăng ký học lại thông thường.\n\n"
+            "Lưu ý: Các kênh Google Form (https://forms.gle/iBk3hNwG4SCGKMEFA) và nhóm Zalo (https://zalo.me/g/ar6b85p9opfxctwhxwpd) trong tài liệu là kênh hỗ trợ dành cho đăng ký HỌC LẠI thông thường theo văn bản tóm tắt [VB2 – chưa kiểm chứng] (kênh chính thức của Trường là https://dkmh.lhu.edu.vn theo VB1), không phải kênh riêng của lớp học vét. Sinh viên nên liên hệ giáo vụ khoa để được hướng dẫn chính xác."
+        )
         answer = re.sub(r"Hiện tại,? Nhà trường chưa có văn bản quy định riêng về lớp học vét", "Hiện tại tài liệu hiện có không đề cập riêng về lớp học vét", answer, flags=re.IGNORECASE)
         answer = re.sub(r"Nhà trường chưa có văn bản quy định riêng về lớp học vét", "tài liệu hiện có không đề cập riêng về lớp học vét", answer, flags=re.IGNORECASE)
         if "tài liệu hiện có không đề cập riêng" not in answer.lower():
-            if note_prefix not in answer:
-                answer = f"{note_prefix}\n\n{answer.strip()}"
+            answer = f"{hoc_vet_note}\n\n{answer.strip()}".strip()
+        else:
+            if "dành cho đăng ký học lại" not in answer.lower() and "hỗ trợ dành cho đăng ký học lại" not in answer.lower():
+                answer = f"{hoc_vet_note}\n\n{answer.strip()}".strip()
+
+    # 3b. Câu hỏi về quy định / cách thức học lại (ưu tiên dkmh.lhu.edu.vn theo VB1, kênh phụ VB2, ghi chú xung đột Mục 8)
+    if any(k in msg_l for k in ["học lại", "hoc lai"]) and not any(k in msg_l for k in ["học phí", "hoc phi", "chi phí", "bao nhiêu tiền", "tiền"]) and ("học vét" not in msg_l and "hoc vet" not in msg_l):
+        # Đảm bảo nêu kênh dkmh.lhu.edu.vn của VB1 trước các kênh Google Form/Zalo
+        if "dkmh.lhu.edu.vn" not in answer.lower():
+            portal_text = (
+                "- Kênh đăng ký học lại chính thức (VB1 – Điều 7): Đăng ký trực tuyến tại cổng https://dkmh.lhu.edu.vn theo kế hoạch mở đợt của Phòng Đào tạo (học kỳ chính hoặc hè).\n"
+                "- Kênh hỗ trợ bổ sung (VB2 – chưa kiểm chứng): Google Form: https://forms.gle/iBk3hNwG4SCGKMEFA và nhóm Zalo: https://zalo.me/g/ar6b85p9opfxctwhxwpd."
+            )
+            answer = f"{portal_text}\n\n{answer.strip()}".strip()
+
+        # Khôi phục ghi chú xung đột Mục 8 (F < 4.0 theo VB1 vs dưới 5 theo VB2)
+        if "dưới 5" not in answer.lower() and "xung đột" not in answer.lower():
+            conflict_note = "\n\n(Lưu ý xung đột theo Mục 8: Niên giám chính thức VB1 quy định học phần bị điểm F (dưới 4.0 thang 10) phải học lại và tính điểm lần học cuối; tuy nhiên văn bản khác (VB2) ghi học phần dưới 5 phải học lại và tính điểm cao nhất các lần học. Bạn nên hỏi giáo vụ khoa để được xác nhận)."
+            answer += conflict_note
 
     # 4. Câu hỏi về kỹ năng mềm
     if any(k in msg_l for k in ["kỹ năng mềm", "ky nang mem", "kĩ năng mềm", "ki nang mem", "knm"]):
@@ -1429,7 +1458,7 @@ def chat(
 
     max_score = max((c["score"] for c in chunks), default=0.0)
 
-    academic_kws = ["quy chế", "quy định", "thông báo", "học vụ", "niên giám", "buộc thôi học", "cảnh báo", "học bổng", "nghỉ học", "bảo lưu", "tốt nghiệp", "tín chỉ", "học phần", "chứng chỉ", "tiếng anh", "ngoại ngữ", "tin học", "lệ phí", "hồ sơ", "học kỳ", "thi lại", "thi phụ", "cấm thi", "học lại", "học vét"]
+    academic_kws = ["quy chế", "quy định", "thông báo", "học vụ", "niên giám", "buộc thôi học", "cảnh báo", "học bổng", "nghỉ học", "bảo lưu", "tốt nghiệp", "tín chỉ", "học phần", "chứng chỉ", "tiếng anh", "ngoại ngữ", "tin học", "lệ phí", "hồ sơ", "học kỳ", "thi lại", "thi phụ", "cấm thi", "học lại", "học vét", "điểm", "thang điểm", "kỹ năng mềm"]
     has_acad_kw = any(kw in msg_lower for kw in academic_kws)
 
     # Nhận diện câu hỏi liên quan đến hồ sơ cá nhân / điểm / môn rớt / tốt nghiệp
@@ -1838,7 +1867,7 @@ def chat_stream(
             return StreamingResponse(gen_deadline(), media_type="text/event-stream", headers=SSE_HEADERS)
 
     is_convo = req.message.strip().lower() in _CONVO_QUERIES
-    academic_kws = ["quy chế", "quy định", "thông báo", "học vụ", "niên giám", "buộc thôi học", "cảnh báo", "học bổng", "nghỉ học", "bảo lưu", "tốt nghiệp", "tín chỉ", "học phần", "chứng chỉ", "tiếng anh", "ngoại ngữ", "tin học", "lệ phí", "hồ sơ", "học kỳ", "thi lại", "thi phụ", "cấm thi", "học lại", "học vét"]
+    academic_kws = ["quy chế", "quy định", "thông báo", "học vụ", "niên giám", "buộc thôi học", "cảnh báo", "học bổng", "nghỉ học", "bảo lưu", "tốt nghiệp", "tín chỉ", "học phần", "chứng chỉ", "tiếng anh", "ngoại ngữ", "tin học", "lệ phí", "hồ sơ", "học kỳ", "thi lại", "thi phụ", "cấm thi", "học lại", "học vét", "điểm", "thang điểm", "kỹ năng mềm"]
     has_acad_kw = any(kw in msg_lower for kw in academic_kws)
 
     # Nhận diện câu hỏi học vụ cá nhân / môn rớt / bảng điểm
