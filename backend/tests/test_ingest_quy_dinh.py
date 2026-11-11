@@ -41,8 +41,8 @@ def test_parse_docx_all_16_chunks():
     sources = [c["source"] for c in chunks]
     contents = " ".join([c["content"] for c in chunks])
 
-    # 1. Điều 27: Xét tốt nghiệp (150 tín chỉ, 8 học kỳ, Mác-Lênin, GDQP, GDTC)
-    assert any("Điều 27" in s for s in sections)
+    # 1. Điều 15: Xét tốt nghiệp (150 tín chỉ, 8 học kỳ, Mác-Lênin, GDQP, GDTC)
+    assert any("Điều 15" in s for s in sections)
     assert "150 tín chỉ" in contents
     assert "Mác-Lênin" in contents
 
@@ -54,11 +54,11 @@ def test_parse_docx_all_16_chunks():
     # 3. Điều 12: Quy định học lại
     assert any("Điều 12" in s for s in sections)
 
-    # 4. Điều 20: Cải thiện điểm
-    assert any("Điều 20" in s for s in sections)
+    # 4. Cải thiện điểm
+    assert any("Cải thiện điểm" in s for s in sections)
 
-    # 5. Điều 24: Cảnh báo học vụ và buộc thôi học
-    assert any("Điều 24" in s for s in sections)
+    # 5. Cảnh báo học vụ và dừng học
+    assert any("Cảnh báo học vụ" in s for s in sections)
 
     # 6. Đăng ký học lại / học vét (Link form, link Zalo)
     assert any("Hướng dẫn đăng ký" in s for s in sections)

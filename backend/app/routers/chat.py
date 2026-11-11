@@ -565,13 +565,17 @@ def clean_academic_regulation_answer(answer: str, user_message: str) -> str:
         kept = []
         for line in lines:
             line_l = line.lower()
-            if any(k in line_l for k in ["hạnh kiểm", "hanh kiem", "học phí", "hoc phi", "đtbctl", "điểm trung bình tích lũy", "trung bình chung", "2.00", "2,00", "kỷ luật", "đình chỉ"]):
+            # Chỉ loại bỏ các ý thực sự bịa đặt ngoài văn bản (như hạnh kiểm, học phí tốt nghiệp).
+            # KHÔNG loại bỏ các điều kiện từ Document 79 (đình chỉ học tập, ĐTBCTL >= 5.0 thang 10).
+            if any(k in line_l for k in ["hạnh kiểm", "hanh kiem", "học phí tốt nghiệp"]):
                 continue
             kept.append(line)
         cleaned = "\n".join(kept).strip()
         cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
         if len(cleaned) > 20:
             answer = cleaned
+        # Không tự quy đổi sang thang 4: chuẩn hóa về >= 5.0 (thang 10) nếu LLM xuất hiện 2.00 (thang 4)
+        answer = re.sub(r'\b2(?:\.00?|\,00?)\s*(?:/\s*4(?:\.0)?|\(thang 4\)|thang 4)\b', '5.0 (thang 10)', answer, flags=re.IGNORECASE)
         # Bổ sung ý "không còn học phần không đạt" nếu chưa có
         if "không còn học phần không đạt" not in answer.lower():
             if "150 tín chỉ" in answer:
@@ -609,6 +613,8 @@ def clean_academic_regulation_answer(answer: str, user_message: str) -> str:
                 answer,
                 flags=re.IGNORECASE
             )
+        # Chống ảo giác học phí kỹ năng mềm: chuẩn hóa 500.000 VNĐ / môn theo Mục 7.4
+        answer = answer.replace("300.000", "500.000")
 
     # 5. Xử lý các điểm xung đột (Mục 8)
     # 5a. Ngưỡng F / điểm không đạt: theo VB1 là < 4.0; nhắc thêm văn bản khác ghi < 5.0
@@ -624,6 +630,14 @@ def clean_academic_regulation_answer(answer: str, user_message: str) -> str:
         answer = re.sub(r"Điều 9(?:\s*(?:&|và)\s*Điều 10)?\b", "Điều 11 Khoản 5 điểm đ (QĐ 22 - VB1)", answer)
         if "văn bản khác" not in answer.lower() and "2 tuần" in answer.lower() and "đầu học kỳ mới" not in answer.lower():
             answer += "\n\n(Lưu ý theo Mục 8: Niên giám chính thức VB1 quy định kỳ thi phụ tổ chức sớm nhất 02 tuần sau kỳ thi chính; có văn bản khác ghi thi lần 2 vào đầu học kỳ mới. Bạn nên theo dõi thông báo của Phòng Đào tạo hoặc hỏi giáo vụ khoa)."
+
+    # Cắt tỉa dòng cụt dở ở cuối nếu bị ngắt do giới hạn token LLM
+    ans_lines = answer.strip().split("\n")
+    if len(ans_lines) > 2:
+        last_l = ans_lines[-1].strip()
+        if last_l and not any(last_l.endswith(p) for p in [".", "!", "?", "...", ":", ")", "]"]):
+            ans_lines.pop()
+            answer = "\n".join(ans_lines).strip()
 
     return answer
 
@@ -1298,13 +1312,19 @@ def chat(
         "tôi đã đủ điều kiện tốt nghiệp chưa", "em đã đủ điều kiện tốt nghiệp chưa",
         "kiểm tra tốt nghiệp cho tôi", "xét tốt nghiệp của tôi",
         "tôi rớt môn nào", "em rớt môn nào", "tôi nợ môn nào", "em nợ môn nào",
-        "tôi rớt môn", "em rớt môn", "môn rớt", "môn nợ", "rớt môn", "nợ môn",
-        "học lại", "cần làm gì", "phải làm gì", "hồ sơ của tôi", "hồ sơ của em"
+        "tôi rớt môn", "em rớt môn", "hồ sơ của tôi", "hồ sơ của em"
     ]
     is_personal_query = any(p in msg_lower for p in personal_explicit) or (
         any(kw in msg_lower for kw in ["rớt", "nợ", "chưa đạt", "không đạt", "điểm", "bảng điểm", "tốt nghiệp"]) and
         any(sub in msg_lower for sub in ["tôi", "em", "mình", "của tôi", "của em", "làm gì"])
     )
+    # Phân biệt câu hỏi quy chế chung (ví dụ: "cách tính điểm khi học lại như thế nào?")
+    is_general_reg = (
+        any(w in msg_lower for w in ["như thế nào", "thế nào", "mấy điểm", "là mấy", "cách tính", "quy định"]) and
+        not any(sub in msg_lower for sub in ["của tôi", "của em", "của mình", "bảng điểm của tôi", "bảng điểm của em", "tôi đã", "em đã", "cho tôi", "cho em"])
+    )
+    if is_general_reg:
+        is_personal_query = False
 
     if is_personal_query:
         intent = "personal"

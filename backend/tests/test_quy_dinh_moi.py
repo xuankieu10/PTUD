@@ -81,3 +81,41 @@ def test_graduation_conditions_content_in_rag():
         assert "Giáo dục thể chất" in content
         assert "Kỹ năng mềm" in content
 
+
+def test_graduation_answer_preserves_qd1013_and_khong_con_hoc_phan_khong_dat():
+    """
+    Câu hỏi điều kiện xét tốt nghiệp:
+    - Không lọc bỏ điều kiện QĐ 1013: điểm TBTL toàn khóa >= 5.0 (thang 10), không đang bị đình chỉ học tập.
+    - Bắt buộc có ý 'không còn học phần không đạt'.
+    - Không tự quy đổi sang thang 4.
+    """
+    raw_answer = (
+        "Điều kiện xét tốt nghiệp:\n"
+        "- Tích lũy đủ 150 tín chỉ của CTĐT, không còn học phần không đạt (không còn môn điểm F dưới 4.0).\n"
+        "- Có chứng chỉ GDQP-AN và hoàn thành 3 học phần GDTC (điểm P từ 5.0 trở lên).\n"
+        "- Đạt chuẩn ngoại ngữ - tin học và hoàn thành Kỹ năng mềm.\n"
+        "- Cho đến thời điểm xét tốt nghiệp không bị truy cứu TNHS hoặc không đang trong thời gian bị kỷ luật ở mức đình chỉ học tập (QĐ 1013).\n"
+        "- Điểm trung bình tích lũy toàn khóa đạt từ 5.0 trở lên (thang 10) (QĐ 1013)."
+    )
+    cleaned = clean_academic_regulation_answer(raw_answer, "điều kiện xét tốt nghiệp là gì?")
+    assert "không còn học phần không đạt" in cleaned.lower()
+    assert "5.0" in cleaned
+    assert "đình chỉ" in cleaned.lower()
+    assert "truy cứu" in cleaned.lower()
+
+
+def test_thi_ho_and_buoc_thoi_hoc_not_truncated():
+    """
+    Câu hỏi về thi hộ / buộc thôi học không bị cắt nội dung kỷ luật, đình chỉ, hay buộc thôi học.
+    """
+    raw_answer = (
+        "Theo quy định về xử lý kỷ luật sinh viên:\n"
+        "1. Thi hộ hoặc nhờ người khác thi hộ: Đình chỉ học tập 01 năm đối với trường hợp vi phạm lần thứ nhất; Buộc thôi học đối với trường hợp vi phạm lần thứ hai.\n"
+        "2. Sử dụng hồ sơ, bằng cấp, chứng chỉ giả mạo: Buộc thôi học ngay khi phát hiện."
+    )
+    cleaned = clean_academic_regulation_answer(raw_answer, "Hình thức xử lý khi thi hộ hoặc nhờ người thi hộ là gì?")
+    assert "thi hộ" in cleaned.lower()
+    assert "đình chỉ học tập 01 năm" in cleaned.lower()
+    assert "buộc thôi học" in cleaned.lower()
+
+

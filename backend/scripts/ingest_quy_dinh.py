@@ -62,7 +62,7 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
         # Chunk 0: Mục 1 - Thang điểm, cơ cấu điểm và điểm 0 (VB1)
         {
             "chunk_index": 0,
-            "section": "Mục 1 – Thang điểm và điểm 0",
+            "section": "Mục 1 – Thang điểm và điểm 0 [VB1 – Điều 11, Điều 12]",
             "title": "Thang điểm 10, thang chữ, thang 4 và các trường hợp bị điểm 0",
             "source": "VB1 – QĐ 22/QĐ-ĐHLH, Điều 11 Khoản 5, Điều 12 Khoản 2",
             "verified": True,
@@ -89,9 +89,9 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
         # Chunk 1: Mục 2 - Điều kiện cấm thi (VB2 - Chưa kiểm chứng)
         {
             "chunk_index": 1,
-            "section": "Mục 2 – Điều kiện cấm thi (Điều 19)",
+            "section": "Mục 2 – Điều kiện cấm thi [VB2 – Điều 19]",
             "title": "Điều kiện cấm thi kết thúc học phần",
-            "source": "[VB2 – chưa kiểm chứng]",
+            "source": "[VB2 – chưa kiểm chứng – Điều 19]",
             "verified": False,
             "keywords": "cấm thi, vắng quá 20%, điểm thành phần dưới 2.0, chuyên cần, giữa kỳ, không được dự thi",
             "content": (
@@ -105,9 +105,9 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
         # Chunk 2: Mục 3.1 - Học lại (VB1)
         {
             "chunk_index": 2,
-            "section": "Mục 3.1 – Học lại (Điều 12)",
+            "section": "Mục 3.1 – Học lại [VB1 – Điều 12]",
             "title": "Quy định học lại học phần và tính điểm học lại",
-            "source": "VB1 – QĐ 22, Điều 3 K1, Điều 7 K5, Điều 9 K1, Điều 11 K5đ",
+            "source": "VB1 – QĐ 22, Điều 3 K1, Điều 7 K5, Điều 9 K1, Điều 11 K5đ, Điều 12",
             "verified": True,
             "keywords": "học lại, điểm F, dưới 4.0, học phần bắt buộc, học phần tự chọn, lần học cuối",
             "content": (
@@ -122,7 +122,7 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
         # Chunk 3: Mục 3.2 - Thi lại (Kỳ thi phụ) (VB1 & VB2)
         {
             "chunk_index": 3,
-            "section": "Mục 3.2 – Thi lại (kỳ thi phụ - Điều 11 K5đ)",
+            "section": "Mục 3.2 – Thi lại (kỳ thi phụ) [VB1 – Điều 11]",
             "title": "Quy định thi lại và kỳ thi phụ cuối kỳ",
             "source": "VB1 – QĐ 22 & [VB2 – chưa kiểm chứng]",
             "verified": True,
@@ -142,7 +142,7 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
         # Chunk 4: Mục 3.3 - Cải thiện điểm (VB1 & VB2)
         {
             "chunk_index": 4,
-            "section": "Mục 3.3 – Cải thiện điểm (Điều 20)",
+            "section": "Mục 3.3 – Cải thiện điểm [VB1]",
             "title": "Quy định cải thiện điểm học phần",
             "source": "VB1 & [VB2 – chưa kiểm chứng]",
             "verified": True,
@@ -157,7 +157,7 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
         # Chunk 5: Mục 4 - Cảnh báo học vụ và buộc thôi học (VB1 & VB2)
         {
             "chunk_index": 5,
-            "section": "Mục 4 – Cảnh báo học vụ, dừng học và buộc thôi học (Điều 24)",
+            "section": "Mục 4 – Cảnh báo học vụ, dừng học và buộc thôi học [VB1 – Điều 13, 19, 21]",
             "title": "Cảnh báo học vụ, tạm ngừng học và buộc thôi học",
             "source": "VB1 – QĐ 22, Điều 13, 19, 21 & [VB2 – chưa kiểm chứng]",
             "verified": True,
@@ -177,7 +177,7 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
         # Chunk 6: Mục 5 - Điều kiện xét tốt nghiệp đại học (VB1)
         {
             "chunk_index": 6,
-            "section": "Mục 5 – Điều kiện xét tốt nghiệp (Điều 15 / Điều 27)",
+            "section": "Mục 5 – Điều kiện xét tốt nghiệp [VB1 – Điều 15]",
             "title": "Điều kiện xét tốt nghiệp đại học ngành CNTT",
             "source": "VB1 – QĐ 22, Điều 15 K1đ, K2; Điều 4 K2a; Điều 11 K5b",
             "verified": True,
@@ -197,7 +197,7 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
         # Chunk 7: Mục 6.1, 6.2 - Hệ thống đăng ký và cổng thông tin trực tuyến (VB1)
         {
             "chunk_index": 7,
-            "section": "Mục 6.1, 6.2 – Cổng thông tin và đăng ký môn học",
+            "section": "Mục 6.1, 6.2 – Cổng thông tin và đăng ký môn học [VB1 – Điều 7]",
             "title": "Hệ thống đăng ký môn học và các cổng thông tin sinh viên LHU",
             "source": "VB1 – Điều 7 K1; Niên giám 2023 tr. 128–138",
             "verified": True,
@@ -216,7 +216,7 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
         # Chunk 8: Mục 6.3 - Đăng ký học lại, học vét qua Google Form (VB2 - Chưa kiểm chứng)
         {
             "chunk_index": 8,
-            "section": "Mục 6.3 – Hướng dẫn đăng ký học lại, học vét",
+            "section": "Mục 6.3 – Hướng dẫn đăng ký học lại, học vét [VB2]",
             "title": "Kênh đăng ký học lại, học vét và chi phí tham khảo",
             "source": "[VB2 – chưa kiểm chứng]",
             "verified": False,
@@ -235,7 +235,7 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
         # Chunk 9: Mục 6.6 & Bảng 1 - Các thủ tục và mẫu đơn hành chính (VB1)
         {
             "chunk_index": 9,
-            "section": "Mục 6.6 – Thủ tục hành chính và mẫu đơn",
+            "section": "Mục 6.6 – Thủ tục hành chính và mẫu đơn [VB1 – Điều 16]",
             "title": "Thủ tục hành chính, cấp giấy chứng nhận online và Phòng Công tác sinh viên",
             "source": "VB1 – QĐ 22, Điều 16 K3; QĐ 406 tr. 118–120, 135",
             "verified": True,
@@ -252,7 +252,7 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
         # Chunk 10: Mục 7.1 - Chương trình đào tạo CNTT 150 tín chỉ (VB1)
         {
             "chunk_index": 10,
-            "section": "Mục 7.1 – CTĐT ngành CNTT 150 tín chỉ",
+            "section": "Mục 7.1 – CTĐT ngành CNTT 150 tín chỉ [VB1]",
             "title": "Khung chương trình đào tạo ngành Công nghệ thông tin (150 tín chỉ, 8 học kỳ)",
             "source": "VB1 – Niên giám 2023 (Khóa 2023–2027)",
             "verified": True,
@@ -274,7 +274,7 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
         # Chunk 11: Mục 7.3 - Lệ phí và sát hạch Tin học, Ngoại ngữ (VB2 - Chưa kiểm chứng)
         {
             "chunk_index": 11,
-            "section": "Mục 7.3 – Lệ phí thi chứng chỉ và sát hạch",
+            "section": "Mục 7.3 – Lệ phí thi chứng chỉ và sát hạch [VB2]",
             "title": "Lệ phí thi chứng chỉ Ngoại ngữ, Tin học và ôn thi sát hạch",
             "source": "[VB2 – chưa kiểm chứng]",
             "verified": False,
@@ -298,7 +298,7 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
         # Chunk 12: Mục 7.3 - Đối tượng miễn thi ngoại ngữ (VB2 - Chưa kiểm chứng)
         {
             "chunk_index": 12,
-            "section": "Mục 7.3 – Miễn thi ngoại ngữ",
+            "section": "Mục 7.3 – Miễn thi ngoại ngữ [VB2]",
             "title": "Đối tượng miễn thi chứng chỉ ngoại ngữ chuẩn đầu ra",
             "source": "[VB2 – chưa kiểm chứng]",
             "verified": False,
@@ -316,7 +316,7 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
         # Chunk 13: Mục 7.4 - Giáo dục quốc phòng – an ninh và Thể chất (VB1 & VB2)
         {
             "chunk_index": 13,
-            "section": "Mục 7.4 – GDQP-AN và Giáo dục thể chất",
+            "section": "Mục 7.4 – GDQP-AN và Giáo dục thể chất [VB1 – Điều 4, 11, 15]",
             "title": "Quy định hoàn thành Giáo dục quốc phòng - An ninh và Giáo dục thể chất",
             "source": "VB1 – QĐ 22 Điều 4, 11, 15 & [VB2 – chưa kiểm chứng]",
             "verified": True,
@@ -333,7 +333,7 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
         # Chunk 14: Mục 7.4 - Quy định 4 kỹ năng mềm (VB1 & VB2 - Chưa kiểm chứng)
         {
             "chunk_index": 14,
-            "section": "Mục 7.4 – Kỹ năng mềm",
+            "section": "Mục 7.4 – Kỹ năng mềm [VB2]",
             "title": "Quy định 4 kỹ năng mềm bắt buộc chuẩn đầu ra và học phí",
             "source": "VB1 – Điều 15 K1đ & [VB2 – chưa kiểm chứng]",
             "verified": False,
@@ -354,7 +354,7 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
         # Chunk 15: Mục 7.5 - Danh bạ liên hệ Khoa CNTT (VB2 - Chưa kiểm chứng)
         {
             "chunk_index": 15,
-            "section": "Mục 7.5 – Danh bạ liên hệ Khoa CNTT",
+            "section": "Mục 7.5 – Danh bạ liên hệ Khoa CNTT [VB2]",
             "title": "Thông tin liên hệ Khoa Công nghệ thông tin LHU",
             "source": "[VB2 – chưa kiểm chứng]",
             "verified": False,
@@ -373,9 +373,9 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
         # Chunk 16: Mục 8 - Tổng hợp điểm xung đột giữa VB1 và VB2 (Chính thức)
         {
             "chunk_index": 16,
-            "section": "Mục 8 – Điểm xung đột giữa VB1 và VB2",
+            "section": "Mục 8 – Điểm xung đột giữa VB1 và VB2 [Hợp nhất]",
             "title": "Các điểm xung đột quy định học vụ giữa VB1 và VB2 và nguyên tắc xử lý",
-            "source": "Hợp nhất quy chế LHU",
+            "source": "Tổng hợp đối chiếu Quy chế đào tạo tín chỉ LHU",
             "verified": True,
             "keywords": "xung đột, so sánh, điểm F, dưới 4.0, dưới 5.0, điểm cao nhất, điểm lần cuối, thi lại, dkmh.lhu.edu.vn, google form, điều 15, điều 27",
             "content": (
