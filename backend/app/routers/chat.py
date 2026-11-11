@@ -32,6 +32,73 @@ from backend.services.nnth_sync import (
 router = APIRouter(prefix="/chat", tags=["chat"])
 logger = logging.getLogger(__name__)
 
+def is_personal_academic_query(msg_lower: str) -> bool:
+    """
+    Phân loại câu hỏi học vụ cá nhân (dùng hồ sơ/bảng điểm sinh viên) vs câu hỏi quy chế chung (chỉ tra cứu RAG):
+    - Trả về True: câu hỏi về điểm, môn nợ, tín chỉ, điều kiện tốt nghiệp của cá nhân người hỏi (tôi, em, mình).
+    - Trả về False: câu hỏi về quy định, điều kiện chung của nhà trường (không chèn dữ liệu cá nhân).
+    """
+    personal_explicit = [
+        "điểm của tôi", "điểm của em", "điểm của mình",
+        "bảng điểm của tôi", "bảng điểm của em", "bảng điểm của mình",
+        "tôi đã tích lũy bao nhiêu", "em đã tích lũy bao nhiêu", "mình đã tích lũy bao nhiêu",
+        "tôi có bị rớt môn", "em có bị rớt môn", "mình có bị rớt môn", "danh sách môn rớt của tôi",
+        "tôi đã đủ điều kiện tốt nghiệp chưa", "em đã đủ điều kiện tốt nghiệp chưa", "mình đã đủ điều kiện tốt nghiệp chưa",
+        "kiểm tra tốt nghiệp cho tôi", "kiểm tra tốt nghiệp cho em", "kiểm tra tốt nghiệp cho mình",
+        "xét tốt nghiệp của tôi", "xét tốt nghiệp của em", "xét tốt nghiệp của mình",
+        "xét tốt nghiệp cho tôi", "xét tốt nghiệp cho em", "xét tốt nghiệp cho mình",
+        "tôi rớt môn nào", "em rớt môn nào", "mình rớt môn nào",
+        "tôi nợ môn nào", "em nợ môn nào", "mình nợ môn nào",
+        "tôi rớt môn", "em rớt môn", "mình rớt môn",
+        "hồ sơ của tôi", "hồ sơ của em", "hồ sơ của mình",
+        "môn nào tôi", "môn nào em", "môn nào mình",
+        "tôi đang bị", "em đang bị", "mình đang bị",
+        "tôi bị f", "em bị f", "mình bị f",
+        "tôi bị rớt", "em bị rớt", "mình bị rớt",
+        "tôi còn thiếu", "em còn thiếu", "mình còn thiếu",
+        "tôi thiếu bao nhiêu", "em thiếu bao nhiêu", "mình thiếu bao nhiêu",
+        "thiếu bao nhiêu tín chỉ", "còn thiếu bao nhiêu tín chỉ"
+    ]
+    is_personal = any(p in msg_lower for p in personal_explicit) or (
+        any(kw in msg_lower for kw in ["rớt", "nợ", "chưa đạt", "không đạt", "điểm", "bảng điểm", "tốt nghiệp", "tín chỉ", "bị f", "điểm f"]) and
+        any(sub in msg_lower for sub in ["tôi", "em", "mình", "của tôi", "của em", "của mình"])
+    )
+    # Danh sách đại từ cá nhân bảo vệ khỏi bị nhầm lẫn khi câu hỏi cá nhân chứa từ "quy định", "như thế nào"
+    personal_pronouns_bind = [
+        "của tôi", "của em", "của mình",
+        "bảng điểm của tôi", "bảng điểm của em", "bảng điểm của mình",
+        "tôi đã", "em đã", "mình đã",
+        "cho tôi", "cho em", "cho mình",
+        "tôi còn", "em còn", "mình còn",
+        "tôi đang", "em đang", "mình đang",
+        "tôi bị", "em bị", "mình bị",
+        "tôi nợ", "em nợ", "mình nợ",
+        "tôi rớt", "em rớt", "mình rớt",
+        "môn nào tôi", "môn nào em", "môn nào mình",
+        "tôi thiếu", "em thiếu", "mình thiếu",
+        "tôi hoàn thành", "em hoàn thành", "mình hoàn thành"
+    ]
+    # Phân biệt câu hỏi quy chế chung (ví dụ: "cách tính điểm khi học lại như thế nào?", "điều kiện tốt nghiệp là gì?")
+    is_general_reg = (
+        any(w in msg_lower for w in ["như thế nào", "thế nào", "mấy điểm", "là mấy", "cách tính", "quy định", "là gì"]) and
+        not any(sub in msg_lower for sub in personal_pronouns_bind)
+    )
+    if is_general_reg:
+        is_personal = False
+    return is_personal
+
+
+def safe_truncate_chunk(content: str, max_chars: int) -> str:
+    """Cắt chunk an toàn: không cắt đứt ngang URL dạng http:// hoặc https://."""
+    if not content or len(content) <= max_chars:
+        return content
+    cut_pos = max_chars
+    for m in re.finditer(r'https?://[^\s\)]+', content):
+        if m.start() < max_chars < m.end():
+            cut_pos = m.end()
+            break
+    return content[:cut_pos] + "..."
+
 # Header chống buffer cho Server-Sent Events (SSE) stream
 SSE_HEADERS = {
     "Cache-Control": "no-cache",
@@ -538,10 +605,15 @@ def clean_academic_regulation_answer(answer: str, user_message: str) -> str:
     Hậu kiểm chống bịa khi trả lời quy chế:
     - Câu điều kiện xét tốt nghiệp: loại bỏ các ý tự thêm về hạnh kiểm, học phí ngoài văn bản.
     - Câu cấm thi: chỉ trả 2 lý do (vắng quá 20% số tiết, điểm thành phần dưới 2.0). Thêm lưu ý thông tin chưa xác nhận chính thức từ VB2.
+    - Câu thi lại: điều kiện dự thi lại là không dự thi chính hoặc điểm dưới 4.0; sớm nhất 2 tuần sau thi chính; cấm lẫn với điều kiện cấm thi (20% và 2.0).
     - Câu học vét: không tự định nghĩa; nói rõ chưa có văn bản riêng về lớp học vét, hướng dẫn đăng ký học lại theo chunk.
+    - Học phí học lại vs Kỹ năng mềm: 500.000đ/môn chỉ là học phí KNM; học phí học lại không có mức cụ thể trong tài liệu; nguồn học phí KNM là VB2.
     - Điểm xung đột Mục 8: trả lời theo VB1 và nhắc có văn bản khác ghi khác.
     """
     msg_l = (user_message or "").lower()
+
+    # 0. Chuẩn hóa link Google Form tránh bị cắt cụt đuôi (.gm hay .g...)
+    answer = re.sub(r'https://forms\.(?:gm|g\b|gl\b|gle\b[^\s\)]*)', 'https://forms.gle/iBk3hNwG4SCGKMEFA', answer)
 
     # 1. Câu hỏi cấm thi
     if "cấm thi" in msg_l or "cam thi" in msg_l:
@@ -572,6 +644,26 @@ def clean_academic_regulation_answer(answer: str, user_message: str) -> str:
 
         if "chưa được xác nhận chính thức" not in answer.lower() and "chưa kiểm chứng" not in answer.lower():
             answer += "\n\n(Lưu ý: Thông tin điều kiện cấm thi này chưa được xác nhận chính thức trong Niên giám, bạn nên hỏi giáo vụ khoa để được hướng dẫn chính xác nhất)."
+
+    # 1b. Câu hỏi về thi lại / kỳ thi phụ (khi nào được thi lại, điều kiện thi lại)
+    # Tuyệt đối không được lẫn điều kiện cấm thi (vắng >20%, điểm thành phần <2.0)
+    if any(k in msg_l for k in ["thi lại", "thi lai", "thi phụ", "thi phu", "thi lần 2", "thi lan 2"]) and not any(k in msg_l for k in ["cấm thi", "cam thi"]):
+        lines = answer.split("\n")
+        kept = []
+        for line in lines:
+            line_l = line.lower()
+            if any(k in line_l for k in ["20%", "2.0", "2,0", "vắng quá 20%", "thành phần dưới 2", "điểm thành phần < 2", "chuyên cần dưới 2"]):
+                continue
+            kept.append(line)
+        cleaned = "\n".join(kept).strip()
+        cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+        if len(cleaned) > 20:
+            answer = cleaned
+
+        # Kiểm tra đảm bảo nêu rõ điều kiện thi lại theo Mục 3.2
+        if not any(k in answer.lower() for k in ["dưới 4.0", "< 4.0", "điểm f", "không dự kỳ thi chính", "không dự thi chính"]):
+            cond_thi_lai = "- Điều kiện được dự thi lại/thi phụ: Sinh viên không dự kỳ thi chính hoặc có điểm học phần dưới 4.0 (điểm F) ở kỳ thi chính."
+            answer = f"{cond_thi_lai}\n{answer}"
 
     # 2. Câu hỏi điều kiện xét tốt nghiệp (không phải cá nhân hoá điểm)
     if any(k in msg_l for k in ["điều kiện xét tốt nghiệp", "dieu kien xet tot nghiep", "điều kiện tốt nghiệp", "dieu kien tot nghiep"]) and not any(k in msg_l for k in ["của tôi", "của em", "tôi cần", "em cần"]):
@@ -604,16 +696,19 @@ def clean_academic_regulation_answer(answer: str, user_message: str) -> str:
 
     # 3. Câu hỏi về học vét
     if "học vét" in msg_l or "hoc vet" in msg_l:
+        # Xóa triệt để các định nghĩa tự suy đoán bên ngoài
+        answer = re.sub(r'(?:lớp\s+học\s+vét|học\s+vét)\s+là\s+[^.\n]+[.\n]?', '', answer, flags=re.IGNORECASE)
+        answer = re.sub(r'[^.\n]*(?:được tạo ra|mở ra cho|dành cho sinh viên chưa kịp|kỳ thi vét)[^.\n]*[\.\n]?', '', answer, flags=re.IGNORECASE)
+        
         note_prefix = "Hiện tại tài liệu hiện có không đề cập riêng về lớp học vét; sinh viên có nhu cầu học lại thực hiện theo quy trình đăng ký học lại thông thường."
         answer = re.sub(r"Hiện tại,? Nhà trường chưa có văn bản quy định riêng về lớp học vét", "Hiện tại tài liệu hiện có không đề cập riêng về lớp học vét", answer, flags=re.IGNORECASE)
         answer = re.sub(r"Nhà trường chưa có văn bản quy định riêng về lớp học vét", "tài liệu hiện có không đề cập riêng về lớp học vét", answer, flags=re.IGNORECASE)
         if "tài liệu hiện có không đề cập riêng" not in answer.lower():
-            answer = re.sub(r"^Học vét là[^\.\n]+\.", note_prefix, answer, flags=re.IGNORECASE)
             if note_prefix not in answer:
-                answer = f"{note_prefix}\n\n{answer}"
+                answer = f"{note_prefix}\n\n{answer.strip()}"
 
     # 4. Câu hỏi về kỹ năng mềm
-    if any(k in msg_l for k in ["kỹ năng mềm", "ky nang mem", "kĩ năng mềm", "ki nang mem"]):
+    if any(k in msg_l for k in ["kỹ năng mềm", "ky nang mem", "kĩ năng mềm", "ki nang mem", "knm"]):
         answer = re.sub(r",?\s*(?:của|thuộc)\s*Khoa\s*(?:Công nghệ thông tin|CNTT),?", "", answer, flags=re.IGNORECASE)
         answer = re.sub(r"\bKhoa\s*(?:Công nghệ thông tin|CNTT)\s*–?\s*", "", answer, flags=re.IGNORECASE)
         answer = re.sub(
@@ -631,6 +726,28 @@ def clean_academic_regulation_answer(answer: str, user_message: str) -> str:
             )
         # Chống ảo giác học phí kỹ năng mềm: chuẩn hóa 500.000 VNĐ / môn theo Mục 7.4
         answer = answer.replace("300.000", "500.000")
+        # Chuẩn hóa nguồn của học phí KNM: nguồn phải là [VB2 – chưa kiểm chứng], không được là [VB1 – Điều 15]
+        answer = re.sub(r'\[VB1\s*–\s*Điều\s*15[^\]]*\](?=[^.\n]*500\.000)', '[VB2 – chưa kiểm chứng]', answer)
+        answer = re.sub(r'(500\.000[^\.\n]*)\[VB1\s*–\s*Điều\s*15[^\]]*\]', r'\1[VB2 – chưa kiểm chứng]', answer)
+        if "500.000" in answer and "[vb2" not in answer.lower():
+            answer = re.sub(r'(500\.000\s*(?:vnđ|đồng|đ)?\s*/\s*môn)', r'\1 [Nguồn: VB2 – chưa kiểm chứng]', answer, flags=re.IGNORECASE)
+
+    # 4b. Xử lý tách bạch học phí học lại vs Kỹ năng mềm:
+    # 500.000đ/môn CHỈ LÀ học phí kỹ năng mềm. Không được gán cho học lại.
+    if not any(k in msg_l for k in ["kỹ năng mềm", "ky nang mem", "kĩ năng mềm", "knm"]):
+        if "500.000" in answer:
+            # Xóa các câu gán 500.000đ cho học lại hoặc môn khác
+            lines = answer.split("\n")
+            kept = [line for line in lines if "500.000" not in line]
+            answer = "\n".join(kept).strip()
+
+        # Nếu câu hỏi hỏi về học phí / tiền học lại:
+        if any(k in msg_l for k in ["học lại", "hoc lai"]) and any(k in msg_l for k in ["học phí", "hoc phi", "chi phí", "chi phi", "bao nhiêu tiền", "bao nhieu tien", "tiền", "tien", "đóng bao nhiêu", "dong bao nhieu"]):
+            answer = re.sub(r'[^.\n]*500\.000[^.\n]*[\.\n]?', '', answer)
+            if "tài liệu hiện có không nêu mức học phí học lại" not in answer.lower():
+                note_fee = "Hiện tại tài liệu hiện có không nêu mức học phí học lại cụ thể; tài liệu chỉ cung cấp liên kết bảng chi phí tham khảo. Sinh viên vui lòng xem bảng chi phí tham khảo tại Google Sheets hoặc liên hệ Phòng Đào tạo để biết chi tiết."
+                answer = f"{note_fee}\n\n{answer.strip()}".strip()
+            answer = answer.replace("500.000", "")
 
     # 5. Xử lý các điểm xung đột (Mục 8)
     # 5a. Ngưỡng F / điểm không đạt: theo VB1 là < 4.0; nhắc thêm văn bản khác ghi < 5.0
@@ -1316,29 +1433,7 @@ def chat(
     has_acad_kw = any(kw in msg_lower for kw in academic_kws)
 
     # Nhận diện câu hỏi liên quan đến hồ sơ cá nhân / điểm / môn rớt / tốt nghiệp
-    personal_explicit = [
-        "điểm của tôi", "điểm của em", "bảng điểm của tôi", "bảng điểm của em",
-        "tôi đã tích lũy bao nhiêu", "em đã tích lũy bao nhiêu",
-        "tôi có bị rớt môn", "em có bị rớt môn", "danh sách môn rớt của tôi",
-        "tôi đã đủ điều kiện tốt nghiệp chưa", "em đã đủ điều kiện tốt nghiệp chưa",
-        "kiểm tra tốt nghiệp cho tôi", "xét tốt nghiệp của tôi",
-        "tôi rớt môn nào", "em rớt môn nào", "tôi nợ môn nào", "em nợ môn nào",
-        "tôi rớt môn", "em rớt môn", "hồ sơ của tôi", "hồ sơ của em",
-        "môn nào tôi", "môn nào em", "tôi đang bị", "em đang bị", "tôi bị f", "em bị f",
-        "tôi còn thiếu", "em còn thiếu", "tôi thiếu bao nhiêu", "em thiếu bao nhiêu",
-        "thiếu bao nhiêu tín chỉ", "còn thiếu bao nhiêu tín chỉ"
-    ]
-    is_personal_query = any(p in msg_lower for p in personal_explicit) or (
-        any(kw in msg_lower for kw in ["rớt", "nợ", "chưa đạt", "không đạt", "điểm", "bảng điểm", "tốt nghiệp", "tín chỉ", "bị f", "điểm f"]) and
-        any(sub in msg_lower for sub in ["tôi", "em", "mình", "của tôi", "của em"])
-    )
-    # Phân biệt câu hỏi quy chế chung (ví dụ: "cách tính điểm khi học lại như thế nào?", "điều kiện tốt nghiệp là gì?")
-    is_general_reg = (
-        any(w in msg_lower for w in ["như thế nào", "thế nào", "mấy điểm", "là mấy", "cách tính", "quy định", "là gì"]) and
-        not any(sub in msg_lower for sub in ["của tôi", "của em", "của mình", "bảng điểm của tôi", "bảng điểm của em", "tôi đã", "em đã", "cho tôi", "cho em", "tôi còn", "em còn", "tôi đang", "em đang", "môn nào tôi", "môn nào em"])
-    )
-    if is_general_reg:
-        is_personal_query = False
+    is_personal_query = is_personal_academic_query(msg_lower)
 
     if is_personal_query:
         intent = "personal"
@@ -1399,9 +1494,7 @@ def chat(
                 "url": url,
                 "so_hieu": so_hieu
             })
-            chunk_c = c["content"]
-            if len(chunk_c) > settings.MAX_CHUNK_CHARS:
-                chunk_c = chunk_c[:settings.MAX_CHUNK_CHARS] + "..."
+            chunk_c = safe_truncate_chunk(c["content"], settings.MAX_CHUNK_CHARS)
             rag_lines.append(f"\n--- Quy chế: {title} (Mục {section or 'Chung'}) ---\n{chunk_c}\n")
 
         if ocr_info:
@@ -1533,10 +1626,7 @@ def chat(
             "url": url,
             "so_hieu": so_hieu
         })
-        chunk_content = c['content']
-        # Cắt ngắn chunk quá dài để giảm kích thước prompt và tăng tốc suy luận CPU
-        if len(chunk_content) > settings.MAX_CHUNK_CHARS:
-            chunk_content = chunk_content[:settings.MAX_CHUNK_CHARS] + "..."
+        chunk_content = safe_truncate_chunk(c['content'], settings.MAX_CHUNK_CHARS)
         context_text += f"\n--- Tài liệu: {title} (Mục {section or 'Chung'}) ---\n{chunk_content}\n"
 
     # ── 3.6. Kiểm tra truy vấn Lịch học / Lịch thi Trung tâm NNTH ────────────
@@ -1752,20 +1842,7 @@ def chat_stream(
     has_acad_kw = any(kw in msg_lower for kw in academic_kws)
 
     # Nhận diện câu hỏi học vụ cá nhân / môn rớt / bảng điểm
-    personal_explicit = [
-        "điểm của tôi", "điểm của em", "bảng điểm của tôi", "bảng điểm của em",
-        "tôi đã tích lũy bao nhiêu", "em đã tích lũy bao nhiêu",
-        "tôi có bị rớt môn", "em có bị rớt môn", "danh sách môn rớt của tôi",
-        "tôi đã đủ điều kiện tốt nghiệp chưa", "em đã đủ điều kiện tốt nghiệp chưa",
-        "kiểm tra tốt nghiệp cho tôi", "xét tốt nghiệp của tôi",
-        "tôi rớt môn nào", "em rớt môn nào", "tôi nợ môn nào", "em nợ môn nào",
-        "tôi rớt môn", "em rớt môn", "môn rớt", "môn nợ", "rớt môn", "nợ môn",
-        "học lại", "cần làm gì", "phải làm gì", "hồ sơ của tôi", "hồ sơ của em"
-    ]
-    is_personal_query = any(p in msg_lower for p in personal_explicit) or (
-        any(kw in msg_lower for kw in ["rớt", "nợ", "chưa đạt", "không đạt", "điểm", "bảng điểm", "tốt nghiệp"]) and
-        any(sub in msg_lower for sub in ["tôi", "em", "mình", "của tôi", "của em", "làm gì"])
-    )
+    is_personal_query = is_personal_academic_query(msg_lower)
 
     student_ctx = ""
     ocr_info = None
@@ -1838,10 +1915,7 @@ def chat_stream(
             "chunk_index": c["chunk_index"], "score": c["score"], "snippet": c["content"][:200],
             "url": url, "so_hieu": so_hieu
         })
-        chunk_content = c['content']
-        # Cắt ngắn chunk quá dài để phản hồi sớm trong stream
-        if len(chunk_content) > settings.MAX_CHUNK_CHARS:
-            chunk_content = chunk_content[:settings.MAX_CHUNK_CHARS] + "..."
+        chunk_content = safe_truncate_chunk(c['content'], settings.MAX_CHUNK_CHARS)
         context_text += f"\n--- Tài liệu: {title} (Mục {section or 'Chung'}) ---\n{chunk_content}\n"
 
     history = db.execute(

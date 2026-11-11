@@ -126,17 +126,17 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
             "title": "Quy định thi lại và kỳ thi phụ cuối kỳ",
             "source": "VB1 – QĐ 22 & [VB2 – chưa kiểm chứng]",
             "verified": True,
-            "keywords": "thi lại, kỳ thi phụ, thi lần 2, vắng thi, điểm F, 2 tuần sau thi chính, đầu học kỳ mới",
+            "keywords": "thi lại, kỳ thi phụ, thi lần 2, vắng thi, điểm F, 2 tuần sau thi chính, đầu học kỳ mới, điều kiện thi lại, khi nào được thi lại",
             "content": (
                 "[Nguồn: VB1 – QĐ 22/QĐ-ĐHLH Điều 11 K5đ & [VB2 – chưa kiểm chứng]]\n"
-                "Quy định thi lại (kỳ thi phụ):\n"
-                "1. Theo VB1 (Niên giám chính thức):\n"
-                "- Kỳ thi phụ tổ chức cho sinh viên không dự kỳ thi chính hoặc có điểm học phần dưới 4.0 (điểm F) ở kỳ thi chính.\n"
-                "- Thời gian: Kỳ thi phụ được tổ chức sớm nhất 02 tuần sau kỳ thi chính.\n"
+                "Điều kiện và quy định thi lại (kỳ thi phụ):\n"
+                "1. Theo VB1 (Chính thức):\n"
+                "- Điều kiện dự thi phụ/thi lại: Sinh viên không dự kỳ thi chính hoặc có điểm học phần dưới 4.0 (điểm F) ở kỳ thi chính.\n"
+                "- Thời gian tổ chức: Kỳ thi phụ được tổ chức sớm nhất 02 tuần sau kỳ thi chính.\n"
                 "- Vắng thi chính có lý do chính đáng: Được dự thi phụ ngay sau đó và điểm thi phụ được tính là điểm thi lần đầu.\n"
                 "2. Theo [VB2 – chưa kiểm chứng]:\n"
                 "- Kỳ thi lần 2 (thi lại lần 2) tổ chức vào đầu học kỳ mới cho học phần dưới 5; điểm chuyên cần và giữa kỳ KHÔNG có thi lần 2.\n"
-                "Lưu ý điểm xung đột (Mục 8): VB1 tổ chức thi phụ sớm nhất 2 tuần sau thi chính cho môn điểm < 4.0; VB2 ghi thi lần 2 vào đầu học kỳ mới cho môn điểm < 5. Sinh viên nên theo dõi thông báo chính thức của Phòng Đào tạo hoặc hỏi giáo vụ khoa."
+                "Lưu ý điểm xung đột (Mục 8): VB1 tổ chức thi phụ sớm nhất 2 tuần sau thi chính cho môn điểm < 4.0; VB2 ghi thi lần 2 (thi lại lần 2) vào đầu học kỳ mới cho môn điểm < 5. Sinh viên nên theo dõi thông báo chính thức của Phòng Đào tạo hoặc hỏi giáo vụ khoa."
             )
         },
         # Chunk 4: Mục 3.3 - Cải thiện điểm (VB1 & VB2)
@@ -225,11 +225,11 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
                 "[Nguồn: VB2 – Văn bản tóm tắt quy định học vụ | Trạng thái: [VB2 – chưa kiểm chứng]]\n"
                 "Kênh đăng ký học lại, học vét và chi phí tham khảo:\n"
                 "(Lưu ý: VB1 Niên giám quy định đăng ký hoàn toàn trực tuyến trên dkmh.lhu.edu.vn; kênh Google Form/Zalo dưới đây là kênh phụ trợ từ văn bản tóm tắt chưa được xác nhận chính thức, bạn nên hỏi giáo vụ khoa để được hướng dẫn chính xác):\n"
-                "1. Hiện tại tài liệu hiện có không đề cập riêng về lớp học vét; sinh viên có nhu cầu học lại thực hiện theo quy trình đăng ký học lại thông thường.\n"
-                "2. Hình thức đăng ký học lại: Đăng ký trực tuyến qua Google Form: https://forms.gle/iBk3hNwG4SCGKMEFA\n"
-                "3. Nhóm Zalo hỗ trợ: https://zalo.me/g/ar6b85p9opfxctwhxwpd\n"
-                "4. Bảng danh sách môn học lại và chi phí tham khảo: https://docs.google.com/spreadsheets/d/1LBSioDaeoHSclt4R4yXpO0aFR-6kkTk9/edit?usp=sharing&ouid=103838733389649116635&rtpof=true&sd=true\n"
-                "5. Nếu mẫu đơn đã quá thời hạn đăng ký, sinh viên vui lòng theo dõi trên app ME về đợt học lại tiếp theo."
+                "1. Hình thức đăng ký học lại: Đăng ký trực tuyến qua Google Form: https://forms.gle/iBk3hNwG4SCGKMEFA\n"
+                "2. Nhóm Zalo hỗ trợ: https://zalo.me/g/ar6b85p9opfxctwhxwpd\n"
+                "3. Về lớp học vét: Hiện tại tài liệu hiện có không đề cập riêng về lớp học vét; sinh viên có nhu cầu học lại thực hiện theo quy trình đăng ký học lại thông thường.\n"
+                "4. Học phí học lại: Sinh viên xem bảng danh sách môn học lại và chi phí tham khảo tại link: https://docs.google.com/spreadsheets/d/1LBSioDaeoHSclt4R4yXpO0aFR-6kkTk9/edit?usp=sharing&ouid=103838733389649116635&rtpof=true&sd=true (Lưu ý quan trọng: Tài liệu hiện có không nêu mức học phí học lại cụ thể; mức 500.000đ/môn là học phí KỸ NĂNG MỀM, không áp dụng cho học lại môn học thông thường).\n"
+                "5. Nếu mẫu đơn đã quá thời hạn đăng ký, sinh viên vui lòng theo dõi trên App ME về đợt học lại tiếp theo."
             )
         },
         # Chunk 9: Mục 6.6 & Bảng 1 - Các thủ tục và mẫu đơn hành chính (VB1)
@@ -330,25 +330,25 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
                 "2. Theo [VB2 – chưa kiểm chứng]: Lịch học GDQP-AN bắt đầu dời sang ngày 28/7/2025 (lịch cũ là 14/7/2025), tra cứu tại https://calen.lhu.edu.vn; lịch GDQP chỉ mở 1 năm/lần, quá hạn phải đăng ký vào năm sau (thông tin lịch học cụ thể cần tra cứu lại trên calen.lhu.edu.vn)."
             )
         },
-        # Chunk 14: Mục 7.4 - Quy định 4 kỹ năng mềm (VB1 & VB2 - Chưa kiểm chứng)
+        # Chunk 14: Mục 7.4 - Quy định 4 kỹ năng mềm (VB2 - Chưa kiểm chứng)
         {
             "chunk_index": 14,
             "section": "Mục 7.4 – Kỹ năng mềm [VB2]",
             "title": "Quy định 4 kỹ năng mềm bắt buộc chuẩn đầu ra và học phí",
-            "source": "VB1 – Điều 15 K1đ & [VB2 – chưa kiểm chứng]",
+            "source": "[VB2 – chưa kiểm chứng]",
             "verified": False,
             "keywords": "kỹ năng mềm, 4 kỹ năng, giải quyết vấn đề, thuyết trình, viết cv, khởi nghiệp, 500.000, AppMe",
             "content": (
-                "[Nguồn: VB1 – Điều 15 K1đ & [VB2 – chưa kiểm chứng]]\n"
+                "[Nguồn: [VB2 – chưa kiểm chứng]]\n"
                 "Quy định chuẩn đầu ra Kỹ năng mềm:\n"
-                "(Lưu ý: VB1 Niên giám chỉ quy định hoàn thành Kỹ năng mềm là điều kiện bắt buộc tốt nghiệp mà không có danh mục tên môn cụ thể; danh mục 4 môn dưới đây là quy định chung của trường từ văn bản tóm tắt chưa được kiểm chứng chính thức, bạn nên hỏi giáo vụ khoa để được hướng dẫn):\n"
+                "(Lưu ý: Theo VB1 – Điều 15 K1đ, hoàn thành Kỹ năng mềm là điều kiện bắt buộc xét tốt nghiệp, nhưng VB1 không quy định danh mục môn và mức học phí. Danh mục 4 môn và học phí dưới đây thuộc [VB2 – chưa kiểm chứng], bạn nên hỏi giáo vụ khoa để được hướng dẫn chính xác):\n"
                 "1. Danh mục 4 môn kỹ năng mềm:\n"
                 "- (1) Kỹ năng giải quyết vấn đề và ra quyết định\n"
                 "- (2) Kỹ năng thuyết trình hiệu quả\n"
                 "- (3) Kỹ năng viết CV điện tử và trả… (văn bản gốc bị cắt dở chữ 'và trả...', chưa xác nhận tên đầy đủ)\n"
                 "- (4) Kỹ năng khởi nghiệp\n"
-                "2. Mức học phí: Khóa 2023, 2024, 2025 là 500.000 VNĐ / môn.\n"
-                "3. Hình thức đóng tiền: Sinh viên đóng tiền trực tiếp trên AppMe theo hướng dẫn đính kèm."
+                "2. Mức học phí Kỹ năng mềm: 500.000 VNĐ / môn là học phí KỸ NĂNG MỀM (áp dụng Khóa 2023, 2024, 2025). Tài liệu hiện có không nêu mức học phí học lại của các môn học thông thường khác.\n"
+                "3. Hình thức đóng tiền kỹ năng mềm: Sinh viên đóng tiền trực tiếp trên AppMe theo hướng dẫn đính kèm."
             )
         },
         # Chunk 15: Mục 7.5 - Danh bạ liên hệ Khoa CNTT (VB2 - Chưa kiểm chứng)

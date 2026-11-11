@@ -191,4 +191,114 @@ def test_personal_vs_general_query_routing():
     assert "bảng điểm ocr" not in ans_gen.lower()
 
 
+def test_hoc_lai_fee_does_not_contain_500000():
+    """
+    1. Học phí 500.000đ chỉ là học phí KỸ NĂNG MỀM.
+    Câu hỏi về học phí học lại: câu trả lời KHÔNG chứa '500.000'.
+    """
+    raw_answer_with_wrong_fee = (
+        "Quy định đăng ký học lại:\n"
+        "- Hình thức đăng ký: Trực tuyến qua Google Form.\n"
+        "- Học phí học lại: 500.000 VNĐ / môn trên AppMe."
+    )
+    cleaned = clean_academic_regulation_answer(raw_answer_with_wrong_fee, "học lại phải đóng bao nhiêu tiền?")
+    assert "500.000" not in cleaned
+    assert "tài liệu hiện có không nêu mức học phí học lại cụ thể" in cleaned.lower() or "bảng chi phí tham khảo" in cleaned.lower()
+
+
+def test_thi_lai_does_not_contain_cam_thi_conditions():
+    """
+    2. 'Khi nào được thi lại?' không lẫn điều kiện cấm thi (vắng >20%, điểm thành phần <2.0).
+    Điều kiện thi lại theo Mục 3.2: không dự thi chính hoặc điểm <4.0; sớm nhất 2 tuần sau thi chính.
+    """
+    raw_answer_with_cam_thi = (
+        "Thời gian và điều kiện thi lại:\n"
+        "- Sinh viên được dự thi lại khi vắng mặt quá 20% số tiết hoặc điểm thành phần dưới 2.0.\n"
+        "- Kỳ thi phụ được tổ chức sớm nhất 02 tuần sau kỳ thi chính cho sinh viên có điểm dưới 4.0."
+    )
+    cleaned = clean_academic_regulation_answer(raw_answer_with_cam_thi, "Khi nào được thi lại?")
+    assert "20%" not in cleaned
+    assert "2.0" not in cleaned
+    assert "dưới 4.0" in cleaned or "< 4.0" in cleaned
+    assert "2 tuần" in cleaned.lower()
+
+
+def test_hoc_vet_does_not_contain_custom_definition():
+    """
+    3. Lớp học vét: Không được định nghĩa theo kiến thức ngoài ('Lớp học vét là...').
+    Chỉ nói 'tài liệu hiện có không đề cập riêng về lớp học vét', kèm hướng dẫn học lại.
+    """
+    raw_answer_custom_def = (
+        "Lớp học vét là một lớp học được tạo ra dành cho các sinh viên chưa kịp qua môn.\n"
+        "Sinh viên đăng ký theo link Google Form."
+    )
+    cleaned = clean_academic_regulation_answer(raw_answer_custom_def, "Lớp học vét là gì?")
+    assert "lớp học vét là một lớp học được tạo ra" not in cleaned.lower()
+    assert "tài liệu hiện có không đề cập riêng" in cleaned.lower()
+
+
+def test_google_form_url_not_truncated():
+    """
+    4. Link Google Form trong đăng ký học lại không bị cụt thành 'https://forms.gm',
+    phải là 'https://forms.gle/iBk3hNwG4SCGKMEFA'.
+    """
+    raw_answer_truncated_url = "Đăng ký trực tuyến qua Google Form: https://forms.gm"
+    cleaned = clean_academic_regulation_answer(raw_answer_truncated_url, "Đăng ký học lại ở đâu?")
+    assert "https://forms.gle/iBk3hNwG4SCGKMEFA" in cleaned
+    assert "https://forms.gm" not in cleaned
+
+    # Đồng thời kiểm tra URL trong Chunk 8 ở DB
+    with SessionLocal() as db:
+        content = db.execute(
+            text("SELECT content FROM document_chunks WHERE document_id = 9001 AND chunk_index = 8")
+        ).scalar()
+        assert "https://forms.gle/iBk3hNwG4SCGKMEFA" in content
+
+
+def test_knm_fee_source_is_vb2():
+    """
+    5. Học phí KNM: nguồn phải là [VB2 – chưa kiểm chứng], không được là [VB1 – Điều 15].
+    """
+    raw_answer = (
+        "Chương trình kỹ năng mềm gồm 4 môn:\n"
+        "1. Kỹ năng giải quyết vấn đề và ra quyết định\n"
+        "2. Kỹ năng thuyết trình hiệu quả\n"
+        "3. Kỹ năng viết CV điện tử và trả (chưa xác nhận tên đầy đủ)\n"
+        "4. Kỹ năng khởi nghiệp\n"
+        "- Học phí: 500.000 VNĐ / môn [VB1 – Điều 15]."
+    )
+    cleaned = clean_academic_regulation_answer(raw_answer, "Kỹ năng mềm gồm những môn nào và học phí bao nhiêu?")
+    assert "[VB1 – Điều 15]" not in cleaned
+    assert "[VB2 – chưa kiểm chứng]" in cleaned or "vb2" in cleaned.lower()
+
+
+def test_personal_vs_general_routing_multi_expressions():
+    """
+    6. Kiểm tra phân loại câu hỏi cá nhân vs quy chế chung với ít nhất 6 cách diễn đạt khác nhau
+    (có 'tôi'/'em'/'mình', có/không có 'như thế nào'/'quy định', kể cả câu cá nhân chứa từ 'quy định').
+    """
+    from backend.app.routers.chat import is_personal_academic_query
+
+    # 6 cách diễn đạt câu hỏi CÁ NHÂN:
+    # 1. Có 'tôi', không có 'như thế nào' / 'quy định'
+    assert is_personal_academic_query("môn nào tôi đang bị f?") is True
+    # 2. Có 'tôi', có từ 'quy định'
+    assert is_personal_academic_query("tôi còn thiếu bao nhiêu tín chỉ theo quy định?") is True
+    # 3. Có 'em', không có 'như thế nào' / 'quy định'
+    assert is_personal_academic_query("em bị rớt những môn nào?") is True
+    # 4. Có 'em', có từ 'quy định'
+    assert is_personal_academic_query("môn nào em đang nợ theo quy định đào tạo?") is True
+    # 5. Có 'mình', không có 'quy định'
+    assert is_personal_academic_query("bảng điểm của mình còn thiếu bao nhiêu tín chỉ?") is True
+    # 6. Có 'mình', có từ 'quy định'
+    assert is_personal_academic_query("cho mình hỏi mình nợ những môn nào theo quy định?") is True
+
+    # Đối chiếu các câu hỏi QUY CHẾ CHUNG (không chèn dữ liệu cá nhân):
+    assert is_personal_academic_query("điều kiện tốt nghiệp là gì?") is False
+    assert is_personal_academic_query("cách tính điểm khi học lại như thế nào?") is False
+    assert is_personal_academic_query("quy định cấm thi như thế nào?") is False
+    assert is_personal_academic_query("quy định thi lại như thế nào?") is False
+
+
+
 
