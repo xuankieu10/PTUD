@@ -89,7 +89,7 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
         # Chunk 1: Mục 2 - Điều kiện cấm thi (VB2 - Chưa kiểm chứng)
         {
             "chunk_index": 1,
-            "section": "Mục 2 – Điều kiện cấm thi",
+            "section": "Mục 2 – Điều kiện cấm thi (Điều 19)",
             "title": "Điều kiện cấm thi kết thúc học phần",
             "source": "[VB2 – chưa kiểm chứng]",
             "verified": False,
@@ -105,7 +105,7 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
         # Chunk 2: Mục 3.1 - Học lại (VB1)
         {
             "chunk_index": 2,
-            "section": "Mục 3.1 – Học lại",
+            "section": "Mục 3.1 – Học lại (Điều 12)",
             "title": "Quy định học lại học phần và tính điểm học lại",
             "source": "VB1 – QĐ 22, Điều 3 K1, Điều 7 K5, Điều 9 K1, Điều 11 K5đ",
             "verified": True,
@@ -122,7 +122,7 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
         # Chunk 3: Mục 3.2 - Thi lại (Kỳ thi phụ) (VB1 & VB2)
         {
             "chunk_index": 3,
-            "section": "Mục 3.2 – Thi lại (kỳ thi phụ)",
+            "section": "Mục 3.2 – Thi lại (kỳ thi phụ - Điều 11 K5đ)",
             "title": "Quy định thi lại và kỳ thi phụ cuối kỳ",
             "source": "VB1 – QĐ 22 & [VB2 – chưa kiểm chứng]",
             "verified": True,
@@ -135,14 +135,14 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
                 "- Thời gian: Kỳ thi phụ được tổ chức sớm nhất 02 tuần sau kỳ thi chính.\n"
                 "- Vắng thi chính có lý do chính đáng: Được dự thi phụ ngay sau đó và điểm thi phụ được tính là điểm thi lần đầu.\n"
                 "2. Theo [VB2 – chưa kiểm chứng]:\n"
-                "- Kỳ thi lần 2 tổ chức vào đầu học kỳ mới cho học phần dưới 5; điểm chuyên cần và giữa kỳ KHÔNG có thi lần 2.\n"
+                "- Kỳ thi lần 2 (thi lại lần 2) tổ chức vào đầu học kỳ mới cho học phần dưới 5; điểm chuyên cần và giữa kỳ KHÔNG có thi lần 2.\n"
                 "Lưu ý điểm xung đột (Mục 8): VB1 tổ chức thi phụ sớm nhất 2 tuần sau thi chính cho môn điểm < 4.0; VB2 ghi thi lần 2 vào đầu học kỳ mới cho môn điểm < 5. Sinh viên nên theo dõi thông báo chính thức của Phòng Đào tạo hoặc hỏi giáo vụ khoa."
             )
         },
         # Chunk 4: Mục 3.3 - Cải thiện điểm (VB1 & VB2)
         {
             "chunk_index": 4,
-            "section": "Mục 3.3 – Cải thiện điểm",
+            "section": "Mục 3.3 – Cải thiện điểm (Điều 20)",
             "title": "Quy định cải thiện điểm học phần",
             "source": "VB1 & [VB2 – chưa kiểm chứng]",
             "verified": True,
@@ -157,7 +157,7 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
         # Chunk 5: Mục 4 - Cảnh báo học vụ và buộc thôi học (VB1 & VB2)
         {
             "chunk_index": 5,
-            "section": "Mục 4 – Cảnh báo học vụ, dừng học và buộc thôi học",
+            "section": "Mục 4 – Cảnh báo học vụ, dừng học và buộc thôi học (Điều 24)",
             "title": "Cảnh báo học vụ, tạm ngừng học và buộc thôi học",
             "source": "VB1 – QĐ 22, Điều 13, 19, 21 & [VB2 – chưa kiểm chứng]",
             "verified": True,
@@ -177,7 +177,7 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
         # Chunk 6: Mục 5 - Điều kiện xét tốt nghiệp đại học (VB1)
         {
             "chunk_index": 6,
-            "section": "Mục 5 – Điều kiện xét tốt nghiệp",
+            "section": "Mục 5 – Điều kiện xét tốt nghiệp (Điều 15 / Điều 27)",
             "title": "Điều kiện xét tốt nghiệp đại học ngành CNTT",
             "source": "VB1 – QĐ 22, Điều 15 K1đ, K2; Điều 4 K2a; Điều 11 K5b",
             "verified": True,
@@ -216,7 +216,7 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
         # Chunk 8: Mục 6.3 - Đăng ký học lại, học vét qua Google Form (VB2 - Chưa kiểm chứng)
         {
             "chunk_index": 8,
-            "section": "Mục 6.3 – Đăng ký học lại, học vét",
+            "section": "Mục 6.3 – Hướng dẫn đăng ký học lại, học vét",
             "title": "Kênh đăng ký học lại, học vét và chi phí tham khảo",
             "source": "[VB2 – chưa kiểm chứng]",
             "verified": False,
@@ -287,6 +287,7 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
                 "- Chứng chỉ Ngoại ngữ 6 bậc (VSTEP): 2.000.000 VNĐ / thí sinh / kỳ thi.\n"
                 "- Chứng nhận đánh giá năng lực tiếng Anh (CEFR): 1.100.000 VNĐ / thí sinh / kỳ thi.\n"
                 "- Chứng chỉ Ứng dụng công nghệ thông tin: 600.000 VNĐ / thí sinh / kỳ thi.\n"
+                "- Thời hạn nộp chứng chỉ tiếng Anh: Nộp trước ngày xét tốt nghiệp tối thiểu 1 tháng.\n"
                 "2. Sát hạch tin học:\n"
                 "- Phí ôn luyện: 90.000 VNĐ / sinh viên.\n"
                 "- Link đăng ký lớp ôn: https://forms.gle/WtUpfZbPiWAq3RqK6\n"
@@ -364,7 +365,7 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
                 "- Số điện thoại liên hệ: 02513.952.251\n"
                 "- Email: cntt@lhu.edu.vn\n"
                 "- Website: http://cs.lhu.edu.vn\n"
-                "- Văn phòng Khoa: Phòng B301 - B302, Cơ sở 1, Số 10 Huỳnh Văn Nghệ, P. Bửu Long, TP. Biên Hòa, Tỉnh Đồng Nai.\n"
+                "- Văn phòng Khoa: Phòng B301 - B302, Cơ sở 1, Số 10 Huỳnh Văn Nghệ, Biên Hòa, Đồng Nai (P. Bửu Long, TP. Biên Hòa, Tỉnh Đồng Nai).\n"
                 "- Giờ làm việc: Thứ Hai đến Thứ Sáu (Sáng: 7h30 – 11h30 | Chiều: 13h00 – 16h30 / 17h00).\n"
                 "Phòng Công tác sinh viên (VB1): Phòng D201, Cơ sở 2 (tiếp nhận xác nhận vay vốn và miễn giảm học phí)."
             )

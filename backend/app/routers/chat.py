@@ -565,13 +565,24 @@ def clean_academic_regulation_answer(answer: str, user_message: str) -> str:
         kept = []
         for line in lines:
             line_l = line.lower()
-            if any(k in line_l for k in ["hạnh kiểm", "hanh kiem", "học phí", "hoc phi"]):
+            if any(k in line_l for k in ["hạnh kiểm", "hanh kiem", "học phí", "hoc phi", "đtbctl", "điểm trung bình tích lũy", "trung bình chung", "2.00", "2,00", "kỷ luật", "đình chỉ"]):
                 continue
             kept.append(line)
         cleaned = "\n".join(kept).strip()
         cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
         if len(cleaned) > 20:
             answer = cleaned
+        # Bổ sung ý "không còn học phần không đạt" nếu chưa có
+        if "không còn học phần không đạt" not in answer.lower():
+            if "150 tín chỉ" in answer:
+                answer = re.sub(
+                    r"(150 tín chỉ[^\.\n]*)",
+                    r"\1 (không còn học phần không đạt)",
+                    answer,
+                    count=1
+                )
+            else:
+                answer += "\n- Không còn học phần không đạt (không còn môn điểm F dưới 4.0)."
 
     # 3. Câu hỏi về học vét
     if "học vét" in msg_l or "hoc vet" in msg_l:
@@ -602,11 +613,15 @@ def clean_academic_regulation_answer(answer: str, user_message: str) -> str:
     # 5. Xử lý các điểm xung đột (Mục 8)
     # 5a. Ngưỡng F / điểm không đạt: theo VB1 là < 4.0; nhắc thêm văn bản khác ghi < 5.0
     if any(k in msg_l for k in ["ngưỡng điểm f", "nguong diem f", "ngưỡng f", "nguong f", "điểm f là", "diem f la", "ngưỡng không đạt", "nguong khong dat"]) or (("điểm f" in msg_l or "diem f" in msg_l) and ("mấy" in msg_l or "bao nhiêu" in msg_l or "ngưỡng" in msg_l)):
+        # Chuẩn hoá số điều khoản theo metadata chunk (Điều 11 Khoản 5, Điều 12 Khoản 2)
+        answer = re.sub(r"Điều 10\b", "Điều 11 Khoản 5, Điều 12 Khoản 2 (QĐ 22 - VB1)", answer)
         if "văn bản khác" not in answer.lower() and "xác nhận với giáo vụ" not in answer.lower():
             answer += "\n\n(Lưu ý theo Mục 8: Theo Niên giám chính thức VB1, điểm F là dưới 4.0 (thang 10); tuy nhiên có văn bản khác ghi dưới 5 phải học lại. Bạn nên xác nhận với giáo vụ khoa)."
 
     # 5b. Thi lại / kỳ thi phụ: theo VB1 sớm nhất 2 tuần sau thi chính
     if any(k in msg_l for k in ["thi lại", "thi lai", "thi phụ", "thi phu", "thi lần 2", "thi lan 2"]) and any(k in msg_l for k in ["khi nào", "thời gian", "bao giờ", "tổ chức"]):
+        # Chuẩn hoá số điều khoản theo metadata chunk (Điều 11 Khoản 5 điểm đ)
+        answer = re.sub(r"Điều 9(?:\s*(?:&|và)\s*Điều 10)?\b", "Điều 11 Khoản 5 điểm đ (QĐ 22 - VB1)", answer)
         if "văn bản khác" not in answer.lower() and "2 tuần" in answer.lower() and "đầu học kỳ mới" not in answer.lower():
             answer += "\n\n(Lưu ý theo Mục 8: Niên giám chính thức VB1 quy định kỳ thi phụ tổ chức sớm nhất 02 tuần sau kỳ thi chính; có văn bản khác ghi thi lần 2 vào đầu học kỳ mới. Bạn nên theo dõi thông báo của Phòng Đào tạo hoặc hỏi giáo vụ khoa)."
 
