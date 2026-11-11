@@ -168,7 +168,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   {data.is_eligible ? 'ĐỦ ĐIỀU KIỆN TỐT NGHIỆP' : 'CHƯA ĐỦ ĐIỀU KIỆN TỐT NGHIỆP'}
                 </p>
                 <p className="text-[11px] mt-0.5">
-                  Tín chỉ tích lũy: {data.total_credits_earned ?? data.total_credits_passed ?? 0} / {data.total_credits_required || data.required_credits || 120}
+                  Tín chỉ tích lũy: {data.total_credits_earned ?? data.total_credits_passed ?? 0} / {data.total_credits_required || data.required_credits || 150}
                 </p>
               </div>
             </div>
