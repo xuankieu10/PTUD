@@ -536,9 +536,10 @@ REGISTRATION_LINKS_NOTE = (
 def clean_academic_regulation_answer(answer: str, user_message: str) -> str:
     """
     Hậu kiểm chống bịa khi trả lời quy chế:
-    - Câu điều kiện xét tốt nghiệp: loại bỏ các ý tự thêm về hạnh kiểm, học phí ngoài văn bản Điều 27.
-    - Câu cấm thi: chỉ trả 2 lý do (vắng quá 20% số tiết, điểm thành phần dưới 2.0). Không trộn cảnh báo học vụ.
+    - Câu điều kiện xét tốt nghiệp: loại bỏ các ý tự thêm về hạnh kiểm, học phí ngoài văn bản.
+    - Câu cấm thi: chỉ trả 2 lý do (vắng quá 20% số tiết, điểm thành phần dưới 2.0). Thêm lưu ý thông tin chưa xác nhận chính thức từ VB2.
     - Câu học vét: không tự định nghĩa; nói rõ chưa có văn bản riêng về lớp học vét, hướng dẫn đăng ký học lại theo chunk.
+    - Điểm xung đột Mục 8: trả lời theo VB1 và nhắc có văn bản khác ghi khác.
     """
     msg_l = (user_message or "").lower()
 
@@ -555,6 +556,8 @@ def clean_academic_regulation_answer(answer: str, user_message: str) -> str:
         cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
         if len(cleaned) > 20:
             answer = cleaned
+        if "chưa được xác nhận chính thức" not in answer.lower() and "chưa kiểm chứng" not in answer.lower():
+            answer += "\n\n(Lưu ý: Thông tin điều kiện cấm thi này chưa được xác nhận chính thức trong Niên giám, bạn nên hỏi giáo vụ khoa để được hướng dẫn chính xác nhất)."
 
     # 2. Câu hỏi điều kiện xét tốt nghiệp (không phải cá nhân hoá điểm)
     if any(k in msg_l for k in ["điều kiện xét tốt nghiệp", "dieu kien xet tot nghiep", "điều kiện tốt nghiệp", "dieu kien tot nghiep"]) and not any(k in msg_l for k in ["của tôi", "của em", "tôi cần", "em cần"]):
@@ -574,17 +577,14 @@ def clean_academic_regulation_answer(answer: str, user_message: str) -> str:
     if "học vét" in msg_l or "hoc vet" in msg_l:
         note_prefix = "Hiện tại Nhà trường chưa có văn bản quy định riêng về lớp học vét; sinh viên có nhu cầu học lại/học vét thực hiện theo quy trình đăng ký học lại thông thường."
         if "chưa có văn bản" not in answer.lower():
-            # Thay thế định nghĩa tự sáng tác nếu có
             answer = re.sub(r"^Học vét là[^\.\n]+\.", note_prefix, answer, flags=re.IGNORECASE)
             if note_prefix not in answer:
                 answer = f"{note_prefix}\n\n{answer}"
 
     # 4. Câu hỏi về kỹ năng mềm
     if any(k in msg_l for k in ["kỹ năng mềm", "ky nang mem", "kĩ năng mềm", "ki nang mem"]):
-        # Bỏ cụm "của Khoa CNTT" / "của Khoa Công nghệ thông tin", vì docx không nói đây là quy định riêng của khoa
         answer = re.sub(r",?\s*(?:của|thuộc)\s*Khoa\s*(?:Công nghệ thông tin|CNTT),?", "", answer, flags=re.IGNORECASE)
         answer = re.sub(r"\bKhoa\s*(?:Công nghệ thông tin|CNTT)\s*–?\s*", "", answer, flags=re.IGNORECASE)
-        # Đảm bảo kỹ năng thứ 3 đúng nguyên văn chunk, không tự điền
         answer = re.sub(
             r"Kỹ năng viết CV điện tử và (?:trả lời phỏng vấn|phỏng vấn tìm việc làm|phỏng vấn xin việc|phỏng vấn)",
             "Kỹ năng viết CV điện tử và trả (văn bản gốc bị cắt, chưa xác nhận tên đầy đủ)",
@@ -598,6 +598,17 @@ def clean_academic_regulation_answer(answer: str, user_message: str) -> str:
                 answer,
                 flags=re.IGNORECASE
             )
+
+    # 5. Xử lý các điểm xung đột (Mục 8)
+    # 5a. Ngưỡng F / điểm không đạt: theo VB1 là < 4.0; nhắc thêm văn bản khác ghi < 5.0
+    if any(k in msg_l for k in ["ngưỡng điểm f", "nguong diem f", "ngưỡng f", "nguong f", "điểm f là", "diem f la", "ngưỡng không đạt", "nguong khong dat"]) or (("điểm f" in msg_l or "diem f" in msg_l) and ("mấy" in msg_l or "bao nhiêu" in msg_l or "ngưỡng" in msg_l)):
+        if "văn bản khác" not in answer.lower() and "xác nhận với giáo vụ" not in answer.lower():
+            answer += "\n\n(Lưu ý theo Mục 8: Theo Niên giám chính thức VB1, điểm F là dưới 4.0 (thang 10); tuy nhiên có văn bản khác ghi dưới 5 phải học lại. Bạn nên xác nhận với giáo vụ khoa)."
+
+    # 5b. Thi lại / kỳ thi phụ: theo VB1 sớm nhất 2 tuần sau thi chính
+    if any(k in msg_l for k in ["thi lại", "thi lai", "thi phụ", "thi phu", "thi lần 2", "thi lan 2"]) and any(k in msg_l for k in ["khi nào", "thời gian", "bao giờ", "tổ chức"]):
+        if "văn bản khác" not in answer.lower() and "2 tuần" in answer.lower() and "đầu học kỳ mới" not in answer.lower():
+            answer += "\n\n(Lưu ý theo Mục 8: Niên giám chính thức VB1 quy định kỳ thi phụ tổ chức sớm nhất 02 tuần sau kỳ thi chính; có văn bản khác ghi thi lần 2 vào đầu học kỳ mới. Bạn nên theo dõi thông báo của Phòng Đào tạo hoặc hỏi giáo vụ khoa)."
 
     return answer
 
