@@ -7,8 +7,25 @@ import { Composer } from './components/Chat/Composer';
 import { LoginModal } from './components/Modals/LoginModal';
 import { ProfileModal } from './components/Modals/ProfileModal';
 import { ProjectsModal } from './components/Modals/ProjectsModal';
+import { LandingPage } from './components/Landing/LandingPage';
+import { SignUpPage } from './components/Auth/SignUpPage';
 import { chatApi, authApi, healthApi, removeAuthToken } from './services/api';
 import type { ChatSession, ChatMessage, UserProfile, OllamaHealth, AttachedFile } from './types';
+
+export type AppView = 'landing' | 'signup' | 'chat';
+
+export interface AppProps {
+  initialView?: AppView;
+}
+
+const getInitialView = (): AppView => {
+  if (typeof window === 'undefined') return 'landing';
+  const path = window.location.pathname.toLowerCase();
+  const hash = window.location.hash.toLowerCase();
+  if (path === '/dang-ky' || hash === '#dang-ky' || hash === '#signup') return 'signup';
+  if (path === '/chat' || hash === '#chat') return 'chat';
+  return 'landing';
+};
 
 const SIDEBAR_STORAGE_KEY = 'lhu_ai_sidebar_open';
 const THEME_STORAGE_KEY = 'lhu_ai_dark_mode';
@@ -16,7 +33,44 @@ const ALLOWED_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.pdf', '.docx', '.txt'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_FILES_COUNT = 5;
 
-export function App() {
+export function App({ initialView }: AppProps = {}) {
+  // Navigation View State ('landing' | 'signup' | 'chat')
+  const [currentView, setCurrentView] = useState<AppView>(() => {
+    if (initialView) return initialView;
+    if (typeof window !== 'undefined') {
+      if (import.meta.env.MODE === 'test') {
+        const path = window.location.pathname.toLowerCase();
+        const hash = window.location.hash.toLowerCase();
+        if (path === '/dang-ky' || hash === '#dang-ky') return 'signup';
+        if (path === '/landing' || hash === '#landing') return 'landing';
+        return 'chat';
+      }
+      return getInitialView();
+    }
+    return 'landing';
+  });
+
+  const navigateTo = (view: AppView) => {
+    setCurrentView(view);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      const url = view === 'signup' ? '/dang-ky' : view === 'chat' ? '/chat' : '/';
+      window.history.pushState({ view }, '', url);
+    }
+  };
+
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      if (e.state && e.state.view) {
+        setCurrentView(e.state.view);
+      } else {
+        setCurrentView(getInitialView());
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   // Sidebar open/close state with localStorage persistence
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
     if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
@@ -524,6 +578,55 @@ export function App() {
     }
   };
 
+  // Render Landing Page View
+  if (currentView === 'landing') {
+    return (
+      <>
+        <LandingPage
+          isDarkMode={isDarkMode}
+          onToggleDarkMode={toggleDarkMode}
+          onNavigateToSignUp={() => navigateTo('signup')}
+          onOpenLoginModal={() => setIsLoginModalOpen(true)}
+          onNavigateToChat={() => navigateTo('chat')}
+        />
+
+        <LoginModal
+          isOpen={isLoginModalOpen}
+          onClose={() => setIsLoginModalOpen(false)}
+          onLoginSuccess={(loggedUser) => {
+            handleLoginSuccess(loggedUser);
+            navigateTo('chat');
+          }}
+          onSwitchToSignUp={() => {
+            setIsLoginModalOpen(false);
+            navigateTo('signup');
+          }}
+        />
+      </>
+    );
+  }
+
+  // Render Sign Up Page View
+  if (currentView === 'signup') {
+    return (
+      <>
+        <SignUpPage
+          onBackToHome={() => navigateTo('landing')}
+          onOpenLogin={() => setIsLoginModalOpen(true)}
+        />
+
+        <LoginModal
+          isOpen={isLoginModalOpen}
+          onClose={() => setIsLoginModalOpen(false)}
+          onLoginSuccess={(loggedUser) => {
+            handleLoginSuccess(loggedUser);
+            navigateTo('chat');
+          }}
+        />
+      </>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#F4F6F8] dark:bg-[#0F1B2D] text-[#222222] dark:text-[#E2E8F0] transition-colors duration-200">
       {/* Main Layout Container */}
@@ -564,6 +667,7 @@ export function App() {
             health={health}
             isDarkMode={isDarkMode}
             onToggleDarkMode={toggleDarkMode}
+            onNavigateToHome={() => navigateTo('landing')}
           />
 
           {/* Overlay khi đang kéo tệp vào khung chat */}
@@ -629,6 +733,10 @@ export function App() {
         isOpen={isLoginModalOpen}
         onClose={() => setIsLoginModalOpen(false)}
         onLoginSuccess={handleLoginSuccess}
+        onSwitchToSignUp={() => {
+          setIsLoginModalOpen(false);
+          navigateTo('signup');
+        }}
       />
 
       <ProfileModal

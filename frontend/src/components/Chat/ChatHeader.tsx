@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PanelLeftOpen, Menu, SquarePen, AlertCircle, Share2, Sun, Moon, Check, Sparkles } from 'lucide-react';
+import { PanelLeftOpen, Menu, SquarePen, AlertCircle, Share2, Sun, Moon, Check, Sparkles, Home } from 'lucide-react';
 import type { OllamaHealth } from '../../types';
 
 interface ChatHeaderProps {
@@ -9,6 +9,7 @@ interface ChatHeaderProps {
   health: OllamaHealth | null;
   isDarkMode?: boolean;
   onToggleDarkMode?: () => void;
+  onNavigateToHome?: () => void;
 }
 
 export const ChatHeader: React.FC<ChatHeaderProps> = ({
@@ -18,6 +19,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   health,
   isDarkMode = false,
   onToggleDarkMode,
+  onNavigateToHome,
 }) => {
   const [copiedShare, setCopiedShare] = useState(false);
 
@@ -82,6 +84,19 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
             <AlertCircle className="w-3 h-3" />
             <span className="hidden sm:inline">Offline</span>
           </div>
+        )}
+
+        {/* Nút về Trang chủ */}
+        {onNavigateToHome && (
+          <button
+            type="button"
+            onClick={onNavigateToHome}
+            title="Quay lại Trang chủ"
+            aria-label="Quay lại Trang chủ"
+            className="p-1.5 sm:p-2 rounded-lg text-white/85 hover:text-white hover:bg-white/15 active:bg-white/20 transition-colors cursor-pointer"
+          >
+            <Home className="w-4 h-4 stroke-[1.8]" />
+          </button>
         )}
 
         {/* Nút chia sẻ */}
