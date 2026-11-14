@@ -15,12 +15,12 @@ from backend.app.routers.chat import clean_academic_regulation_answer
 
 
 def test_verified_flags_in_database():
-    """Kiểm tra cờ verified trong database: các chunk VB2 phải có verified=False (tổng 36 chunks)."""
+    """Kiểm tra cờ verified trong database: các chunk VB2 phải có verified=False (tổng 37 chunks)."""
     with SessionLocal() as db:
         rows = db.execute(
             text("SELECT chunk_index, section, verified FROM document_chunks WHERE document_id = 9001 ORDER BY chunk_index")
         ).fetchall()
-        assert len(rows) == 36, f"Mong đợi 36 chunks cho doc 9001, nhận {len(rows)}"
+        assert len(rows) == 37, f"Mong đợi 37 chunks cho doc 9001, nhận {len(rows)}"
 
         verified_map = {r.chunk_index: bool(r.verified) for r in rows}
 
@@ -34,12 +34,12 @@ def test_verified_flags_in_database():
         assert verified_map[10] is True
         # Chunk 14 (Mục 6.3 Form học lại): VB2 -> False
         assert verified_map[14] is False
-        # Chunk 25 (Mục 7.3 Lệ phí NN-TH): VB2 -> False
-        assert verified_map[25] is False
-        # Chunk 27 (Mục 7.3 Miễn ngoại ngữ): VB2 -> False
-        assert verified_map[27] is False
-        # Chunk 31 (Mục 7.4 Kỹ năng mềm): VB2 -> False
-        assert verified_map[31] is False
+        # Chunk 26 (Mục 7.3 Lệ phí NN-TH): VB2 -> False
+        assert verified_map[26] is False
+        # Chunk 28 (Mục 7.3 Miễn ngoại ngữ): VB2 -> False
+        assert verified_map[28] is False
+        # Chunk 32 (Mục 7.4 Kỹ năng mềm): VB2 -> False
+        assert verified_map[32] is False
 
 
 def test_retrieval_returns_verified_field():

@@ -15,6 +15,10 @@ db_test_result.txt
 test_chat_results.md
 test.txt
 test2.txt
+answers.csv
+results.csv
+benchmark_comparison.png
+datasets_inventory.csv
 
 # Outputs / Temporary uploads
 output/
@@ -32,6 +36,11 @@ task-*.log
 env/
 venv/
 ENV/
+*.pem
+*.key
+*.crt
+credentials*.json
+service_account*.json
 
 # Local & Server Databases
 *.db

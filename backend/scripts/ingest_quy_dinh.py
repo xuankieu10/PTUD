@@ -343,152 +343,171 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
             "2. Xin trở lại học sau nghỉ tạm thời: Đơn viết gửi Hiệu trưởng, nộp tại Trường trước kỳ học mới ít nhất 1 tuần."
         )
     },
-    # 18: Mục 7.1 CTĐT ngành CNTT: Học kỳ 1
+    # 18: Mục 7.1 CTĐT ngành CNTT: Học kỳ 1 (17 TC)
     {
         "chunk_index": 18,
-        "section": "Mục 7.1 – CTĐT ngành CNTT: Học kỳ 1 [VB1]",
-        "title": "Danh mục môn học Học kỳ 1 ngành Công nghệ thông tin",
+        "section": "Mục 7.1 – CTĐT ngành CNTT: Học kỳ 1 (17 TC) [VB1]",
+        "title": "Chương trình đào tạo ngành CNTT – Học kỳ 1 (17 TC)",
         "source": "VB1 – Niên giám 2023",
         "verified": True,
-        "keywords": "ctđt cntt, học kỳ 1, toán cao cấp 1, english 1, nhập môn lập trình, cấu trúc và lắp ráp máy tính, mã nguồn mở",
+        "keywords": "ctđt cntt, học kỳ 1, 17 tc, toán cao cấp 1, english 1, nhập môn lập trình, cấu trúc và lắp ráp máy tính, mã nguồn mở, nhập môn cntt, dự án kỹ thuật",
         "content": (
             "[Nguồn: VB1 – Niên giám 2023 | Trạng thái: Chính thức]\n"
-            "Chương trình đào tạo ngành CNTT (Mã ngành: 7480201) – Học kỳ 1 (Tổng cộng 17 TC):\n"
-            "- Giáo dục quốc phòng (-)\n"
-            "- 102002 Giáo dục thể chất 1 (0 TC)\n"
-            "- 102073 Toán cao cấp 1 (4 TC)\n"
-            "- 102074 English 1 (3 TC)\n"
-            "- 111094 Nhập môn lập trình (2 TC)\n"
-            "- 111001 Cấu trúc và lắp ráp máy tính (3 TC)\n"
-            "- 111080 Phần mềm mã nguồn mở (2 TC)\n"
-            "- 111055 Nhập môn Công nghệ thông tin (1 TC)\n"
-            "- 111053 Nhập môn Phát triển dự án kỹ thuật (2 TC)."
+            "Mục 7.1 – CTĐT ngành CNTT (Mã ngành: 7480201, Khóa 2023–2027) – Học kỳ 1 (Tổng cộng 17 TC):\n"
+            "- Giáo dục quốc phòng (-): Bắt buộc, học đầu khóa, không tính tín chỉ\n"
+            "- 102002 Giáo dục thể chất 1 (0 TC, BB)\n"
+            "- 102073 Toán cao cấp 1 (4 TC, BB)\n"
+            "- 102074 English 1 (3 TC, BB)\n"
+            "- 111094 Nhập môn lập trình (2 TC, BB)\n"
+            "- 111001 Cấu trúc và lắp ráp máy tính (3 TC, BB)\n"
+            "- 111080 Phần mềm mã nguồn mở (2 TC, BB)\n"
+            "- 111055 Nhập môn Công nghệ thông tin (1 TC, BB)\n"
+            "- 111053 Nhập môn Phát triển dự án kỹ thuật (2 TC, BB)."
         )
     },
-    # 19: Mục 7.1 CTĐT ngành CNTT: Học kỳ 2
+    # 19: Mục 7.1 CTĐT ngành CNTT: Học kỳ 2 (20 TC)
     {
         "chunk_index": 19,
-        "section": "Mục 7.1 – CTĐT ngành CNTT: Học kỳ 2 [VB1]",
-        "title": "Danh mục môn học Học kỳ 2 ngành Công nghệ thông tin",
+        "section": "Mục 7.1 – CTĐT ngành CNTT: Học kỳ 2 (20 TC) [VB1]",
+        "title": "Chương trình đào tạo ngành CNTT – Học kỳ 2 (20 TC)",
         "source": "VB1 – Niên giám 2023",
         "verified": True,
-        "keywords": "ctđt cntt, học kỳ 2, xác suất thống kê, english 2, tin học đại cương, vật lý thực hành, điện tử cơ bản, ui/ux, kỹ thuật lập trình, mạng máy tính",
+        "keywords": "ctđt cntt, học kỳ 2, 20 tc, xác suất thống kê, english 2, tin học đại cương, vật lý thực hành, điện tử cơ bản, ui/ux, kỹ thuật lập trình, mạng máy tính",
         "content": (
             "[Nguồn: VB1 – Niên giám 2023 | Trạng thái: Chính thức]\n"
-            "Chương trình đào tạo ngành CNTT – Học kỳ 2 (Tổng cộng 20 TC):\n"
-            "- 102003 Giáo dục thể chất 2 (0 TC)\n"
-            "- 102087 Xác suất thống kê (2 TC)\n"
-            "- 102075 English 2 (4 TC)\n"
-            "- 102014 Tin học đại cương (3 TC)\n"
-            "- 111046 Vật lý thực hành (3 TC)\n"
-            "- 111047 Điện tử cơ bản (2 TC)\n"
-            "- 111056 Thiết kế UI/UX (2 TC)\n"
-            "- 111058 Kỹ thuật lập trình (2 TC)\n"
-            "- 112061 Mạng máy tính (2 TC)."
+            "Mục 7.1 – CTĐT ngành CNTT – Học kỳ 2 (Tổng cộng 20 TC):\n"
+            "- 102003 Giáo dục thể chất 2 (0 TC, BB)\n"
+            "- 102087 Xác suất thống kê (2 TC, BB)\n"
+            "- 102075 English 2 (4 TC, BB; Học trước: 102074)\n"
+            "- 102014 Tin học đại cương (Word, Excel, PowerPoint, Internet) (3 TC, BB)\n"
+            "- 111046 Vật lý thực hành (3 TC, BB)\n"
+            "- 111047 Điện tử cơ bản (2 TC, BB)\n"
+            "- 111056 Thiết kế UI/UX (2 TC, BB)\n"
+            "- 111058 Kỹ thuật lập trình (2 TC, BB; Học trước: 111094)\n"
+            "- 112061 Mạng máy tính (2 TC, BB)."
         )
     },
-    # 20: Mục 7.1 CTĐT ngành CNTT: Học kỳ 3
+    # 20: Mục 7.1 CTĐT ngành CNTT: Học kỳ 3 (25 TC)
     {
         "chunk_index": 20,
-        "section": "Mục 7.1 – CTĐT ngành CNTT: Học kỳ 3 [VB1]",
-        "title": "Danh mục môn học Học kỳ 3 ngành Công nghệ thông tin",
+        "section": "Mục 7.1 – CTĐT ngành CNTT: Học kỳ 3 (25 TC) [VB1]",
+        "title": "Chương trình đào tạo ngành CNTT – Học kỳ 3 (25 TC)",
         "source": "VB1 – Niên giám 2023",
         "verified": True,
-        "keywords": "ctđt cntt, học kỳ 3, triết học mác lênin, kinh tế chính trị, cnxh khoa học, english 3, toán rời rạc, cấu trúc dữ liệu và giải thuật, tín hiệu số, cơ sở dữ liệu, mạng máy tính nâng cao",
+        "keywords": "ctđt cntt, học kỳ 3, 25 tc, triết học mác lênin, kinh tế chính trị, cnxh khoa học, english 3, toán rời rạc, cấu trúc dữ liệu và giải thuật, tín hiệu số, cơ sở dữ liệu, mạng máy tính nâng cao",
         "content": (
             "[Nguồn: VB1 – Niên giám 2023 | Trạng thái: Chính thức]\n"
-            "Chương trình đào tạo ngành CNTT – Học kỳ 3 (Tổng cộng 25 TC):\n"
-            "- 102004 Giáo dục thể chất 3 (0 TC)\n"
-            "- 102063 Triết học Mác - Lênin (3 TC)\n"
-            "- 102064 Kinh tế chính trị Mác - Lênin (2 TC)\n"
-            "- 102065 Chủ nghĩa xã hội khoa học (2 TC)\n"
-            "- 102076 English 3 (4 TC)\n"
-            "- 111010 Toán rời rạc (3 TC)\n"
-            "- 111062 Cấu trúc dữ liệu và giải thuật (3 TC)\n"
-            "- 111048 Tín hiệu số cơ bản (2 TC)\n"
-            "- 111059 Cơ sở dữ liệu (3 TC)\n"
-            "- 112064 Mạng máy tính nâng cao (3 TC)."
+            "Mục 7.1 – CTĐT ngành CNTT – Học kỳ 3 (Tổng cộng 25 TC):\n"
+            "- 102004 Giáo dục thể chất 3 (0 TC, BB)\n"
+            "- 102063 Triết học Mác - Lênin (3 TC, BB)\n"
+            "- 102064 Kinh tế chính trị Mác - Lênin (2 TC, BB)\n"
+            "- 102065 Chủ nghĩa xã hội khoa học (2 TC, BB)\n"
+            "- 102076 English 3 (4 TC, BB; Học trước: 102075)\n"
+            "- 111010 Toán rời rạc (3 TC, BB)\n"
+            "- 111062 Cấu trúc dữ liệu và giải thuật (3 TC, BB; Học trước: 111058)\n"
+            "- 111048 Tín hiệu số cơ bản (2 TC, BB)\n"
+            "- 111059 Cơ sở dữ liệu (3 TC, BB)\n"
+            "- 112064 Mạng máy tính nâng cao (3 TC, BB; Học trước: 112061)."
         )
     },
-    # 21: Mục 7.1 CTĐT ngành CNTT: Học kỳ 4
+    # 21: Mục 7.1 CTĐT ngành CNTT: Học kỳ 4 (21 TC)
     {
         "chunk_index": 21,
-        "section": "Mục 7.1 – CTĐT ngành CNTT: Học kỳ 4 [VB1]",
-        "title": "Danh mục môn học Học kỳ 4 ngành Công nghệ thông tin",
+        "section": "Mục 7.1 – CTĐT ngành CNTT: Học kỳ 4 (21 TC) [VB1]",
+        "title": "Chương trình đào tạo ngành CNTT – Học kỳ 4 (21 TC)",
         "source": "VB1 – Niên giám 2023",
         "verified": True,
-        "keywords": "ctđt cntt, học kỳ 4, tư tưởng hồ chí minh, pháp luật đại cương, english 4, dịch vụ mạng, lập trình hướng đối tượng, hệ quản trị csdl, front-end, kiến tập",
+        "keywords": "ctđt cntt, học kỳ 4, 21 tc, tư tưởng hồ chí minh, pháp luật đại cương, english 4, dịch vụ mạng, lập trình hướng đối tượng, hệ quản trị csdl, front-end, kiến tập",
         "content": (
             "[Nguồn: VB1 – Niên giám 2023 | Trạng thái: Chính thức]\n"
-            "Chương trình đào tạo ngành CNTT – Học kỳ 4 (Tổng cộng 21 TC):\n"
-            "- 102033 Tư tưởng Hồ Chí Minh (2 TC)\n"
-            "- 102006 Pháp luật đại cương (2 TC)\n"
-            "- 102077 English 4 (4 TC)\n"
-            "- 111036 Dịch vụ mạng (3 TC)\n"
-            "- 111070 Lập trình hướng đối tượng (3 TC)\n"
-            "- 111060 Hệ quản trị CSDL (3 TC)\n"
-            "- 111067 Lập trình Front-End (2 TC)\n"
-            "- 111081 Kiến tập (2 TC)."
+            "Mục 7.1 – CTĐT ngành CNTT – Học kỳ 4 (Tổng cộng 21 TC):\n"
+            "- 102033 Tư tưởng Hồ Chí Minh (2 TC, BB)\n"
+            "- 102006 Pháp luật đại cương (2 TC, BB)\n"
+            "- 102077 English 4 (4 TC, BB; Học trước: 102076)\n"
+            "- 111036 Dịch vụ mạng (3 TC, BB)\n"
+            "- 111070 Lập trình hướng đối tượng (3 TC, BB; Học trước: 111062)\n"
+            "- 111060 Hệ quản trị CSDL (3 TC, BB; Học trước: 111059)\n"
+            "- 111067 Lập trình Front-End (2 TC, BB; Học trước: 111056)\n"
+            "- 111081 Kiến tập (2 TC, BB)."
         )
     },
-    # 22: Mục 7.1 CTĐT ngành CNTT: Học kỳ 5
+    # 22: Mục 7.1 CTĐT ngành CNTT: Học kỳ 5 (20 TC)
     {
         "chunk_index": 22,
-        "section": "Mục 7.1 – CTĐT ngành CNTT: Học kỳ 5 [VB1]",
-        "title": "Danh mục môn học Học kỳ 5 ngành Công nghệ thông tin",
+        "section": "Mục 7.1 – CTĐT ngành CNTT: Học kỳ 5 (20 TC) [VB1]",
+        "title": "Chương trình đào tạo ngành CNTT – Học kỳ 5 (20 TC)",
         "source": "VB1 – Niên giám 2023",
         "verified": True,
-        "keywords": "ctđt cntt, học kỳ 5, lịch sử đảng, english 5, nguyên lý thống kê, thiết kế hệ thống mạng, lập trình back-end, lập trình windows, tự chọn",
+        "keywords": "ctđt cntt, học kỳ 5, 20 tc, lịch sử đảng, english 5, nguyên lý thống kê, thiết kế hệ thống mạng, lập trình back-end, lập trình windows, tự chọn",
         "content": (
             "[Nguồn: VB1 – Niên giám 2023 | Trạng thái: Chính thức]\n"
-            "Chương trình đào tạo ngành CNTT – Học kỳ 5 (Tổng cộng 20 TC):\n"
-            "- 102066 Lịch sử Đảng (2 TC)\n"
-            "- 102078 English 5 (4 TC)\n"
-            "- 111057 Nguyên lý thống kê (2 TC)\n"
-            "- 112065 Thiết kế hệ thống mạng (3 TC)\n"
-            "- 111066 Lập trình Back-End (3 TC)\n"
-            "- 111072 Lập trình Windows (3 TC)\n"
-            "- Tự chọn 3 TC (chọn 1 trong 2: 111043 PT&TK HT HĐT hoặc 111089 PT&TK HT HQR)."
+            "Mục 7.1 – CTĐT ngành CNTT – Học kỳ 5 (Tổng cộng 20 TC):\n"
+            "- 102066 Lịch sử Đảng Cộng sản Việt Nam (2 TC, BB)\n"
+            "- 102078 English 5 (4 TC, BB; Học trước: 102077)\n"
+            "- 111057 Nguyên lý thống kê (2 TC, BB; Học trước: 102087)\n"
+            "- 112065 Thiết kế hệ thống mạng (3 TC, BB)\n"
+            "- 111066 Lập trình Back-End (3 TC, BB)\n"
+            "- 111072 Lập trình trên môi trường Windows (3 TC, BB; Học trước: 111060, 111070)\n"
+            "- Tự chọn 3 TC (chọn 1/2): 111043 Phân tích thiết kế HT hướng đối tượng (3 TC; Học trước: 111059, 111060) hoặc 111089 Phân tích thiết kế HT hướng quan hệ (3 TC)."
         )
     },
-    # 23: Mục 7.1 CTĐT ngành CNTT: Học kỳ 6
+    # 23: Mục 7.1 CTĐT ngành CNTT: Học kỳ 6 (16 TC)
     {
         "chunk_index": 23,
-        "section": "Mục 7.1 – CTĐT ngành CNTT: Học kỳ 6 [VB1]",
-        "title": "Danh mục môn học Học kỳ 6 ngành Công nghệ thông tin",
+        "section": "Mục 7.1 – CTĐT ngành CNTT: Học kỳ 6 (16 TC) [VB1]",
+        "title": "Chương trình đào tạo ngành CNTT – Học kỳ 6 (16 TC)",
         "source": "VB1 – Niên giám 2023",
         "verified": True,
-        "keywords": "ctđt cntt, học kỳ 6, english 6, thiết kế ht mạng nâng cao, giao tiếp thiết bị, di động, web, python học máy, thị giác máy tính",
+        "keywords": "ctđt cntt, học kỳ 6, 16 tc, english 6, thiết kế hệ thống mạng nâng cao, giao tiếp thiết bị, di động, web, python học máy, python thị giác máy tính",
         "content": (
             "[Nguồn: VB1 – Niên giám 2023 | Trạng thái: Chính thức]\n"
-            "Chương trình đào tạo ngành CNTT – Học kỳ 6 (Tổng cộng 16 TC):\n"
-            "- 102079 English 6 (4 TC)\n"
-            "- 112068 Thiết kế HT mạng nâng cao (2 TC)\n"
-            "- 111069 Lập trình giao tiếp thiết bị (2 TC)\n"
-            "- 111082 Lập trình ứng dụng di động (3 TC)\n"
-            "- 111083 Lập trình ứng dụng web (3 TC)\n"
-            "- Tự chọn 2 TC (chọn 1 trong 2: 111071 Python cho học máy hoặc 111084 Python thị giác MT)."
+            "Mục 7.1 – CTĐT ngành CNTT – Học kỳ 6 (Tổng cộng 16 TC):\n"
+            "- 102079 English 6 (4 TC, BB; Học trước: 102078)\n"
+            "- 112068 Thiết kế hệ thống mạng nâng cao (2 TC, BB; Học trước: 112065)\n"
+            "- 111069 Lập trình giao tiếp thiết bị (2 TC, BB)\n"
+            "- 111082 Lập trình ứng dụng di động (3 TC, BB; Học trước: 111066)\n"
+            "- 111083 Lập trình ứng dụng web (3 TC, BB; Học trước: 111066, 111067)\n"
+            "- Tự chọn 2 TC (chọn 1/2): 111071 Lập trình Python cho học máy (2 TC) hoặc 111084 Lập trình Python trong thị giác máy tính (2 TC)."
         )
     },
-    # 24: Mục 7.1 CTĐT ngành CNTT: Học kỳ 7 và Học kỳ 8
+    # 24: Mục 7.1 CTĐT ngành CNTT: Học kỳ 7 (21 TC)
     {
         "chunk_index": 24,
-        "section": "Mục 7.1 – CTĐT ngành CNTT: Học kỳ 7 và Học kỳ 8 [VB1]",
-        "title": "Danh mục môn học Học kỳ 7, Học kỳ 8 và Tổng số tín chỉ toàn khóa",
+        "section": "Mục 7.1 – CTĐT ngành CNTT: Học kỳ 7 (21 TC) [VB1]",
+        "title": "Chương trình đào tạo ngành CNTT – Học kỳ 7 (21 TC)",
         "source": "VB1 – Niên giám 2023",
         "verified": True,
-        "keywords": "ctđt cntt, học kỳ 7, học kỳ 8, english 7, kiểm thử phần mềm, phát triển ứng dụng, thực tập, tốt nghiệp, 150 tín chỉ",
+        "keywords": "ctđt cntt, học kỳ 7, 21 tc, english 7, kiểm thử và đảm bảo chất lượng phần mềm, quản trị website trên vps, phát triển ứng dụng, trí tuệ nhân tạo, công nghệ blockchain",
         "content": (
             "[Nguồn: VB1 – Niên giám 2023 | Trạng thái: Chính thức]\n"
-            "Chương trình đào tạo ngành CNTT – HK7, HK8 và Tổng kết toàn khóa:\n"
-            "- Học kỳ 7 (21 TC): 102080 English 7 (4 TC), 111065 Kiểm thử & ĐBCLPM (3 TC), 111085 Quản trị website trên VPS (2 TC), 111038 Phát triển ứng dụng (9 TC), Tự chọn 3 TC (111088 AI hoặc 111061 Blockchain).\n"
-            "- Học kỳ 8 (10 TC): 111049 Thực tập (2 TC), 33333 Tốt nghiệp (8 TC).\n"
-            "- Toàn khóa: Đúng 150 tín chỉ (8 học kỳ). GDQP không tính tín chỉ; GDTC gồm 3 học phần 0 tín chỉ (điểm P từ 5.0 trở lên)."
+            "Mục 7.1 – CTĐT ngành CNTT – Học kỳ 7 (Tổng cộng 21 TC):\n"
+            "- 102080 English 7 (4 TC, BB; Học trước: 102079)\n"
+            "- 111065 Kiểm thử và đảm bảo chất lượng phần mềm (3 TC, BB)\n"
+            "- 111085 Quản trị website trên VPS (2 TC, BB)\n"
+            "- 111038 Phát triển ứng dụng (9 TC, BB; Học trước: 111069, 111082, 111083)\n"
+            "- Tự chọn 3 TC (chọn 1/2): 111088 Trí tuệ nhân tạo (3 TC; Học trước: 111071) hoặc 111061 Công nghệ Blockchain (3 TC)."
         )
     },
-    # 25: Mục 7.3 Lệ phí thi chứng chỉ Ngoại ngữ - Tin học
+    # 25: Mục 7.1 CTĐT ngành CNTT: Học kỳ 8 (10 TC) & Tổng kết khóa
     {
         "chunk_index": 25,
+        "section": "Mục 7.1 – CTĐT ngành CNTT: Học kỳ 8 (10 TC) & Tổng kết khóa [VB1]",
+        "title": "Chương trình đào tạo ngành CNTT – Học kỳ 8 (10 TC) và Tổng kết toàn khóa (150 TC)",
+        "source": "VB1 – Niên giám 2023",
+        "verified": True,
+        "keywords": "ctđt cntt, học kỳ 8, 10 tc, thực tập, tốt nghiệp, 150 tín chỉ, toàn khóa, 8 học kỳ",
+        "content": (
+            "[Nguồn: VB1 – Niên giám 2023 | Trạng thái: Chính thức]\n"
+            "Mục 7.1 – CTĐT ngành CNTT – Học kỳ 8 (10 TC) & Tổng kết toàn khóa:\n"
+            "- 111049 Thực tập (2 TC, BB; Học trước: 111081)\n"
+            "- 33333 Tốt nghiệp (8 TC, BB; Song hành: 111049).\n"
+            "- Tổng tín chỉ HK8: 10 TC.\n"
+            "- Toàn khóa: Đúng 150 tín chỉ (8 học kỳ). GDQP không tính tín chỉ; GDTC gồm 3 học phần 0 tín chỉ (yêu cầu điểm P từ 5.0 trở lên). BB = bắt buộc, TC = tự chọn."
+        )
+    },
+    # 26: Mục 7.3 Lệ phí thi chứng chỉ Ngoại ngữ - Tin học
+    {
+        "chunk_index": 26,
         "section": "Mục 7.3 – Lệ phí thi chứng chỉ Ngoại ngữ - Tin học [VB2]",
         "title": "Lệ phí thi chứng chỉ VSTEP, CEFR, Tin học và thời hạn nộp",
         "source": "[VB2 – chưa kiểm chứng]",
@@ -505,9 +524,9 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
             "2. Thời hạn nộp: Nộp trước ngày xét tốt nghiệp tối thiểu 1 tháng."
         )
     },
-    # 26: Mục 7.3 Đăng ký sát hạch tin học chuẩn đầu ra
+    # 27: Mục 7.3 Đăng ký sát hạch tin học chuẩn đầu ra
     {
-        "chunk_index": 26,
+        "chunk_index": 27,
         "section": "Mục 7.3 – Đăng ký sát hạch tin học chuẩn đầu ra [VB2]",
         "title": "Phí ôn luyện sát hạch tin học và link đăng ký",
         "source": "[VB2 – chưa kiểm chứng]",
@@ -522,9 +541,9 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
             "4. Nếu quá hạn đăng ký, sinh viên theo dõi trên App ME về đợt tiếp theo."
         )
     },
-    # 27: Mục 7.3 Miễn thi ngoại ngữ: Bằng đại học tiếng Anh
+    # 28: Mục 7.3 Miễn thi ngoại ngữ: Bằng đại học tiếng Anh
     {
-        "chunk_index": 27,
+        "chunk_index": 28,
         "section": "Mục 7.3 – Miễn thi ngoại ngữ: Bằng đại học tiếng Anh [VB2]",
         "title": "Đối tượng miễn thi ngoại ngữ chuẩn đầu ra có bằng đại học",
         "source": "[VB2 – chưa kiểm chứng]",
@@ -538,9 +557,9 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
             "2. Có bằng tốt nghiệp đại học tại các CTĐT trong nước mà ngôn ngữ dùng trong toàn bộ chương trình là tiếng Anh không qua phiên dịch."
         )
     },
-    # 28: Mục 7.3 Miễn thi ngoại ngữ: Chứng chỉ quốc tế
+    # 29: Mục 7.3 Miễn thi ngoại ngữ: Chứng chỉ quốc tế
     {
-        "chunk_index": 28,
+        "chunk_index": 29,
         "section": "Mục 7.3 – Miễn thi ngoại ngữ: Chứng chỉ quốc tế TOEFL/IELTS [VB2]",
         "title": "Đối tượng miễn thi ngoại ngữ có chứng chỉ quốc tế TOEFL, IELTS",
         "source": "[VB2 – chưa kiểm chứng]",
@@ -554,9 +573,9 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
             "2. Có chứng chỉ do các cơ sở đào tạo ngoại ngữ được Bộ Giáo dục và Đào tạo giao nhiệm vụ và công nhận tương đương các mức trên."
         )
     },
-    # 29: Mục 7.4 Quy định GDQP-AN và Giáo dục thể chất
+    # 30: Mục 7.4 Quy định GDQP-AN và Giáo dục thể chất
     {
-        "chunk_index": 29,
+        "chunk_index": 30,
         "section": "Mục 7.4 – Quy định GDQP-AN và Giáo dục thể chất [VB1]",
         "title": "Quy định hoàn thành GDQP-AN và 3 học phần GDTC",
         "source": "VB1 – QĐ 22 Điều 4, 11, 15",
@@ -569,9 +588,9 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
             "2. Giáo dục thể chất (GDTC): Gồm 3 học phần (102002 GDTC 1, 102003 GDTC 2, 102004 GDTC 3), 0 tín chỉ trong CTĐT. Điều kiện đạt là điểm P (từ 5.0 trở lên); không tính vào GPA nhưng bắt buộc hoàn thành đủ cả 3 học phần để được xét tốt nghiệp."
         )
     },
-    # 30: Mục 7.4 Lịch học GDQP-AN và tra cứu lịch
+    # 31: Mục 7.4 Lịch học GDQP-AN và tra cứu lịch
     {
-        "chunk_index": 30,
+        "chunk_index": 31,
         "section": "Mục 7.4 – Lịch học GDQP-AN và tra cứu lịch [VB2]",
         "title": "Lịch học GDQP-AN và trang tra cứu lịch calen.lhu.edu.vn",
         "source": "[VB2 – chưa kiểm chứng]",
@@ -585,9 +604,9 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
             "2. Lịch GDQP chỉ mở 1 năm/lần, quá hạn phải đăng ký vào năm sau."
         )
     },
-    # 31: Mục 7.4 Danh mục 4 môn Kỹ năng mềm chuẩn đầu ra
+    # 32: Mục 7.4 Danh mục 4 môn Kỹ năng mềm chuẩn đầu ra
     {
-        "chunk_index": 31,
+        "chunk_index": 32,
         "section": "Mục 7.4 – Danh mục 4 môn Kỹ năng mềm chuẩn đầu ra [VB2]",
         "title": "Danh mục 4 môn Kỹ năng mềm bắt buộc chuẩn đầu ra",
         "source": "[VB2 – chưa kiểm chứng]",
@@ -603,9 +622,9 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
             "4. Kỹ năng khởi nghiệp"
         )
     },
-    # 32: Mục 7.4 Học phí Kỹ năng mềm 500.000đ và đóng qua AppMe
+    # 33: Mục 7.4 Học phí Kỹ năng mềm 500.000đ và đóng qua AppMe
     {
-        "chunk_index": 32,
+        "chunk_index": 33,
         "section": "Mục 7.4 – Học phí Kỹ năng mềm 500.000đ và đóng qua AppMe [VB2]",
         "title": "Mức học phí Kỹ năng mềm 500.000đ và hình thức đóng tiền qua AppMe",
         "source": "[VB2 – chưa kiểm chứng]",
@@ -618,9 +637,9 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
             "2. Hình thức đóng tiền: Sinh viên đóng tiền trực tiếp trên AppMe theo hướng dẫn đính kèm."
         )
     },
-    # 33: Mục 7.5 Danh bạ liên hệ Khoa CNTT
+    # 34: Mục 7.5 Danh bạ liên hệ Khoa CNTT
     {
-        "chunk_index": 33,
+        "chunk_index": 34,
         "section": "Mục 7.5 – Danh bạ liên hệ Khoa CNTT [VB2]",
         "title": "Thông tin liên hệ Khoa Công nghệ thông tin LHU",
         "source": "[VB2 – chưa kiểm chứng]",
@@ -635,9 +654,9 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
             "- Khi cần liên hệ hỗ trợ: Ghi rõ Họ tên, MSSV, Khóa, Lớp, Ngành và mô tả chi tiết vấn đề cần giải quyết."
         )
     },
-    # 34: Mục 8.1 Điểm xung đột về điểm F, thi lại và cải thiện điểm
+    # 35: Mục 8.1 Điểm xung đột về điểm F, thi lại và cải thiện điểm
     {
-        "chunk_index": 34,
+        "chunk_index": 35,
         "section": "Mục 8.1 – Điểm xung đột về điểm F, thi lại và cải thiện điểm [Hợp nhất]",
         "title": "Đối chiếu xung đột về ngưỡng điểm F, kỳ thi phụ và tính điểm",
         "source": "VB1 (Niên giám 2023) & VB2 (Tóm tắt quy định)",
@@ -652,9 +671,9 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
             "=> Sinh viên thực hiện theo VB1 và xác nhận với giáo vụ khoa."
         )
     },
-    # 35: Mục 8.2 Điểm xung đột về kênh đăng ký và môn tốt nghiệp
+    # 36: Mục 8.2 Điểm xung đột về kênh đăng ký và môn tốt nghiệp
     {
-        "chunk_index": 35,
+        "chunk_index": 36,
         "section": "Mục 8.2 – Điểm xung đột về kênh đăng ký và môn tốt nghiệp [Hợp nhất]",
         "title": "Đối chiếu xung đột về kênh đăng ký và môn tốt nghiệp",
         "source": "VB1 (Niên giám 2023) & VB2 (Tóm tắt quy định)",
@@ -743,6 +762,13 @@ def ingest_quy_dinh(docx_path: str = None, dry_run: bool = False) -> int:
                     "url": DOCUMENT_URL
                 }
             )
+
+        # Đảm bảo cột verified tồn tại trong document_chunks (tương ứng migration_add_verified_to_document_chunks.sql)
+        col_verified_exists = conn.execute(
+            text("SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'document_chunks' AND COLUMN_NAME = 'verified'")
+        ).fetchone()
+        if not col_verified_exists:
+            conn.execute(text("ALTER TABLE document_chunks ADD verified BIT NOT NULL CONSTRAINT DF_document_chunks_verified DEFAULT 1"))
 
         # 2. Xóa CHỈ các chunk cũ của document 9001 để đảm bảo idempotent
         conn.execute(

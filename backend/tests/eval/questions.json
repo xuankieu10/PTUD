@@ -1,0 +1,278 @@
+[
+  {
+    "id": 1,
+    "category": "Điều kiện tốt nghiệp",
+    "question": "Điều kiện xét tốt nghiệp ngành CNTT là gì?",
+    "must_contain": [
+      "150 tín chỉ",
+      "Điều 15",
+      "Giáo dục quốc phòng",
+      "Giáo dục thể chất",
+      "Kỹ năng mềm",
+      "5.0",
+      "thang 10"
+    ],
+    "must_not_contain": [
+      "thang 4",
+      "2.00",
+      "hạnh kiểm",
+      "học phí tốt nghiệp"
+    ],
+    "notes": "Phải có Điều 15 (VB1) và QĐ 1013 (ĐTBCTL >= 5.0 thang 10), không quy đổi thang 4, không bịa hạnh kiểm."
+  },
+  {
+    "id": 2,
+    "category": "Môn tốt nghiệp & HK8",
+    "question": "Môn Tốt nghiệp bao nhiêu tín chỉ và học ở học kỳ nào?",
+    "must_contain": [
+      "8 tín chỉ",
+      "học kỳ 8",
+      "thực tập",
+      "2 tín chỉ"
+    ],
+    "must_not_contain": [
+      "10 tín chỉ môn tốt nghiệp",
+      "học kỳ 7"
+    ],
+    "notes": "Môn tốt nghiệp 8 TC ở HK8, đi cùng Thực tập 2 TC, tổng kỳ 8 là 10 TC."
+  },
+  {
+    "id": 3,
+    "category": "Chương trình đào tạo HK1",
+    "question": "Học kỳ 1 ngành CNTT gồm những môn nào và tổng bao nhiêu tín chỉ?",
+    "must_contain": [
+      "17 tín chỉ",
+      "Toán cao cấp 1",
+      "English 1",
+      "Nhập môn lập trình",
+      "Cấu trúc và lắp ráp máy tính",
+      "Phần mềm mã nguồn mở",
+      "Nhập môn Công nghệ thông tin",
+      "Nhập môn Phát triển dự án kỹ thuật"
+    ],
+    "must_not_contain": [
+      "18 tín chỉ",
+      "19 tín chỉ"
+    ],
+    "notes": "HK1 đúng 17 TC, GDQP và GDTC1 (0 TC) không tính vào tổng tín chỉ tích lũy."
+  },
+  {
+    "id": 4,
+    "category": "Chương trình đào tạo HK3",
+    "question": "Học kỳ 3 ngành CNTT có tổng cộng bao nhiêu tín chỉ và gồm các môn gì?",
+    "must_contain": [
+      "25 tín chỉ",
+      "Triết học Mác - Lênin",
+      "Kinh tế chính trị",
+      "Chủ nghĩa xã hội khoa học",
+      "English 3",
+      "Toán rời rạc",
+      "Cấu trúc dữ liệu và giải thuật",
+      "Cơ sở dữ liệu",
+      "Mạng máy tính nâng cao"
+    ],
+    "must_not_contain": [
+      "19 tín chỉ",
+      "24 tín chỉ"
+    ],
+    "notes": "HK3 đúng 25 TC."
+  },
+  {
+    "id": 5,
+    "category": "Chương trình đào tạo HK6",
+    "question": "Học kỳ 6 ngành CNTT có bao nhiêu tín chỉ?",
+    "must_contain": [
+      "16 tín chỉ",
+      "English 6",
+      "Thiết kế hệ thống mạng nâng cao",
+      "Lập trình giao tiếp thiết bị",
+      "Lập trình ứng dụng di động",
+      "Lập trình ứng dụng web"
+    ],
+    "must_not_contain": [
+      "20 tín chỉ",
+      "18 tín chỉ"
+    ],
+    "notes": "HK6 đúng 16 TC (5 môn bắt buộc 14 TC + 1 môn tự chọn 2 TC)."
+  },
+  {
+    "id": 6,
+    "category": "Chương trình đào tạo HK7",
+    "question": "Học kỳ 7 ngành CNTT có những môn nào và tổng bao nhiêu tín chỉ?",
+    "must_contain": [
+      "21 tín chỉ",
+      "English 7",
+      "Kiểm thử và đảm bảo chất lượng phần mềm",
+      "Quản trị website trên VPS",
+      "Phát triển ứng dụng",
+      "9 tín chỉ"
+    ],
+    "must_not_contain": [
+      "32 tín chỉ",
+      "24 tín chỉ"
+    ],
+    "notes": "HK7 đúng 21 TC (môn Phát triển ứng dụng 9 TC)."
+  },
+  {
+    "id": 7,
+    "category": "Tổng tín chỉ toàn khóa",
+    "question": "Tổng số tín chỉ toàn khóa của ngành Công nghệ thông tin là bao nhiêu?",
+    "must_contain": [
+      "150 tín chỉ",
+      "8 học kỳ"
+    ],
+    "must_not_contain": [
+      "130 tín chỉ",
+      "140 tín chỉ",
+      "160 tín chỉ"
+    ],
+    "notes": "Toàn khóa đúng 150 tín chỉ phân bổ trong 8 học kỳ."
+  },
+  {
+    "id": 8,
+    "category": "Điều kiện cấm thi",
+    "question": "Những trường hợp nào sinh viên bị cấm thi kết thúc học phần?",
+    "must_contain": [
+      "20%",
+      "2.0",
+      "chưa được xác nhận chính thức"
+    ],
+    "must_not_contain": [
+      "buộc thôi học",
+      "cảnh báo học vụ",
+      "2 học kỳ liên tiếp"
+    ],
+    "notes": "Đầy đủ 2 điều kiện: vắng quá 20% và điểm thành phần dưới 2.0; kèm cảnh báo VB2 chưa kiểm chứng."
+  },
+  {
+    "id": 9,
+    "category": "Điều kiện thi lại",
+    "question": "Khi nào sinh viên được thi lại hoặc thi phụ?",
+    "must_contain": [
+      "dưới 4.0",
+      "không dự",
+      "2 tuần"
+    ],
+    "must_not_contain": [
+      "vắng quá 20%",
+      "điểm thành phần dưới 2.0"
+    ],
+    "notes": "Thi lại cho SV vắng thi chính hoặc điểm F < 4.0, tổ chức sớm nhất 2 tuần; không lẫn lộn với cấm thi."
+  },
+  {
+    "id": 10,
+    "category": "Học vét",
+    "question": "Lớp học vét đăng ký ở đâu?",
+    "must_contain": [
+      "không đề cập riêng về lớp học vét",
+      "đăng ký học lại",
+      "dkmh.lhu.edu.vn"
+    ],
+    "must_not_contain": [
+      "lớp học vét được đăng ký thông qua",
+      "lớp học vét là lớp",
+      "đăng ký lớp học vét qua zalo"
+    ],
+    "notes": "Không tự định nghĩa, nói rõ tài liệu không đề cập riêng, chỉ có kênh học lại thông thường."
+  },
+  {
+    "id": 11,
+    "category": "Quy định học lại",
+    "question": "Quy định học lại môn học như thế nào?",
+    "must_contain": [
+      "dkmh.lhu.edu.vn",
+      "dưới 4.0",
+      "lần học cuối",
+      "dưới 5"
+    ],
+    "must_not_contain": [
+      "bắt buộc qua zalo"
+    ],
+    "notes": "Ưu tiên cổng dkmh.lhu.edu.vn (VB1), nêu điểm lần học cuối (VB1) và ghi chú xung đột dưới 5 (VB2)."
+  },
+  {
+    "id": 12,
+    "category": "Học phí học lại",
+    "question": "Học phí đăng ký học lại là bao nhiêu một môn?",
+    "must_contain": [
+      "không nêu mức học phí học lại",
+      "tham khảo"
+    ],
+    "must_not_contain": [
+      "500.000",
+      "500k",
+      "300.000"
+    ],
+    "notes": "Tài liệu không có mức học phí học lại cụ thể, không được gán 500.000đ của KNM cho học lại."
+  },
+  {
+    "id": 13,
+    "category": "Kỹ năng mềm",
+    "question": "Kỹ năng mềm gồm những môn nào và học phí bao nhiêu?",
+    "must_contain": [
+      "Kỹ năng giải quyết vấn đề",
+      "Kỹ năng thuyết trình",
+      "Kỹ năng viết CV điện tử và trả",
+      "Kỹ năng khởi nghiệp",
+      "500.000",
+      "chưa kiểm chứng"
+    ],
+    "must_not_contain": [
+      "[VB1 – Điều 15]",
+      "300.000",
+      "Khoa Công nghệ thông tin –"
+    ],
+    "notes": "4 môn KNM, học phí 500.000 VNĐ / môn thuộc VB2 chưa kiểm chứng, không gán nguồn VB1 Điều 15."
+  },
+  {
+    "id": 14,
+    "category": "Ngưỡng điểm F",
+    "question": "Ngưỡng điểm F theo quy chế học vụ là bao nhiêu?",
+    "must_contain": [
+      "dưới 4.0",
+      "thang 10",
+      "văn bản khác"
+    ],
+    "must_not_contain": [
+      "dưới 5.0 là điểm F chính thức"
+    ],
+    "notes": "Điểm F là dưới 4.0 thang 10 theo VB1, kèm ghi chú xung đột Mục 8 có văn bản ghi dưới 5."
+  },
+  {
+    "id": 15,
+    "category": "Lệ phí thi ngoại ngữ tin học",
+    "question": "Lệ phí thi chứng chỉ VSTEP và Tin học là bao nhiêu?",
+    "must_contain": [
+      "2.000.000",
+      "600.000",
+      "chưa được xác nhận chính thức"
+    ],
+    "must_not_contain": [],
+    "notes": "VSTEP 2.000.000đ, Tin học 600.000đ, nguồn VB2 chưa kiểm chứng."
+  },
+  {
+    "id": 16,
+    "category": "Điểm P môn điều kiện",
+    "question": "Điểm P là gì và áp dụng cho môn học nào?",
+    "must_contain": [
+      "Điểm P",
+      "5.0 trở lên",
+      "Giáo dục thể chất",
+      "không tính vào điểm trung bình"
+    ],
+    "must_not_contain": [],
+    "notes": "Điểm P từ 5.0 trở lên cho các môn điều kiện (GDTC), đạt và không tính vào ĐTB."
+  },
+  {
+    "id": 17,
+    "category": "Phân loại câu hỏi cá nhân",
+    "question": "Tôi còn thiếu bao nhiêu tín chỉ theo quy định để ra trường?",
+    "must_contain": [
+      "cá nhân",
+      "tra cứu"
+    ],
+    "must_not_contain": [],
+    "notes": "Câu hỏi cá nhân có từ 'tôi' phải được định tuyến đến cơ sở dữ liệu sinh viên cá nhân."
+  }
+]
+
