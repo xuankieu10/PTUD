@@ -1,5 +1,7 @@
 import re
+import json
 import unicodedata
+from typing import Optional
 from collections import defaultdict, Counter
 import numpy as np
 from sqlalchemy import text
@@ -189,31 +191,133 @@ def compute_keyword_score(query: str, content: str, section: str = "", content_u
     return 0.0
 
 
-def search_chunks(db: Session, query: str) -> list[dict]:
-    # 1. Lấy toàn bộ chunks từ database
-    sql = """
-        SELECT c.id, c.document_id, d.title, c.chunk_index, c.content, c.embedding, c.section, d.so_hieu, d.url, c.verified
-        FROM document_chunks c
-        JOIN documents d ON c.document_id = d.id
-        WHERE d.status = 'indexed'
+def normalize_cohort(cohort_str: Optional[str]) -> str:
+    """Chuẩn hóa khóa sinh viên, ví dụ 'K2021', 'K21', '2021' -> '2021'."""
+    if not cohort_str:
+        return ""
+    m = re.search(r"\d+", str(cohort_str))
+    if not m:
+        return ""
+    digits = m.group(0)
+    if len(digits) == 2:
+        return f"20{digits}"
+    return digits
+
+
+def filter_chunk_indices_by_metadata(
+    chunk_data: list[dict],
+    student_cohort: Optional[str] = None,
+    allow_unverified: bool = False
+) -> list[int]:
     """
-    rows = db.execute(text(sql)).fetchall()
+    Lọc danh sách chunk theo metadata và trả về danh sách index hợp lệ:
+    1. verified=True lọc cứng: Mặc định loại bỏ chunk verified=False (VB2).
+    2. metadata null KHÔNG bị loại: Giữ lại toàn bộ chunk chưa có metadata.
+    3. het_hieu_luc=True: Bị loại bỏ.
+    4. khoa_ap_dung: Nếu có student_cohort, kiểm tra xem cohort có nằm trong khoa_ap_dung hoặc khoa_ap_dung có 'all'.
+    5. Fallback cohort: Nếu lọc theo cohort cho 0 chunk, nới lỏng bỏ lọc cohort.
+    6. Fallback unverified: Nếu lọc verified=True cho 0 chunk và allow_unverified=False, nới lỏng lấy unverified kèm gắn cờ is_unverified_fallback=True.
+    """
+    if not chunk_data:
+        return []
+
+    norm_cohort = normalize_cohort(student_cohort) if student_cohort else ""
+
+    candidates = []
+    for idx, c in enumerate(chunk_data):
+        c_ver = c.get("verified")
+        if c_ver is None:
+            c_ver = True
+        if not allow_unverified and not c_ver:
+            continue
+
+        meta = c.get("metadata")
+        if isinstance(meta, str) and meta.strip():
+            try:
+                meta = json.loads(meta)
+            except Exception:
+                meta = None
+
+        if isinstance(meta, dict):
+            if meta.get("het_hieu_luc") is True:
+                continue
+            if not allow_unverified and meta.get("verified") is False:
+                continue
+
+        candidates.append(idx)
+
+    # Lọc theo khóa nếu có student_cohort
+    if norm_cohort and candidates:
+        cohort_filtered = []
+        for idx in candidates:
+            c = chunk_data[idx]
+            meta = c.get("metadata")
+            if isinstance(meta, str) and meta.strip():
+                try:
+                    meta = json.loads(meta)
+                except Exception:
+                    meta = None
+
+            if not isinstance(meta, dict) or not meta.get("khoa_ap_dung"):
+                # Metadata null hoặc không quy định khóa -> KHÔNG bị loại
+                cohort_filtered.append(idx)
+                continue
+
+            khoa = meta["khoa_ap_dung"]
+            if isinstance(khoa, str):
+                khoa = [khoa]
+
+            khoa_norm = [normalize_cohort(k) if k != "all" else "all" for k in khoa]
+            if "all" in khoa_norm or norm_cohort in khoa_norm:
+                cohort_filtered.append(idx)
+
+        # Fallback an toàn: Nếu lọc khóa bị rỗng thì giữ nguyên tập candidates trước đó
+        if cohort_filtered:
+            candidates = cohort_filtered
+
+    # Fallback unverified nếu rỗng
+    if not candidates and not allow_unverified:
+        unverified_indices = filter_chunk_indices_by_metadata(chunk_data, student_cohort=student_cohort, allow_unverified=True)
+        for idx in unverified_indices:
+            chunk_data[idx]["is_unverified_fallback"] = True
+        return unverified_indices
+
+    return candidates
+
+
+def search_chunks(db: Session, query: str, student_cohort: Optional[str] = None) -> list[dict]:
+    # 1. Lấy toàn bộ chunks từ database
+    try:
+        sql = """
+            SELECT c.id, c.document_id, d.title, c.chunk_index, c.content, c.embedding, c.section, d.so_hieu, d.url, c.verified, c.metadata
+            FROM document_chunks c
+            JOIN documents d ON c.document_id = d.id
+            WHERE d.status = 'indexed'
+        """
+        rows = db.execute(text(sql)).fetchall()
+    except Exception:
+        sql = """
+            SELECT c.id, c.document_id, d.title, c.chunk_index, c.content, c.embedding, c.section, d.so_hieu, d.url, c.verified
+            FROM document_chunks c
+            JOIN documents d ON c.document_id = d.id
+            WHERE d.status = 'indexed'
+        """
+        rows = db.execute(text(sql)).fetchall()
 
     if not rows:
         return []
 
     # 2. Xây dựng danh sách chunk kèm bản không dấu được tính trước
-    embs = []
-    chunk_data = []
+    all_chunks = []
+    all_embs = []
     for row in rows:
         emb = np.frombuffer(row.embedding, dtype=np.float32)
-        embs.append(emb)
+        all_embs.append(emb)
         content_str = row.content or ""
         sec_str = getattr(row, "section", None) or ""
-        # Lưu trước bản không dấu của chunk để tối ưu tốc độ so khớp từ khóa
         content_unaccent = strip_accents(f"{content_str} {sec_str}").lower()
 
-        chunk_data.append({
+        all_chunks.append({
             "id": row.id,
             "document_id": row.document_id,
             "title": row.title,
@@ -223,10 +327,17 @@ def search_chunks(db: Session, query: str) -> list[dict]:
             "so_hieu": getattr(row, "so_hieu", None),
             "url": getattr(row, "url", None),
             "verified": bool(getattr(row, "verified", True) if getattr(row, "verified", None) is not None else True),
+            "metadata": getattr(row, "metadata", None),
             "content_unaccent": content_unaccent,
         })
 
-    doc_embs = np.vstack(embs)
+    # Lọc metadata TRƯỚC khi tính điểm
+    valid_indices = filter_chunk_indices_by_metadata(all_chunks, student_cohort=student_cohort)
+    if not valid_indices:
+        return []
+
+    chunk_data = [all_chunks[i] for i in valid_indices]
+    doc_embs = np.vstack([all_embs[i] for i in valid_indices])
 
     # 3. Khôi phục dấu cho câu hỏi không dấu qua từ điển học từ chính các chunk
     accent_dict = get_or_build_accent_dictionary(chunk_data)
@@ -276,6 +387,10 @@ def search_chunks(db: Session, query: str) -> list[dict]:
     # Sắp xếp giảm dần theo điểm số kết hợp
     results = sorted(results, key=lambda x: x["score"], reverse=True)
 
+    # Cắt lấy top ứng viên ban đầu (mặc định 15)
+    top_candidates_k = getattr(settings, "RAG_TOP_CANDIDATES", 15)
+    candidates = results[:top_candidates_k]
+
     # 6. Khử trùng lặp và lọc bớt chunk không cần thiết để giảm độ dài prompt
     q_lower = query.lower()
     q_unaccent = strip_accents(q_lower)
@@ -287,7 +402,7 @@ def search_chunks(db: Session, query: str) -> list[dict]:
     has_specific_image = any(w in q_unaccent for w in ["hinh 1", "hinh 2"])
 
     filtered_candidates = []
-    for c in results:
+    for c in candidates:
         sec = c.get("section") or ""
         # Không trả chunk B (hệ liên thông) trừ khi câu hỏi nhắc "liên thông/hoàn chỉnh"
         if sec == "B" and not is_lien_thong:
@@ -305,6 +420,7 @@ def search_chunks(db: Session, query: str) -> list[dict]:
             deduped.append(c)
         filtered_candidates = deduped
 
-    # Lấy top_k cấu hình trong settings để kiểm soát lượng ngữ cảnh
-    return filtered_candidates[:settings.TOP_K]
+    # Lấy top_k cuối cùng (mặc định 4)
+    final_top_k = getattr(settings, "RAG_FINAL_TOP_K", getattr(settings, "TOP_K", 4))
+    return filtered_candidates[:final_top_k]
 

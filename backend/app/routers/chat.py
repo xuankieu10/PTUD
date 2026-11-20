@@ -381,106 +381,182 @@ def clean_source_text(text: str) -> str:
 
 def get_student_academic_and_ocr_context(db: Session, user_id: int, session_id: Optional[int] = None) -> tuple[str, Optional[dict], Optional[dict]]:
     """
-    Truy vấn kết quả OCR (ưu tiên theo session_id nếu có) và hồ sơ học vụ (graduation-check) của chính sinh viên đó.
-    Đảm bảo cô lập tuyệt đối dữ liệu theo user_id (không để dữ liệu sinh viên này lọt sang sinh viên khác).
+    Truy vấn kết quả bảng điểm và hồ sơ học vụ (graduation-check) của chính sinh viên đó:
+    - ƯU TIÊN 1: Dữ liệu trực tiếp từ Cổng trường LHU (dkmh.lhu.edu.vn) nếu sinh viên đã liên kết tài khoản.
+    - FALLBACK 2: Kết quả OCR (theo session_id nếu có, hoặc bản mới nhất của user_id).
+    - Đảm bảo cô lập tuyệt đối dữ liệu theo user_id (không để dữ liệu sinh viên này lọt sang sinh viên khác).
     Trả về: (context_text, ocr_info, grad_info)
     """
     ctx_parts = []
     ocr_info = None
     grad_info = None
 
-    # 1. Lấy kết quả OCR: Ưu tiên bảng điểm của chính session_id này, sau đó mới fallback sang bản mới nhất của user_id
-    try:
-        ocr_row = None
-        if session_id:
-            ocr_row = db.execute(
-                text("""
-                    SELECT TOP 1 id, filename, total_subjects, passed_count, failed_count, courses_data, summary_text, created_at
-                    FROM student_ocr_transcripts
-                    WHERE user_id = :uid AND session_id = :sid
-                    ORDER BY id DESC
-                """),
-                {"uid": user_id, "sid": session_id}
-            ).fetchone()
+    # 1. Kiểm tra nguồn ưu tiên: Dữ liệu tài khoản LHU đã liên kết
+    from backend.app.services.lhu_connector import get_active_lhu_data
+    lhu_data = get_active_lhu_data(user_id)
 
-        if not ocr_row:
-            ocr_row = db.execute(
-                text("""
-                    SELECT TOP 1 id, filename, total_subjects, passed_count, failed_count, courses_data, summary_text, created_at
-                    FROM student_ocr_transcripts
-                    WHERE user_id = :uid
-                    ORDER BY id DESC
-                """),
-                {"uid": user_id}
-            ).fetchone()
+    if lhu_data and "reconciled_courses" in lhu_data:
+        # Nguồn ưu tiên: Dữ liệu trực tiếp từ Cổng trường LHU
+        reconciled_courses = lhu_data.get("reconciled_courses", [])
+        failed_courses = []
+        failed_courses_structured = []
+        passed_courses = []
 
-        if ocr_row:
-            try:
-                courses = json.loads(ocr_row.courses_data)
-                failed_courses = []
-                failed_courses_structured = []
-                passed_courses = []
-                for c in courses:
-                    mon = c.get("course_name") or c.get("mon") or c.get("ten_mon") or c.get("name") or "Chưa rõ tên môn"
-                    code = c.get("course_code") or c.get("ma_mon") or c.get("code") or ""
-                    diem = c.get("grade") if c.get("grade") is not None else c.get("diem")
-                    tc = c.get("credits") if c.get("credits") is not None else c.get("tin_chi")
-                    hk = c.get("semester") or c.get("hoc_ky")
-                    ly_do = c.get("filter_reason") or c.get("ly_do") or ""
-                    is_red = bool(c.get("is_red_marked") is True or "đỏ" in str(ly_do).lower() or "red" in str(ly_do).lower())
-                    is_failed = (
-                        c.get("status") == "failed" or
-                        c.get("is_failed") is True or
-                        (diem is not None and float(diem) < 4.0) or
-                        is_red
-                    )
+        for c in reconciled_courses:
+            mon = c.get("course_name") or c.get("mon") or c.get("ten_mon") or c.get("name") or "Chưa rõ tên môn"
+            code = c.get("course_code") or c.get("ma_mon") or c.get("code") or ""
+            diem = c.get("grade") if c.get("grade") is not None else c.get("diem")
+            tc = c.get("credits") if c.get("credits") is not None else c.get("tin_chi")
+            hk = c.get("semester") or c.get("hoc_ky")
+            is_failed = (
+                c.get("status") == "failed" or
+                c.get("is_failed") is True or
+                (diem is not None and float(diem) < 4.0)
+            )
 
-                    code_str = f" ({code})" if code else ""
-                    ly_do_str = f" - Lý do: {ly_do}" if ly_do else ""
-                    tc_str = f" [{tc} TC]" if tc is not None else ""
-                    course_line = f"  + {mon}{code_str}{tc_str}: Điểm {diem}{ly_do_str}"
+            code_str = f" ({code})" if code else ""
+            tc_str = f" [{tc} TC]" if tc is not None else ""
+            course_line = f"  + {mon}{code_str}{tc_str}: Điểm {diem}"
 
-                    if is_failed:
-                        failed_courses.append(course_line)
-                        failed_courses_structured.append({
-                            "code": code,
-                            "name": mon,
-                            "grade": float(diem) if diem is not None else None,
-                            "credits": int(tc) if tc is not None else None,
-                            "semester": hk,
-                            "filter_reason": ly_do,
-                            "is_red_marked": is_red,
-                            "source": "OCR"
-                        })
+            if is_failed:
+                failed_courses.append(course_line)
+                failed_courses_structured.append({
+                    "code": code,
+                    "name": mon,
+                    "grade": float(diem) if diem is not None else None,
+                    "credits": int(tc) if tc is not None else None,
+                    "semester": hk,
+                    "filter_reason": "Chưa đạt",
+                    "is_red_marked": False,
+                    "source": "LHU"
+                })
+            else:
+                passed_courses.append(course_line)
+
+        ocr_info = {
+            "filename": "Cổng trường LHU (dkmh.lhu.edu.vn)",
+            "source": "LHU",
+            "total_subjects": len(reconciled_courses),
+            "passed_count": len(passed_courses),
+            "failed_count": len(failed_courses),
+            "failed_courses": failed_courses,
+            "failed_courses_structured": failed_courses_structured,
+            "raw_courses": reconciled_courses,
+            "summary_text": f"Bảng điểm lấy trực tiếp từ Cổng trường LHU: {len(reconciled_courses)} môn học.",
+            "gpa_portal": lhu_data.get("transcript", {}).get("gpa_portal")
+        }
+
+        lhu_lines = [
+            f"\n--- [KẾT QUẢ BẢNG ĐIỂM TRÍCH XUẤT TỪ CỔNG TRƯỜNG LHU (DKMH)] ---",
+            f"Tổng số môn trích xuất: {ocr_info['total_subjects']} môn (ĐẠT: {ocr_info['passed_count']}, CHƯA ĐẠT: {ocr_info['failed_count']})"
+        ]
+        if ocr_info.get("gpa_portal") is not None:
+            lhu_lines.append(f"Điểm trung bình (GPA) cổng trường: {ocr_info['gpa_portal']}")
+        if failed_courses:
+            lhu_lines.append("Danh sách các môn CHƯA ĐẠT (môn rớt / điểm < 4.0 / thi lại chưa đạt):")
+            lhu_lines.extend(failed_courses)
+        else:
+            lhu_lines.append("Tất cả các môn trên cổng trường đều ĐẠT (>= 4.0).")
+
+        if passed_courses:
+            lhu_lines.append("Danh sách các môn ĐÃ ĐẠT:")
+            lhu_lines.extend(passed_courses)
+
+        ctx_parts.append("\n".join(lhu_lines))
+
+    else:
+        # Fallback: Lấy kết quả OCR (ưu tiên theo session_id, sau đó sang bản mới nhất của user_id)
+        try:
+            ocr_row = None
+            if session_id:
+                ocr_row = db.execute(
+                    text("""
+                        SELECT TOP 1 id, filename, total_subjects, passed_count, failed_count, courses_data, summary_text, created_at
+                        FROM student_ocr_transcripts
+                        WHERE user_id = :uid AND session_id = :sid
+                        ORDER BY id DESC
+                    """),
+                    {"uid": user_id, "sid": session_id}
+                ).fetchone()
+
+            if not ocr_row:
+                ocr_row = db.execute(
+                    text("""
+                        SELECT TOP 1 id, filename, total_subjects, passed_count, failed_count, courses_data, summary_text, created_at
+                        FROM student_ocr_transcripts
+                        WHERE user_id = :uid
+                        ORDER BY id DESC
+                    """),
+                    {"uid": user_id}
+                ).fetchone()
+
+            if ocr_row:
+                try:
+                    courses = json.loads(ocr_row.courses_data)
+                    failed_courses = []
+                    failed_courses_structured = []
+                    passed_courses = []
+                    for c in courses:
+                        mon = c.get("course_name") or c.get("mon") or c.get("ten_mon") or c.get("name") or "Chưa rõ tên môn"
+                        code = c.get("course_code") or c.get("ma_mon") or c.get("code") or ""
+                        diem = c.get("grade") if c.get("grade") is not None else c.get("diem")
+                        tc = c.get("credits") if c.get("credits") is not None else c.get("tin_chi")
+                        hk = c.get("semester") or c.get("hoc_ky")
+                        ly_do = c.get("filter_reason") or c.get("ly_do") or ""
+                        is_red = bool(c.get("is_red_marked") is True or "đỏ" in str(ly_do).lower() or "red" in str(ly_do).lower())
+                        is_failed = (
+                            c.get("status") == "failed" or
+                            c.get("is_failed") is True or
+                            (diem is not None and float(diem) < 4.0) or
+                            is_red
+                        )
+
+                        code_str = f" ({code})" if code else ""
+                        ly_do_str = f" - Lý do: {ly_do}" if ly_do else ""
+                        tc_str = f" [{tc} TC]" if tc is not None else ""
+                        course_line = f"  + {mon}{code_str}{tc_str}: Điểm {diem}{ly_do_str}"
+
+                        if is_failed:
+                            failed_courses.append(course_line)
+                            failed_courses_structured.append({
+                                "code": code,
+                                "name": mon,
+                                "grade": float(diem) if diem is not None else None,
+                                "credits": int(tc) if tc is not None else None,
+                                "semester": hk,
+                                "filter_reason": ly_do,
+                                "is_red_marked": is_red,
+                                "source": "OCR"
+                            })
+                        else:
+                            passed_courses.append(course_line)
+
+                    ocr_info = {
+                        "filename": ocr_row.filename,
+                        "total_subjects": ocr_row.total_subjects,
+                        "passed_count": ocr_row.passed_count,
+                        "failed_count": ocr_row.failed_count,
+                        "failed_courses": failed_courses,
+                        "failed_courses_structured": failed_courses_structured,
+                        "raw_courses": courses,
+                        "summary_text": ocr_row.summary_text
+                    }
+
+                    ocr_lines = [
+                        f"\n--- [KẾT QUẢ BẢNG ĐIỂM ĐÃ QUÉT (OCR) CỦA BẠN - Tệp: {ocr_row.filename}] ---",
+                        f"Tổng số môn trích xuất: {ocr_row.total_subjects} môn (ĐẠT: {ocr_row.passed_count}, CHƯA ĐẠT: {ocr_row.failed_count})"
+                    ]
+                    if failed_courses:
+                        ocr_lines.append("Danh sách các môn CHƯA ĐẠT (môn rớt / điểm < 4.0 / đánh dấu đỏ):")
+                        ocr_lines.extend(failed_courses)
                     else:
-                        passed_courses.append(course_line)
+                        ocr_lines.append("Tất cả các môn trong bảng điểm OCR đều ĐẠT (>= 4.0).")
 
-                ocr_info = {
-                    "filename": ocr_row.filename,
-                    "total_subjects": ocr_row.total_subjects,
-                    "passed_count": ocr_row.passed_count,
-                    "failed_count": ocr_row.failed_count,
-                    "failed_courses": failed_courses,
-                    "failed_courses_structured": failed_courses_structured,
-                    "raw_courses": courses,
-                    "summary_text": ocr_row.summary_text
-                }
-
-                ocr_lines = [
-                    f"\n--- [KẾT QUẢ BẢNG ĐIỂM ĐÃ QUÉT (OCR) CỦA BẠN - Tệp: {ocr_row.filename}] ---",
-                    f"Tổng số môn trích xuất: {ocr_row.total_subjects} môn (ĐẠT: {ocr_row.passed_count}, CHƯA ĐẠT: {ocr_row.failed_count})"
-                ]
-                if failed_courses:
-                    ocr_lines.append("Danh sách các môn CHƯA ĐẠT (môn rớt / điểm < 4.0 / đánh dấu đỏ):")
-                    ocr_lines.extend(failed_courses)
-                else:
-                    ocr_lines.append("Tất cả các môn trong bảng điểm OCR đều ĐẠT (>= 4.0).")
-
-                ctx_parts.append("\n".join(ocr_lines))
-            except Exception as e:
-                logger.error(f"Lỗi parse dữ liệu OCR bảng điểm cho user {user_id}: {e}", exc_info=True)
-    except Exception as e:
-        logger.error(f"Lỗi truy vấn bảng student_ocr_transcripts cho user {user_id}: {e}", exc_info=True)
+                    ctx_parts.append("\n".join(ocr_lines))
+                except Exception as e:
+                    logger.error(f"Lỗi parse dữ liệu OCR bảng điểm cho user {user_id}: {e}", exc_info=True)
+        except Exception as e:
+            logger.error(f"Lỗi truy vấn bảng student_ocr_transcripts cho user {user_id}: {e}", exc_info=True)
 
     # 2. Lấy dữ liệu hồ sơ học vụ & điều kiện tốt nghiệp (graduation-check)
     try:
@@ -491,7 +567,7 @@ def get_student_academic_and_ocr_context(db: Session, user_id: int, session_id: 
 
         if stu_row:
             try:
-                grad = calculate_graduation_data(stu_row.id, db, explain=False)
+                grad = calculate_graduation_data(stu_row.id, db, explain=False, lhu_data=lhu_data)
                 grad_info = grad
                 stu_nested = grad.get("student") if isinstance(grad.get("student"), dict) else {}
                 student_name = stu_nested.get("full_name") or stu_row.full_name
@@ -1645,35 +1721,74 @@ def chat(
                 text("SELECT id FROM students WHERE user_id = :uid"),
                 {"uid": user_id}
             ).fetchone()
-        except Exception:
-            stu_row = None
-        if stu_row:
-            rows_g = db.execute(
-                text("""
-                    SELECT c.code, c.name, c.credits, g.score, g.passed, g.semester
-                    FROM grades g
-                    JOIN courses c ON g.course_id = c.id
-                    WHERE g.student_id = :sid
-                """),
-                {"sid": stu_row.id}
-            ).fetchall()
-            for rg in rows_g:
-                db_courses.append({
-                    "ma_mon": rg.code,
-                    "ten_mon": rg.name,
-                    "tin_chi": rg.credits,
-                    "diem": rg.score,
-                    "hoc_ky": rg.semester
-                })
+            if stu_row:
+                rows_g = db.execute(
+                    text("""
+                        SELECT c.code, c.name, c.credits, g.score, g.passed, g.semester
+                        FROM grades g
+                        JOIN courses c ON g.course_id = c.id
+                        WHERE g.student_id = :sid
+                    """),
+                    {"sid": stu_row.id}
+                ).fetchall()
+                for rg in rows_g:
+                    db_courses.append({
+                        "ma_mon": rg.code,
+                        "ten_mon": rg.name,
+                        "tin_chi": rg.credits,
+                        "diem": rg.score,
+                        "hoc_ky": rg.semester
+                    })
+        except Exception as e:
+            logger.error("Lỗi khi đọc hồ sơ/bảng điểm sinh viên từ DB (user_id=%s): %s", user_id, e)
+            answer = "Hệ thống hiện không đọc được hồ sơ sinh viên từ cơ sở dữ liệu để thực hiện kiểm tra tốt nghiệp. Bạn vui lòng thử lại sau hoặc liên hệ Phòng Đào tạo."
+            db.execute(
+                text("INSERT INTO chat_messages (session_id, role, content) VALUES (:sid, 'user', :content)"),
+                {"sid": session_id, "content": req.message},
+            )
+            db.execute(
+                text("INSERT INTO chat_messages (session_id, role, content, sources) VALUES (:sid, 'assistant', :content, :sources)"),
+                {"sid": session_id, "content": answer, "sources": "[]"},
+            )
+            db.commit()
+            return {"session_id": session_id, "answer": answer, "sources": []}
 
         profile_courses = list(db_courses)
         if ocr_info and ocr_info.get("raw_courses"):
-            existing_keys = {f"{c.get('ma_mon')}_{normalize_course_name(c.get('ten_mon', ''))}" for c in db_courses}
+            existing_codes = {c.get('ma_mon') for c in db_courses if c.get('ma_mon')}
+            existing_names = {normalize_course_name(c.get('ten_mon', '')) for c in db_courses if c.get('ten_mon')}
             for ocr_c in ocr_info["raw_courses"]:
-                c_key = f"{ocr_c.get('ma_mon')}_{normalize_course_name(ocr_c.get('ten_mon', ''))}"
-                if c_key not in existing_keys:
-                    profile_courses.append(ocr_c)
-                    existing_keys.add(c_key)
+                m_code = ocr_c.get("ma_mon") or ocr_c.get("course_code") or ocr_c.get("code") or ""
+                m_name = ocr_c.get("ten_mon") or ocr_c.get("course_name") or ocr_c.get("mon") or ocr_c.get("name") or ""
+                m_tc = ocr_c.get("tin_chi") if ocr_c.get("tin_chi") is not None else ocr_c.get("credits")
+                m_diem = ocr_c.get("diem") if ocr_c.get("diem") is not None else ocr_c.get("grade")
+                norm_m_name = normalize_course_name(m_name)
+
+                matched_db = None
+                if m_code and m_code in existing_codes:
+                    matched_db = next((c for c in profile_courses if c.get("ma_mon") == m_code), None)
+                elif norm_m_name and norm_m_name in existing_names:
+                    matched_db = next((c for c in profile_courses if normalize_course_name(c.get("ten_mon", "")) == norm_m_name), None)
+
+                if matched_db:
+                    matched_db["ocr_grade"] = m_diem
+                    matched_db["system_grade"] = matched_db.get("diem")
+                    if "OCR" not in matched_db.get("sources", []):
+                        matched_db.setdefault("sources", ["hệ thống"]).append("OCR")
+                else:
+                    profile_courses.append({
+                        "ma_mon": m_code,
+                        "ten_mon": m_name,
+                        "tin_chi": m_tc,
+                        "diem": m_diem,
+                        "ocr_grade": m_diem,
+                        "system_grade": None,
+                        "is_red_marked": ocr_c.get("is_red_marked"),
+                        "filter_reason": ocr_c.get("filter_reason"),
+                        "sources": ["OCR"]
+                    })
+                    if m_code: existing_codes.add(m_code)
+                    if norm_m_name: existing_names.add(norm_m_name)
         elif not profile_courses and grad_info and grad_info.get("failed_courses"):
             profile_courses = [
                 {"ma_mon": f.get("code"), "ten_mon": f.get("name"), "tin_chi": f.get("credits"), "diem": f.get("grade")}
@@ -1687,6 +1802,12 @@ def chat(
             "courses": profile_courses,
             "certificates": grad_info.get("certificates", {}) if grad_info else {}
         }
+
+        is_failed_only_query = (
+            any(k in eff_msg_lower for k in ["rớt môn nào", "nợ môn nào", "môn rớt", "môn nợ"])
+            and not any(k in eff_msg_lower for k in ["tốt nghiệp", "cần làm gì để tốt nghiệp", "tiến độ tốt nghiệp", "xét tốt nghiệp"])
+        )
+        verified_data = build_verified_academic_data(grad_info, ocr_info)
 
         grad_res = check_graduation(
             profile=profile_data,
@@ -1708,7 +1829,10 @@ def chat(
         # 3. Kiểm tra cấu hình ADVISORY_USE_LLM: Nếu False, trả thẳng bản dựng sẵn từ code (tiết kiệm VRAM)
         if not getattr(settings, "ADVISORY_USE_LLM", True):
             logger.info("ADVISORY_USE_LLM=False: Sử dụng trực tiếp bản dựng sẵn từ code.")
-            answer = fallback_template
+            if is_failed_only_query and verified_data:
+                answer = generate_verified_academic_template(verified_data, user_message=effective_query)
+            else:
+                answer = fallback_template
         else:
             # LLM chỉ diễn đạt lại theo đúng 4 phần (qwen2.5:3b), không tự tính toán
             prompt_advisor = (
@@ -1748,13 +1872,19 @@ def chat(
                 # Yêu cầu 1(a): Khi done_reason=length thì dùng ngay bản dựng sẵn của code
                 if done_reason == "length":
                     logger.warning("LLM tư vấn bị cắt do chạm ngưỡng token (done_reason=length). Sử dụng bản dựng sẵn của code.")
-                    answer = fallback_template
+                    answer = generate_verified_academic_template(verified_data, user_message=effective_query) if (is_failed_only_query and verified_data) else fallback_template
                 else:
-                    # 4. Kiểm tra sau khi sinh: nếu thiếu 1 trong 4 phần thì tự động dùng bản dựng chuẩn của code
-                    answer = validate_and_repair_advisory_response(raw_llm_ans, structured_parts, grad_result=grad_res, rag_regulations=seen_sources)
+                    if is_failed_only_query and verified_data:
+                        if not validate_academic_answer(raw_llm_ans, verified_data) or not any(k in raw_llm_ans.lower() for k in ["rớt", "chưa đạt", "môn học"]):
+                            answer = generate_verified_academic_template(verified_data, user_message=effective_query)
+                        else:
+                            answer = raw_llm_ans
+                    else:
+                        # 4. Kiểm tra sau khi sinh: nếu thiếu 1 trong 4 phần thì tự động dùng bản dựng chuẩn của code
+                        answer = validate_and_repair_advisory_response(raw_llm_ans, structured_parts, grad_result=grad_res, rag_regulations=seen_sources)
             except Exception as e:
                 logger.warning("Lỗi gọi LLM cố vấn (%s), sử dụng phương án dự phòng chuẩn từ code.", e)
-                answer = fallback_template
+                answer = generate_verified_academic_template(verified_data, user_message=effective_query) if (is_failed_only_query and verified_data) else fallback_template
 
         # Lưu tin nhắn người dùng và câu trả lời vào DB
         db.execute(
@@ -1913,6 +2043,15 @@ def chat(
         # Ensure answer does not contain source strings (sources are kept in sources_data)
         answer = clean_source_text(answer)
         answer = clean_academic_regulation_answer(answer, req.message)
+
+        # Cảnh báo VB2 do code chèn nếu nguồn trích xuất từ tài liệu chưa kiểm chứng (VB2)
+        has_unverified_chunk = any(
+            (c.get("verified") is False or c.get("is_unverified_fallback") is True)
+            for c in chunks
+        )
+        vb2_warning_str = "[LƯU Ý: Thông tin sau đây được trích từ tài liệu tóm tắt chưa kiểm chứng (VB2), vui lòng liên hệ Phòng Đào tạo để đối soát]."
+        if has_unverified_chunk and vb2_warning_str not in answer and answer not in (REFUSAL_RESPONSE, NO_CONTEXT_RESPONSE, FACULTY_NOT_SUPPORTED_RESPONSE):
+            answer = f"{vb2_warning_str}\n\n{answer}"
 
         # Yêu cầu 6: Thêm thông tin thời điểm cập nhật lịch NNTH
         if is_center_query and answer not in (REFUSAL_RESPONSE, NO_CONTEXT_RESPONSE, FACULTY_NOT_SUPPORTED_RESPONSE):
@@ -2095,34 +2234,57 @@ def chat_stream(
                 text("SELECT id FROM students WHERE user_id = :uid"),
                 {"uid": user_id}
             ).fetchone()
-        except Exception:
-            stu_row = None
-        if stu_row:
-            rows_g = db.execute(
-                text("""
-                    SELECT c.code, c.name, c.credits, g.score, g.passed, g.semester
-                    FROM grades g
-                    JOIN courses c ON g.course_id = c.id
-                    WHERE g.student_id = :sid
-                """),
-                {"sid": stu_row.id}
-            ).fetchall()
-            for rg in rows_g:
-                db_courses.append({
-                    "ma_mon": rg.code,
-                    "ten_mon": rg.name,
-                    "tin_chi": rg.credits,
-                    "diem": rg.score,
-                    "hoc_ky": rg.semester
-                })
+            if stu_row:
+                rows_g = db.execute(
+                    text("""
+                        SELECT c.code, c.name, c.credits, g.score, g.passed, g.semester
+                        FROM grades g
+                        JOIN courses c ON g.course_id = c.id
+                        WHERE g.student_id = :sid
+                    """),
+                    {"sid": stu_row.id}
+                ).fetchall()
+                for rg in rows_g:
+                    db_courses.append({
+                        "ma_mon": rg.code,
+                        "ten_mon": rg.name,
+                        "tin_chi": rg.credits,
+                        "diem": rg.score,
+                        "hoc_ky": rg.semester
+                    })
+        except Exception as e:
+            logger.error("Lỗi khi đọc hồ sơ/bảng điểm sinh viên từ DB (user_id=%s): %s", user_id, e)
+            answer = "Hệ thống hiện không đọc được hồ sơ sinh viên từ cơ sở dữ liệu để thực hiện kiểm tra tốt nghiệp. Bạn vui lòng thử lại sau hoặc liên hệ Phòng Đào tạo."
+            db.execute(
+                text("INSERT INTO chat_messages (session_id, role, content) VALUES (:sid, 'user', :content)"),
+                {"sid": session_id, "content": req.message},
+            )
+            db.execute(
+                text("INSERT INTO chat_messages (session_id, role, content, sources) VALUES (:sid, 'assistant', :content, :sources)"),
+                {"sid": session_id, "content": answer, "sources": "[]"},
+            )
+            db.commit()
+            return {"session_id": session_id, "answer": answer, "sources": []}
 
         profile_courses = list(db_courses)
         if ocr_info and ocr_info.get("raw_courses"):
             existing_keys = {f"{c.get('ma_mon')}_{normalize_course_name(c.get('ten_mon', ''))}" for c in db_courses}
             for ocr_c in ocr_info["raw_courses"]:
-                c_key = f"{ocr_c.get('ma_mon')}_{normalize_course_name(ocr_c.get('ten_mon', ''))}"
+                m_code = ocr_c.get("ma_mon") or ocr_c.get("course_code") or ocr_c.get("code") or ""
+                m_name = ocr_c.get("ten_mon") or ocr_c.get("course_name") or ocr_c.get("mon") or ocr_c.get("name") or ""
+                m_tc = ocr_c.get("tin_chi") if ocr_c.get("tin_chi") is not None else ocr_c.get("credits")
+                m_diem = ocr_c.get("diem") if ocr_c.get("diem") is not None else ocr_c.get("grade")
+                c_key = f"{m_code}_{normalize_course_name(m_name)}"
                 if c_key not in existing_keys:
-                    profile_courses.append(ocr_c)
+                    profile_courses.append({
+                        "ma_mon": m_code,
+                        "ten_mon": m_name,
+                        "tin_chi": m_tc,
+                        "diem": m_diem,
+                        "is_red_marked": ocr_c.get("is_red_marked"),
+                        "filter_reason": ocr_c.get("filter_reason"),
+                        "sources": ["OCR"]
+                    })
                     existing_keys.add(c_key)
         elif not profile_courses and grad_info and grad_info.get("failed_courses"):
             profile_courses = [
@@ -2385,6 +2547,15 @@ def chat_stream(
                     clean_ans = re.sub(r'\b(Based on the context|According to the document|In conclusion|Please note that|Note:)\b', '', clean_ans, flags=re.IGNORECASE).strip()
 
             clean_ans = clean_academic_regulation_answer(clean_ans, effective_query)
+
+            # Cảnh báo VB2 do code chèn nếu nguồn trích xuất từ tài liệu chưa kiểm chứng (VB2)
+            has_unverified_chunk = any(
+                (c.get("verified") is False or c.get("is_unverified_fallback") is True)
+                for c in chunks
+            )
+            vb2_warning_str = "[LƯU Ý: Thông tin sau đây được trích từ tài liệu tóm tắt chưa kiểm chứng (VB2), vui lòng liên hệ Phòng Đào tạo để đối soát]."
+            if has_unverified_chunk and vb2_warning_str not in clean_ans and clean_ans not in (REFUSAL_RESPONSE, NO_CONTEXT_RESPONSE, FACULTY_NOT_SUPPORTED_RESPONSE):
+                clean_ans = f"{vb2_warning_str}\n\n{clean_ans}"
 
             from backend.app.db import SessionLocal
             save_db = SessionLocal()
@@ -2749,9 +2920,9 @@ async def chat_upload(
                             confirm_msg += f"⚠️ Lưu ý: Có {len(unconfirmed)} môn cần bạn xác nhận lại thông tin (do chưa rõ điểm hoặc tín chỉ): {', '.join(u_list)}. Các môn này chưa được tính vào tín chỉ tích lũy & GPA.\n\n"
                         details = []
                         if failed_under_4_names:
-                            details.append(f"có {len(failed_under_4_names)} môn chưa đạt (điểm < 4.0): {', '.join(failed_under_4_names)}")
+                            details.append(f"có {len(failed_under_4_names)} môn chưa đạt (môn rớt, điểm < 4.0): {', '.join(failed_under_4_names)}")
                         if red_marked_ge_4_names:
-                            details.append(f"có {len(red_marked_ge_4_names)} môn bị đánh dấu đỏ (điểm ≥ 4.0): {', '.join(red_marked_ge_4_names)}")
+                            details.append(f"có {len(red_marked_ge_4_names)} môn bị đánh dấu đỏ, cần xác nhận với giáo vụ (điểm ≥ 4.0): {', '.join(red_marked_ge_4_names)}")
 
                         if details:
                             confirm_msg += "Trong đó " + "; ".join(details) + ".\n👉 Bạn có thể hỏi: 'tôi cần làm gì để tốt nghiệp đúng hạn?' để mình lên kế hoạch học tập từng kỳ giúp bạn!"

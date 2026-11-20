@@ -7,6 +7,7 @@ import { Composer } from './components/Chat/Composer';
 import { LoginModal } from './components/Modals/LoginModal';
 import { ProfileModal } from './components/Modals/ProfileModal';
 import { ProjectsModal } from './components/Modals/ProjectsModal';
+import { LhuLinkModal } from './components/Modals/LhuLinkModal';
 import { LandingPage } from './components/Landing/LandingPage';
 import { SignUpPage } from './components/Auth/SignUpPage';
 import { chatApi, authApi, healthApi, removeAuthToken } from './services/api';
@@ -148,6 +149,7 @@ export function App({ initialView }: AppProps = {}) {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isProjectsModalOpen, setIsProjectsModalOpen] = useState(false);
+  const [isLhuModalOpen, setIsLhuModalOpen] = useState(false);
 
   // Drag over main chat area state
   const [isDraggingOverChat, setIsDraggingOverChat] = useState(false);
@@ -646,6 +648,7 @@ export function App({ initialView }: AppProps = {}) {
           onLogout={handleLogout}
           onOpenLoginModal={() => setIsLoginModalOpen(true)}
           onOpenProfileModal={() => setIsProfileModalOpen(true)}
+          onOpenLhuLinkModal={() => setIsLhuModalOpen(true)}
           onExploreProjects={() => setIsProjectsModalOpen(true)}
           isLoadingSessions={isLoadingSessions}
           errorSessions={sessionsError}
@@ -743,12 +746,19 @@ export function App({ initialView }: AppProps = {}) {
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
         user={user}
+        onOpenLhuLinkModal={() => setIsLhuModalOpen(true)}
       />
 
       <ProjectsModal
         isOpen={isProjectsModalOpen}
         onClose={() => setIsProjectsModalOpen(false)}
         onSelectProjectPrompt={handleSelectPrompt}
+      />
+
+      <LhuLinkModal
+        isOpen={isLhuModalOpen}
+        onClose={() => setIsLhuModalOpen(false)}
+        user={user}
       />
     </div>
   );

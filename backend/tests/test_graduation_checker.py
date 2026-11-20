@@ -31,10 +31,13 @@ def test_scale_4_conversion():
     """Kiểm tra quy đổi thang 10 sang thang 4 theo Điều 11"""
     assert convert_score_to_scale_4(9.0) == (4.0, "A")
     assert convert_score_to_scale_4(8.5) == (4.0, "A")
+    assert convert_score_to_scale_4(8.2) == (3.5, "B+")
     assert convert_score_to_scale_4(7.5) == (3.0, "B")
     assert convert_score_to_scale_4(7.0) == (3.0, "B")
+    assert convert_score_to_scale_4(6.7) == (2.5, "C+")
     assert convert_score_to_scale_4(6.0) == (2.0, "C")
     assert convert_score_to_scale_4(5.5) == (2.0, "C")
+    assert convert_score_to_scale_4(5.2) == (1.5, "D+")
     assert convert_score_to_scale_4(4.5) == (1.0, "D")
     assert convert_score_to_scale_4(4.0) == (1.0, "D")
     assert convert_score_to_scale_4(3.9) == (0.0, "F")
@@ -294,3 +297,54 @@ def test_missing_credits_and_none_grade_marked_unconfirmed():
     assert "Môn chưa có điểm" in text_dict["part_2"]
     assert "Môn thiếu tín chỉ" in text_dict["part_2"]
     assert "cần xác nhận lại" in text_dict["part_2"]
+
+
+def test_elective_branch_b_completion():
+    """
+    Yêu cầu F.5: Test nhánh tự chọn B:
+    Sinh viên học 111089 (3 TC), 111084 (2 TC), 111061 (3 TC)
+    - Được tính đủ 3 + 2 + 3 = 8 TC tự chọn vào passed_credits.
+    - Không bị báo thiếu nhánh A (111043, 111071, 111088).
+    - Không xuất hiện trong proposed_plan hay missing_required_courses.
+    """
+    from backend.app.services.graduation_checker import DEFAULT_CNTT_CURRICULUM
+
+    profile = {
+        "student_code": "12100999",
+        "full_name": "Sinh viên Nhánh B",
+        "major": "Công nghệ thông tin",
+        "cohort": "2021",
+        "courses": [
+            {"ma_mon": "111089", "ten_mon": "Phân tích thiết kế hệ thống hướng quan hệ", "tin_chi": 3, "diem": 7.0},
+            {"ma_mon": "111084", "ten_mon": "Lập trình Python trong thị giác máy tính", "tin_chi": 2, "diem": 8.0},
+            {"ma_mon": "111061", "ten_mon": "Công nghệ Blockchain", "tin_chi": 3, "diem": 7.5},
+        ],
+        "certificates": {}
+    }
+
+    res = check_graduation(profile, DEFAULT_CNTT_CURRICULUM, current_semester=8, required_credits=150)
+
+    # 1. Được tính đủ 3 + 2 + 3 = 8 TC
+    assert res["student_summary"]["passed_credits"] == 8
+
+    # 2. Không bị báo thiếu các môn nhánh A tương ứng
+    missing_codes = [m.get("ma_mon") for m in res["missing_required_courses"]]
+
+    # Nhánh A: 111043, 111071, 111088 không được nằm trong danh sách thiếu
+    assert "111043" not in missing_codes
+    assert "111071" not in missing_codes
+    assert "111088" not in missing_codes
+
+    # Nhánh B: cũng không bị báo thiếu
+    assert "111089" not in missing_codes
+    assert "111084" not in missing_codes
+    assert "111061" not in missing_codes
+
+    # 3. Kế hoạch đề xuất không xếp lại các môn nhánh A này
+    planned_codes = []
+    for sem in res["proposed_plan"]:
+        for c in sem.get("courses", []):
+            planned_codes.append(c.get("ma_mon"))
+    assert "111043" not in planned_codes
+    assert "111071" not in planned_codes
+    assert "111088" not in planned_codes

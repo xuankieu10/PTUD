@@ -33,7 +33,7 @@ def test_verify_sample_transcript_1():
     assert summary["passed_credits"] == 52
     assert summary["failed_credits"] == 7
     assert summary["gpa_10"] == pytest.approx(7.18, abs=0.005)
-    assert summary["gpa_4"] == 2.67
+    assert summary["gpa_4"] == 2.81
     assert summary["total_gpa_credits"] == 52
 
     # Kiểm tra thêm GPA tính cả môn rớt (toàn bộ 59 tín chỉ)
@@ -56,7 +56,7 @@ def test_verify_sample_transcript_2():
     assert summary["passed_credits"] == 53
     assert summary["failed_credits"] == 10
     assert summary["gpa_10"] == 6.64
-    assert summary["gpa_4"] == 2.26
+    assert summary["gpa_4"] == 2.38
 
 
 @pytest.mark.skipif(not os.path.exists(os.path.join(SAMPLE_DIR, "Bảng điểm mẫu 3.pdf")), reason="Không tìm thấy tệp Bảng điểm mẫu 3.pdf")
@@ -71,7 +71,7 @@ def test_verify_sample_transcript_3():
     assert summary["passed_credits"] == 57
     assert summary["failed_credits"] == 6
     assert summary["gpa_10"] == 7.40
-    assert summary["gpa_4"] == 2.79
+    assert summary["gpa_4"] == 2.91
 
 
 @pytest.mark.skipif(not os.path.exists(os.path.join(SAMPLE_DIR, "Bảng điểm mẫu 4.pdf")), reason="Không tìm thấy tệp Bảng điểm mẫu 4.pdf")
@@ -86,7 +86,7 @@ def test_verify_sample_transcript_4():
     assert summary["passed_credits"] == 50
     assert summary["failed_credits"] == 12
     assert summary["gpa_10"] == 6.92
-    assert summary["gpa_4"] == 2.30
+    assert summary["gpa_4"] == 2.54
 
 
 @pytest.mark.skipif(not os.path.exists(SAMPLE_DIR), reason="Thư mục bảng điểm mẫu không tồn tại")

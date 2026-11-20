@@ -20,6 +20,7 @@ interface SidebarProps {
   onLogout: () => void;
   onOpenLoginModal: () => void;
   onOpenProfileModal?: () => void;
+  onOpenLhuLinkModal?: () => void;
   onExploreProjects?: () => void;
   isLoadingSessions?: boolean;
   errorSessions?: string | null;
@@ -40,6 +41,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onLogout,
   onOpenLoginModal,
   onOpenProfileModal,
+  onOpenLhuLinkModal,
   onExploreProjects,
   isLoadingSessions = false,
   errorSessions = null,
@@ -110,6 +112,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onLogout={onLogout}
           onOpenLoginModal={onOpenLoginModal}
           onOpenProfileModal={onOpenProfileModal}
+          onOpenLhuLinkModal={onOpenLhuLinkModal}
         />
       </aside>
     </>

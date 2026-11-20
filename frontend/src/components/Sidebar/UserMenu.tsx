@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronsUpDown, LogOut, Settings, GraduationCap, KeyRound, User as UserIcon, LogIn } from 'lucide-react';
+import { ChevronsUpDown, LogOut, Settings, GraduationCap, KeyRound, User as UserIcon, LogIn, Link2 } from 'lucide-react';
 import type { UserProfile } from '../../types';
 
 interface UserMenuProps {
@@ -7,6 +7,7 @@ interface UserMenuProps {
   onLogout: () => void;
   onOpenLoginModal: () => void;
   onOpenProfileModal?: () => void;
+  onOpenLhuLinkModal?: () => void;
 }
 
 export const UserMenu: React.FC<UserMenuProps> = ({
@@ -14,6 +15,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({
   onLogout,
   onOpenLoginModal,
   onOpenProfileModal,
+  onOpenLhuLinkModal,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -88,6 +90,20 @@ export const UserMenu: React.FC<UserMenuProps> = ({
             >
               <GraduationCap className="w-4 h-4 text-[#1565C0] dark:text-[#4D8FE0]" />
               <span>Hồ sơ học vụ & Tốt nghiệp</span>
+            </button>
+          )}
+
+          {onOpenLhuLinkModal && (
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                onOpenLhuLinkModal();
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-[#E3F0FC] dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-[#1565C0] dark:hover:text-[#4D8FE0] transition-colors cursor-pointer"
+            >
+              <Link2 className="w-4 h-4 text-[#1565C0] dark:text-[#4D8FE0]" />
+              <span>Liên kết tài khoản LHU</span>
             </button>
           )}
 

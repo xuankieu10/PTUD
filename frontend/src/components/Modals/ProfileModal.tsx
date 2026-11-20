@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, GraduationCap, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { X, GraduationCap, CheckCircle2, AlertCircle, Loader2, Link2 } from 'lucide-react';
 import type { UserProfile } from '../../types';
 import { getAuthToken } from '../../services/api';
 
@@ -8,6 +8,7 @@ interface ProfileModalProps {
   onClose: () => void;
   user: UserProfile | null;
   studentId?: number | null;
+  onOpenLhuLinkModal?: () => void;
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
@@ -15,6 +16,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onClose,
   user,
   studentId,
+  onOpenLhuLinkModal,
 }) => {
   const [data, setData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -135,6 +137,24 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-[#1565C0] text-white">
               {user.role}
             </span>
+          </div>
+        )}
+
+        {/* Nút liên kết cổng trường LHU nếu có */}
+        {onOpenLhuLinkModal && (
+          <div className="mb-4 p-2.5 bg-blue-50/70 dark:bg-slate-800/60 rounded-2xl border border-blue-100 dark:border-slate-700 flex items-center justify-between text-xs">
+            <span className="text-slate-600 dark:text-slate-300 font-medium">Lấy bảng điểm & chứng chỉ từ cổng trường:</span>
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onOpenLhuLinkModal();
+              }}
+              className="px-2.5 py-1 rounded-xl bg-[#1565C0] hover:bg-[#0D47A1] text-white font-semibold text-xs flex items-center gap-1 transition cursor-pointer shadow-xs"
+            >
+              <Link2 className="w-3.5 h-3.5" />
+              <span>Liên kết LHU</span>
+            </button>
           </div>
         )}
 

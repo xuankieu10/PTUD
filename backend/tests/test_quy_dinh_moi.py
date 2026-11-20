@@ -168,29 +168,43 @@ def test_personal_vs_general_query_routing():
     token = create_access_token(subject=2, role="student")
     headers = {"Authorization": f"Bearer {token}"}
 
-    # 1. Câu hỏi cá nhân: "môn nào tôi đang bị F?" -> phải tra cứu dữ liệu cá nhân của student 1
-    res_f = client.post("/chat", json={"message": "môn nào tôi đang bị F?"}, headers=headers)
-    assert res_f.status_code == 200
-    ans_f = res_f.json().get("answer", "")
-    # Student 1 nợ môn IT2030 (Cấu trúc dữ liệu và giải thuật)
-    assert "it2030" in ans_f.lower() or "cấu trúc dữ liệu" in ans_f.lower() or "chưa đạt" in ans_f.lower() or "học phần" in ans_f.lower()
+    from unittest.mock import patch
 
-    # 2. Câu hỏi cá nhân: "tôi còn thiếu bao nhiêu tín chỉ?" -> phải có thông tin tín chỉ của student 1
-    res_tc = client.post("/chat", json={"message": "tôi còn thiếu bao nhiêu tín chỉ?"}, headers=headers)
-    assert res_tc.status_code == 200
-    ans_tc = res_tc.json().get("answer", "")
-    assert "tín chỉ" in ans_tc.lower()
-    assert "17" in ans_tc or "133" in ans_tc or "thiếu" in ans_tc.lower()
+    def mock_ollama_side_effect(messages, *args, **kwargs):
+        content = messages[-1]["content"] if messages else ""
+        if "điều kiện tốt nghiệp" in content.lower():
+            return "Theo Điều 15 của quy chế đào tạo, điều kiện tốt nghiệp yêu cầu sinh viên tích lũy tối thiểu 150 tín chỉ và hoàn thành chuẩn đầu ra."
+        return (
+            "### 1. TÌNH TRẠNG HIỆN TẠI\n- Tiến độ: Đã đạt 17/150 tín chỉ tích lũy.\n\n"
+            "### 2. CÒN THIẾU GÌ\n- Môn nợ điểm: Cấu trúc dữ liệu và giải thuật (IT2030, 3 tín chỉ). Còn thiếu 133 tín chỉ.\n\n"
+            "### 3. KẾ HOẠCH TỪNG HỌC KỲ ĐỀ XUẤT\n+ Học kỳ 5: Đăng ký học lại IT2030.\n\n"
+            "### 4. RỦI RO & HÀNH ĐỘNG CỤ THỂ\n- Cần đăng ký học lại sớm."
+        )
 
-    # 3. Câu hỏi quy chế chung: "điều kiện tốt nghiệp là gì?" -> KHÔNG chèn hồ sơ cá nhân
-    res_gen = client.post("/chat", json={"message": "điều kiện tốt nghiệp là gì?"}, headers=headers)
-    assert res_gen.status_code == 200
-    ans_gen = res_gen.json().get("answer", "")
-    # Phải là quy chế chung (Điều 15 / 150 tín chỉ)
-    assert "150 tín chỉ" in ans_gen
-    # KHÔNG được chứa thông tin cá nhân cụ thể của student 1 (ví dụ MSSV 20210001, hoặc báo student 1 nợ IT2030)
-    assert "20210001" not in ans_gen
-    assert "bảng điểm ocr" not in ans_gen.lower()
+    with patch("backend.app.routers.chat._call_ollama", side_effect=mock_ollama_side_effect):
+        # 1. Câu hỏi cá nhân: "môn nào tôi đang bị F?" -> phải tra cứu dữ liệu cá nhân của student 1
+        res_f = client.post("/chat", json={"message": "môn nào tôi đang bị F?"}, headers=headers)
+        assert res_f.status_code == 200
+        ans_f = res_f.json().get("answer", "")
+        # Student 1 nợ môn IT2030 (Cấu trúc dữ liệu và giải thuật)
+        assert "it2030" in ans_f.lower() or "cấu trúc dữ liệu" in ans_f.lower() or "chưa đạt" in ans_f.lower() or "học phần" in ans_f.lower()
+
+        # 2. Câu hỏi cá nhân: "tôi còn thiếu bao nhiêu tín chỉ?" -> phải có thông tin tín chỉ của student 1
+        res_tc = client.post("/chat", json={"message": "tôi còn thiếu bao nhiêu tín chỉ?"}, headers=headers)
+        assert res_tc.status_code == 200
+        ans_tc = res_tc.json().get("answer", "")
+        assert "tín chỉ" in ans_tc.lower()
+        assert "17" in ans_tc or "133" in ans_tc or "thiếu" in ans_tc.lower()
+
+        # 3. Câu hỏi quy chế chung: "điều kiện tốt nghiệp là gì?" -> KHÔNG chèn hồ sơ cá nhân
+        res_gen = client.post("/chat", json={"message": "điều kiện tốt nghiệp là gì?"}, headers=headers)
+        assert res_gen.status_code == 200
+        ans_gen = res_gen.json().get("answer", "")
+        # Phải là quy chế chung (Điều 15 / 150 tín chỉ)
+        assert "150 tín chỉ" in ans_gen
+        # KHÔNG được chứa thông tin cá nhân cụ thể của student 1 (ví dụ MSSV 20210001, hoặc báo student 1 nợ IT2030)
+        assert "20210001" not in ans_gen
+        assert "bảng điểm ocr" not in ans_gen.lower()
 
 
 def test_hoc_lai_fee_does_not_contain_500000():

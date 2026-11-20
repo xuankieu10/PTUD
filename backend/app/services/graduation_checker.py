@@ -39,12 +39,12 @@ DEFAULT_SUGGESTED_CREDITS_SUMMER = getattr(settings, "SUGGESTED_CREDITS_SUMMER",
 DEFAULT_MAX_CREDITS_PER_SEMESTER = DEFAULT_SUGGESTED_CREDITS_PER_SEMESTER  # Alias tương thích ngược
 DEFAULT_MAX_CREDITS_SUMMER = DEFAULT_SUGGESTED_CREDITS_SUMMER  # Alias tương thích ngược
 DEFAULT_REQUIRED_CREDITS = getattr(settings, "REQUIRED_CREDITS", 150)
-MIN_GRADUATION_GPA = getattr(settings, "MIN_GRADUATION_GPA", 5.0)  # Nguồn: QĐ 1013/QĐ-ĐHLH Mục A.1.2 (GPA toàn khóa >= 5.0 thang 10)
+MIN_GRADUATION_GPA = getattr(settings, "MIN_GRADUATION_GPA", 5.0)  # Nguồn: tóm tắt trên trang web Khoa CNTT (chưa có văn bản gốc QĐ 1013)
 MAX_STANDARD_SEMESTERS = getattr(settings, "MAX_STANDARD_SEMESTERS", 8)  # Nguồn: Niên giám 2023 Mục 7.1
 MAX_EXTENDED_SEMESTERS = getattr(settings, "MAX_EXTENDED_SEMESTERS", 12)  # Nguồn: QĐ 22 Điều 3 Khoản 1
 
 
-def convert_score_to_scale_4(score_10: float, use_plus_grades: bool = False) -> Tuple[float, str]:
+def convert_score_to_scale_4(score_10: float, use_plus_grades: bool = True) -> Tuple[float, str]:
     """
     Quy đổi điểm thang 10 sang thang 4 và điểm chữ theo Quy chế đào tạo LHU (Điều 11 Khoản 5 QĐ 22):
     - Bảng quy đổi chính thức 8 mức (Điều 11 Khoản 5):
@@ -57,9 +57,7 @@ def convert_score_to_scale_4(score_10: float, use_plus_grades: bool = False) -> 
       + 4.0 - 4.9:  D  (1.0) - Đạt
       + Dưới 4.0:   F  (0.0) - Không đạt
       
-    - Chú thích giải tỏa mâu thuẫn 4.0-5.4 và 4.0-4.9:
-      Trong bảng quy chuẩn Điều 11, điểm D chính xác là 4.0 - 4.9 (1.0), còn dải 5.0 - 5.4 thuộc mức D+ (1.5).
-      Các hệ thống cũ không có điểm '+' thường gộp D và D+ thành dải 4.0 - 5.4 (D).
+    - Mặc định use_plus_grades=True theo đúng chuẩn văn bản Điều 11 Khoản 5 QĐ 22.
     """
     if use_plus_grades:
         if score_10 >= 8.5:
@@ -147,7 +145,7 @@ def calculate_academic_summary(courses_history: List[Dict[str, Any]]) -> Dict[st
 
     for c in courses_history:
         code = str(c.get("ma_mon") or c.get("course_code") or c.get("code") or "").strip().upper()
-        name = str(c.get("ten_mon") or c.get("mon") or c.get("name") or "").strip()
+        name = str(c.get("ten_mon") or c.get("course_name") or c.get("mon") or c.get("name") or "").strip()
         tc = c.get("tin_chi") if c.get("tin_chi") is not None else c.get("credits")
         diem = c.get("diem") if c.get("diem") is not None else c.get("grade")
         he_so = c.get("he_so")
@@ -342,7 +340,7 @@ def check_graduation(
 
     for c in raw_courses:
         code = str(c.get("ma_mon") or c.get("course_code") or c.get("code") or "").strip().upper()
-        name = str(c.get("ten_mon") or c.get("mon") or c.get("name") or "").strip()
+        name = str(c.get("ten_mon") or c.get("course_name") or c.get("mon") or c.get("name") or "").strip()
         tc = c.get("tin_chi") if c.get("tin_chi") is not None else c.get("credits")
         diem = c.get("diem") if c.get("diem") is not None else c.get("grade")
         
@@ -452,6 +450,10 @@ def check_graduation(
             # Kiểm tra xem môn tự chọn tương đương (chọn 1 trong 2) đã hoàn thành chưa:
             alt_ma = ELECTIVE_PAIRS.get(ma)
             is_alt_passed = bool(alt_ma and alt_ma in passed_courses_set)
+            if not is_alt_passed and alt_ma:
+                alt_curr = curr_lookup.get(alt_ma)
+                if alt_curr and alt_curr.get("ten_mon"):
+                    is_alt_passed = bool(normalize_course_name(alt_curr["ten_mon"]) in passed_courses_set)
 
             # Đã học, đã nợ, được miễn hoặc đã đạt môn tự chọn tương đương -> bỏ qua
             if is_passed or is_failed or is_unconf or is_exempted or is_alt_passed:
@@ -754,7 +756,7 @@ def build_structured_advisory_text(
 
     gpa_sub = " (tính trên các kỳ hiện có)" if is_partial else ""
     part_1_lines = [
-        f"- Tín chỉ tích lũy: Đã đạt {passed_cr}/{req_cr} tín chỉ.",
+        f"- Tiến độ tín chỉ: Đã đạt {passed_cr}/{req_cr} tín chỉ tích lũy.",
         f"- Điểm trung bình tích lũy (GPA{gpa_sub}): {gpa_10} (thang 10, yêu cầu tốt nghiệp toàn khóa tối thiểu là 5.0) tương đương {gpa_4} (thang 4)."
     ]
     if is_partial:
@@ -815,8 +817,8 @@ def build_structured_advisory_text(
             part_2_lines.append(f"- Môn học cần xác nhận lại ({len(unconfirmed)} môn do thiếu tín chỉ/điểm, chưa tính vào tích lũy/GPA): {'; '.join(u_strs)}.")
 
         missing_certs = []
-        if not certs.get("english"): missing_certs.append("Chứng chỉ Ngoại ngữ (Tiếng Anh Bậc 3 / TOEIC)")
-        if not certs.get("it"): missing_certs.append("Chứng chỉ Tin học (Sát hạch CNTT / MOS / IC3)")
+        if not certs.get("english"): missing_certs.append("Chứng chỉ Ngoại ngữ (chuẩn đầu ra quy định)")
+        if not certs.get("it"): missing_certs.append("Chứng chỉ Tin học (chuẩn đầu ra quy định)")
         if not certs.get("gdqp"): missing_certs.append("Chứng chỉ GDQP-AN")
         if not certs.get("gdtc"): missing_certs.append("3 học phần GDTC (điểm P)")
         if not certs.get("soft_skills"): missing_certs.append("4 chứng chỉ Kỹ năng mềm")
@@ -860,7 +862,7 @@ def build_structured_advisory_text(
     if summary.get("gpa_10", 0.0) < MIN_GRADUATION_GPA:
         part_4_lines.append(
             f"- Cảnh báo GPA: Điểm trung bình tích lũy hiện tại ({summary.get('gpa_10', 0.0)}/10) chưa đạt ngưỡng "
-            f"tối thiểu 5.0 (thang 10) để xét tốt nghiệp theo QĐ 1013 Mục A.1.2. Bạn cần lên kế hoạch học cải thiện điểm các môn bị điểm D hoặc D+."
+            f"tối thiểu 5.0 (thang 10) để xét tốt nghiệp theo tóm tắt trên trang web Khoa CNTT (chưa có văn bản gốc QĐ 1013). Bạn cần lên kế hoạch học cải thiện điểm các môn bị điểm D hoặc D+."
         )
 
     if failed_courses:
@@ -870,7 +872,7 @@ def build_structured_advisory_text(
         part_4_lines.append("- Rủi ro chứng chỉ: Chuẩn đầu ra Ngoại ngữ và Tin học cần nộp trước thời điểm xét tốt nghiệp; sinh viên nên theo dõi lịch thi của Trung tâm Ngoại ngữ - Tin học để đăng ký thi sớm.")
 
     part_4_lines.append("- Thời hạn đăng ký: Đăng ký môn học theo đúng thông báo từng đợt của Phòng Đào tạo trên cổng https://dkmh.lhu.edu.vn.")
-    part_4_lines.append("- Khi cần hỗ trợ học vụ chính thức: Liên hệ Phòng Đào tạo (B101, Cơ sở 1) hoặc Văn phòng Khoa Công nghệ thông tin để được giải quyết các trường hợp đặc biệt.")
+    part_4_lines.append("- Khi cần hỗ trợ học vụ chính thức: Liên hệ Phòng Đào tạo (phòng B.101, Cơ sở 1) hoặc Văn phòng Khoa Công nghệ thông tin để được giải quyết các trường hợp đặc biệt.")
 
     if rag_regulations:
         # Hỗ trợ cả danh sách chuỗi hoặc danh sách dict chunk
@@ -879,10 +881,13 @@ def build_structured_advisory_text(
             if added_count >= 2:
                 break
             if isinstance(r, str) and r.strip():
-                part_4_lines.append(r.strip())
+                clean_r = r.strip().replace("VB1", "Văn bản 1")
+                part_4_lines.append(clean_r)
                 added_count += 1
             elif isinstance(r, dict) and r.get("title"):
-                part_4_lines.append(f"- Căn cứ quy chế: {r.get('title')} (Mục {r.get('section', 'Chung')})")
+                s_title = r.get("title", "").replace("VB1", "Văn bản 1")
+                s_sec = r.get("section", "Chung").replace("VB1", "Văn bản 1")
+                part_4_lines.append(f"- Căn cứ quy chế: {s_title} (Mục {s_sec})")
                 added_count += 1
 
     part_4 = "\n".join(part_4_lines)

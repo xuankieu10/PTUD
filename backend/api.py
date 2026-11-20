@@ -67,12 +67,20 @@ app.add_middleware(
 )
 
 from backend.app.routers import auth, documents, chat, students, transcripts, center
+from backend.app.services.lhu_connector import build_router as build_lhu_router
+from backend.app.deps import get_current_user
+
+def get_current_user_id(current_user: dict = Depends(get_current_user)) -> int:
+    """Dependency lấy users.id của tài khoản đang đăng nhập."""
+    return current_user["id"]
+
 app.include_router(auth.router)
 app.include_router(documents.router)
 app.include_router(chat.router)
 app.include_router(students.router)
 app.include_router(transcripts.router)
 app.include_router(center.router)
+app.include_router(build_lhu_router(get_current_user_id))
 
 import asyncio
 from backend.app.db import SessionLocal

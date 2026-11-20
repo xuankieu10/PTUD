@@ -57,6 +57,12 @@ class Settings(BaseSettings):
     OLLAMA_NUM_CTX: int = 4096
     OLLAMA_NUM_PREDICT: int = 1000
     MAX_IMAGE_DIM: int = 1280  # Cạnh dài ảnh tối đa <= 1280px
+
+    # Cổng trường LHU (DKMH)
+    LHU_PORTAL_URL: str = "https://dkmh.lhu.edu.vn/api"
+    LHU_SESSION_TTL_SECONDS: int = 1800  # 30 phút
+    LHU_LOCKOUT_ATTEMPTS: int = 5
+    LHU_LOCKOUT_SECONDS: int = 900  # 15 phút
     
     # Tư vấn học vụ & Tùy chọn LLM
     ADVISORY_USE_LLM: bool = True  # True: Dùng LLM format lại 4 phần; False: Dùng bản dựng sẵn từ code (cho máy yếu)

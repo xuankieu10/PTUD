@@ -337,3 +337,105 @@ export const healthApi = {
     }
   },
 };
+
+export interface LhuLinkStatus {
+  linked: boolean;
+  expired?: boolean;
+  student_id: string | null;
+  full_name?: string;
+  expires_at?: number;
+  expires_in_seconds?: number;
+  has_cached_data?: boolean;
+}
+
+export interface LhuLinkResult {
+  success: boolean;
+  message: string;
+  student?: {
+    student_id: string;
+    full_name?: string;
+    major?: string;
+    cohort?: string;
+  };
+  gpa_portal?: number;
+  total_courses?: number;
+  passed_courses_count?: number;
+  failed_courses_count?: number;
+  certificates_count?: number;
+  expires_in_seconds?: number;
+}
+
+export const lhuApi = {
+  async getStatus(): Promise<LhuLinkStatus> {
+    const res = await fetch(`${API_BASE_URL}/lhu/status`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      if (res.status === 401) {
+        return { linked: false, expired: true, student_id: null };
+      }
+      throw new Error(`Lỗi kiểm tra trạng thái LHU (${res.status})`);
+    }
+    return await res.json();
+  },
+
+  async link(studentId: string, password: string): Promise<LhuLinkResult> {
+    const res = await fetch(`${API_BASE_URL}/lhu/link`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ student_id: studentId, password }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      const detail = err.detail || `Lỗi máy chủ (${res.status})`;
+      if (res.status === 401) {
+        throw new Error('Mã số sinh viên hoặc mật khẩu cổng trường không chính xác.');
+      } else if (res.status === 429) {
+        throw new Error(detail || 'Tài khoản tạm thời bị khóa 15 phút do nhập sai mật khẩu quá 5 lần.');
+      } else if (res.status === 502) {
+        throw new Error(detail || 'Cổng trường LHU không phản hồi hoặc không trả về mã xác thực (Token).');
+      }
+      throw new Error(detail);
+    }
+
+    return await res.json();
+  },
+
+  async getTranscript(): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/lhu/transcript`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      if (res.status === 401) {
+        throw new Error('Phiên làm việc LHU đã hết hạn. Vui lòng liên kết lại.');
+      }
+      throw new Error(`Lỗi tải bảng điểm LHU (${res.status})`);
+    }
+    return await res.json();
+  },
+
+  async getCertificates(): Promise<any[]> {
+    const res = await fetch(`${API_BASE_URL}/lhu/certificates`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      if (res.status === 401) {
+        throw new Error('Phiên làm việc LHU đã hết hạn. Vui lòng liên kết lại.');
+      }
+      throw new Error(`Lỗi tải chứng chỉ LHU (${res.status})`);
+    }
+    return await res.json();
+  },
+
+  async unlink(): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/lhu/link`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      throw new Error(`Lỗi hủy liên kết LHU (${res.status})`);
+    }
+    return await res.json();
+  },
+};
