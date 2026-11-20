@@ -8,6 +8,8 @@ Kiểm thử các quy định cập nhật theo Tong_hop_quy_che_dao_tao_hoc_vu_
 """
 
 import pytest
+
+pytestmark = pytest.mark.db
 from sqlalchemy import text
 from backend.app.db import SessionLocal
 from backend.app.services.retrieval import search_chunks

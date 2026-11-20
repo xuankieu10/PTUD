@@ -322,9 +322,11 @@ def test_greeting_stream():
 # ─── TESTS CHO VIỆC 3: GIẢM BẮT NHẦM REGEX DÍNH ANH-VIỆT ────────────────────────
 
 @pytest.mark.parametrize("safe_word", ["PowerPoint", "JavaScript", "eLearning", "TypeScript"])
+@patch("backend.app.routers.chat.search_chunks")
 @patch("backend.app.routers.chat._call_ollama")
-def test_chat_guard_safe_words_no_retry(mock_ollama, safe_word):
+def test_chat_guard_safe_words_no_retry(mock_ollama, mock_search, safe_word):
     """Câu chứa từ an toàn (PowerPoint, JavaScript...) không bị coi là dính tiếng Anh -> Không retry (call_count == 1)."""
+    mock_search.return_value = [{"document_id": 1, "title": "Quy định", "chunk_index": 0, "score": 0.85, "content": "Nộp bài tập theo định dạng yêu cầu."}]
     headers = make_headers()
     mock_ollama.return_value = f"Sinh viên cần nộp bài báo cáo định dạng {safe_word} theo quy định của môn học."
     res = client.post("/chat", json={"message": "Quy định nộp bài tập thế nào?"}, headers=headers)

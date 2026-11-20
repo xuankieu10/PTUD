@@ -12,6 +12,7 @@ def test_chunk_text():
 
 from unittest.mock import patch
 
+@pytest.mark.db
 def test_login_wrong_credentials():
     response = client.post("/auth/login", json={"username": "admin", "password": "wrong_password"})
     assert response.status_code == 401

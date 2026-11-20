@@ -127,3 +127,26 @@ def test_real_output_integration():
     
     assert swe["mon_bi_chan"] == []
     assert swe["do_uu_tien"] >= 1.0 and swe["do_uu_tien"] <= 10.0
+
+
+def test_missing_credits_excluded_and_zero_credit_valid(sample_curriculum):
+    """
+    Test 4:
+    - Môn có tin_chi=None (và không có trong curriculum): bị loại khỏi danh sách xếp lịch.
+    - Môn có tin_chi=0 (môn điều kiện / hệ số 0): là giá trị hợp lệ, vẫn được xếp hạng.
+    """
+    failed_courses = [
+        {"mon_hoc": "Môn thiếu tín chỉ", "ma_mon": "NO_TC", "tin_chi": None, "diem": 2.0},
+        {"mon_hoc": "Môn 0 tín chỉ", "ma_mon": "ZERO_TC", "tin_chi": 0, "diem": 2.0},
+        {"mon_hoc": "Nhập môn Lập trình", "ma_mon": "CS101", "tin_chi": 3, "diem": 3.0}
+    ]
+
+    results = rank_priority(failed_courses, sample_curriculum)
+
+    result_codes = [r["ma_mon"] for r in results]
+    # Môn thiếu tín chỉ bị loại
+    assert "NO_TC" not in result_codes
+    # Môn 0 tín chỉ và CS101 được giữ lại
+    assert "ZERO_TC" in result_codes
+    assert "CS101" in result_codes
+    assert len(results) == 2

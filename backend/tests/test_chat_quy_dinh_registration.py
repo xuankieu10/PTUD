@@ -10,6 +10,8 @@ Kiểm thử các câu hỏi về Quy chế đào tạo mới và xử lý trễ
 """
 
 import pytest
+
+pytestmark = pytest.mark.db
 from datetime import datetime, timedelta
 from unittest.mock import patch
 from fastapi.testclient import TestClient

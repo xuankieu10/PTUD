@@ -1,5 +1,7 @@
 import io
 import pytest
+
+pytestmark = pytest.mark.db
 from datetime import datetime, timezone, timedelta
 from jose import jwt
 from fastapi.testclient import TestClient

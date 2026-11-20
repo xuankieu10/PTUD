@@ -81,6 +81,7 @@ def test_parse_docx_all_16_chunks():
         assert "google.com/url" not in c["content"]
 
 
+@pytest.mark.db
 def test_ingest_quy_dinh_idempotent():
     """Kiểm tra tính idempotent của ingest: nạp lại không bị duplicate chunks."""
     # Chạy lần 1

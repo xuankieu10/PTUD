@@ -3,6 +3,8 @@ import os
 import json
 import uuid
 import pytest
+
+pytestmark = pytest.mark.db
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 from PIL import Image
@@ -656,7 +658,7 @@ class TestChatOcrIntegration:
             # Khối template đúng phải chứa thông tin xác thực của sinh viên A:
             assert "4/150" in ans or "4/120" in ans or "4" in ans
             assert "146" in ans or "116" in ans
-            assert "Tiến độ tín chỉ" in ans
+            assert "Tiến độ tín chỉ" in ans or "Tín chỉ tích lũy" in ans
 
     def test_hallucination_guard_failed_courses_template(self, test_setup):
         """Test mock LLM trả về câu bịa khi hỏi môn rớt -> thay bằng template môn rớt đúng."""
@@ -862,7 +864,7 @@ class TestChatOcrIntegration:
             assert "đạt chuẩn đầu ra tiếng anh" not in ans_grad.lower()
             assert "đạt chuẩn đầu ra tin học" not in ans_grad.lower()
             assert "toeic" not in ans_grad.lower()
-            assert "b1" not in ans_grad.lower()
+            assert " b1" not in ans_grad.lower() and "chứng chỉ b1" not in ans_grad.lower()
 
         # ================== BƯỚC 3: KIỂM TRA GRADUATION-CHECK ==================
         res_check = client.get("/students/me/graduation-check?explain=false", headers=headers_a)

@@ -23,8 +23,9 @@ from backend.app.config import settings
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_OLLAMA_HOST = "http://localhost:11434"
-DEFAULT_VISION_MODEL = getattr(settings, "OLLAMA_VISION_MODEL", "qwen2.5vl:3b")
+DEFAULT_OLLAMA_HOST = getattr(settings, "OLLAMA_BASE_URL", "http://localhost:11434")
+DEFAULT_VISION_MODEL = getattr(settings, "VLM_MODEL", getattr(settings, "OLLAMA_VISION_MODEL", "qwen2.5vl:7b"))
+DEFAULT_IMAGE_DIM = getattr(settings, "MAX_IMAGE_DIM", 1280)
 
 DEFAULT_TIMEOUT = getattr(settings, "OCR_TIMEOUT_SECONDS", getattr(settings, "OLLAMA_TIMEOUT_OCR", 300))
 
@@ -32,13 +33,16 @@ PRIMARY_PROMPT = (
     "Bạn là trợ lý AI chuyên đọc bảng điểm học sinh / sinh viên từ ảnh.\n"
     "Trong ảnh là bảng điểm gồm nhiều dòng môn học xếp từ trên xuống dưới.\n"
     "Nhiệm vụ: Duyệt TẤT CẢ các dòng trong bảng từ trên xuống dưới và trích xuất TOÀN BỘ các môn học có trong bảng:\n"
-    "- Tên môn học: lấy ở cột 'Tên môn học' (bỏ qua mã số môn).\n"
-    "- Điểm số: lấy điểm tổng kết ở cột 'Điểm trung bình' (hoặc cột điểm thành phần cuối cùng bên phải).\n"
+    "- Mã môn học: cột 'Mã môn' hoặc 'Mã HP' (nếu có, không có thì để chuỗi rỗng '').\n"
+    "- Tên môn học: cột 'Tên môn học' hoặc 'Tên học phần'.\n"
+    "- Số tín chỉ: cột 'Số TC' hoặc 'Tín chỉ' (số nguyên, nếu không có để null).\n"
+    "- Điểm số: lấy điểm tổng kết ở cột 'Điểm TB' / 'Điểm TK' / 'Điểm chữ' hoặc cột điểm cuối cùng.\n"
+    "- Học kỳ: cột 'Học kỳ' (nếu có, ví dụ 1, 2, 'HK1', không có để null).\n"
     "Yêu cầu định dạng đầu ra: một đối tượng JSON có key 'danh_sach' chứa mảng toàn bộ các môn học:\n"
     '{\n'
     '  "danh_sach": [\n'
-    '    {"mon": "Tên môn 1", "diem": 8.6},\n'
-    '    {"mon": "Tên môn 2", "diem": 8.9}\n'
+    '    {"ma_mon": "102073", "ten_mon": "Toán cao cấp 1", "tin_chi": 4, "diem": 8.5, "hoc_ky": 1},\n'
+    '    {"ma_mon": "111094", "ten_mon": "Nhập môn lập trình", "tin_chi": 2, "diem": 3.5, "hoc_ky": 1}\n'
     '  ]\n'
     '}\n'
     "chỉ trả JSON, không thêm giải thích."
@@ -47,15 +51,27 @@ PRIMARY_PROMPT = (
 RETRY_PROMPT = (
     "LỖI: Bạn cần trích xuất ĐẦY ĐỦ TẤT CẢ các dòng môn học trong bảng từ trên xuống dưới. "
     "Trả về định dạng JSON object: "
-    '{"danh_sach": [{"mon": "Tên môn 1", "diem": 8.6}, {"mon": "Tên môn 2", "diem": 8.9}, ...]}. '
+    '{"danh_sach": [{"ma_mon": "...", "ten_mon": "...", "tin_chi": 3, "diem": 8.0, "hoc_ky": 1}, ...]}. '
     "chỉ trả JSON, không thêm giải thích."
 )
 
 
-def optimize_image_for_vision(img: Image.Image, max_dim: int = 1600) -> Image.Image:
+def unload_model(model_name: str, host: str = DEFAULT_OLLAMA_HOST):
     """
-    Thu nhỏ ảnh nếu quá lớn để tăng tốc độ suy luận của mô hình Vision trên CPU/GPU.
-    Mức 1600px đảm bảo giữ nguyên độ sắc nét của bảng nhiều dòng và tối ưu VRAM.
+    Giải phóng mô hình khỏi VRAM ngay lập tức bằng cách gọi keep_alive=0 tới Ollama.
+    Tối ưu cho máy chỉ có 4GB VRAM để nạp tuần tự 1 model duy nhất.
+    """
+    try:
+        url = f"{host.rstrip('/')}/api/generate"
+        requests.post(url, json={"model": model_name, "keep_alive": 0}, timeout=5)
+        logger.info(f"Đã giải phóng VRAM mô hình '{model_name}'.")
+    except Exception as e:
+        logger.warning(f"Không thể giải phóng mô hình '{model_name}': {e}")
+
+
+def optimize_image_for_vision(img: Image.Image, max_dim: int = DEFAULT_IMAGE_DIM) -> Image.Image:
+    """
+    Thu nhỏ ảnh nếu cạnh dài lớn hơn max_dim (mặc định <= 1280px) để tối ưu VRAM (4GB) và tăng tốc suy luận.
     """
     w, h = img.size
     if max(w, h) > max_dim:
@@ -65,9 +81,10 @@ def optimize_image_for_vision(img: Image.Image, max_dim: int = 1600) -> Image.Im
     return img
 
 
-def encode_image_to_base64(image_input: Union[str, Image.Image, np.ndarray], max_dim: int = 1600) -> str:
+def encode_image_to_base64(image_input: Union[str, Image.Image, np.ndarray], max_dim: int = DEFAULT_IMAGE_DIM) -> str:
     """
     Chuyển đổi file ảnh, đối tượng PIL Image hoặc numpy BGR array sang chuỗi base64.
+    Đảm bảo kích thước ảnh luôn <= max_dim (1280px).
     """
     if isinstance(image_input, str):
         with Image.open(image_input) as pil_img:
@@ -153,7 +170,8 @@ def clean_and_parse_json(raw_response: str) -> List[Dict[str, Any]]:
 
 def _normalize_subject_list(raw_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    Chuẩn hóa các khóa và kiểu dữ liệu về dạng: {"mon": str, "diem": float}
+    Chuẩn hóa các khóa và kiểu dữ liệu về schema đầy đủ:
+    {"ma_mon": str, "ten_mon": str, "tin_chi": int, "diem": float, "hoc_ky": Any, "mon": str}
     """
     normalized = []
     for idx, item in enumerate(raw_list):
@@ -162,11 +180,32 @@ def _normalize_subject_list(raw_list: List[Dict[str, Any]]) -> List[Dict[str, An
 
         # Tìm tên môn
         mon = (
-            item.get("mon")
+            item.get("ten_mon")
+            or item.get("mon")
             or item.get("mon_hoc")
-            or item.get("ten_mon")
             or item.get("subject")
             or item.get("name")
+        )
+        # Tìm mã môn
+        ma_mon = (
+            item.get("ma_mon")
+            or item.get("ma_hp")
+            or item.get("course_code")
+            or item.get("code")
+            or ""
+        )
+        # Tìm tín chỉ
+        tc_val = (
+            item.get("tin_chi")
+            or item.get("so_tc")
+            or item.get("credits")
+            or item.get("tc")
+        )
+        # Tìm học kỳ
+        hk_val = (
+            item.get("hoc_ky")
+            or item.get("semester")
+            or item.get("hk")
         )
         # Tìm điểm số
         diem_val = (
@@ -184,15 +223,29 @@ def _normalize_subject_list(raw_list: List[Dict[str, Any]]) -> List[Dict[str, An
             continue
 
         mon_str = str(mon).strip()
+        ma_mon_str = str(ma_mon).strip() if ma_mon else ""
+
+        # Parse tín chỉ
+        tin_chi_int = None
+        if tc_val is not None:
+            try:
+                tin_chi_int = int(float(str(tc_val).strip()))
+            except Exception:
+                tin_chi_int = None
+
+        # Parse học kỳ
+        hoc_ky_parsed = None
+        if hk_val is not None:
+            hk_s = str(hk_val).strip()
+            m_hk = re.search(r"\d+", hk_s)
+            hoc_ky_parsed = int(m_hk.group(0)) if m_hk else hk_s
 
         # Chuyển đổi điểm số sang float
         try:
             if isinstance(diem_val, (int, float)):
                 diem_float = float(diem_val)
             else:
-                # Xử lý chuỗi điểm có dấu phẩy '7,5' hoặc ký hiệu
                 clean_str = str(diem_val).replace(",", ".").strip()
-                # Tìm số thực đầu tiên trong chuỗi
                 match_num = re.search(r"\d+(\.\d+)?", clean_str)
                 if match_num:
                     diem_float = float(match_num.group(0))
@@ -204,11 +257,20 @@ def _normalize_subject_list(raw_list: List[Dict[str, Any]]) -> List[Dict[str, An
             diem_float = 0.0
 
         item_dict: Dict[str, Any] = {
+            "ma_mon": ma_mon_str,
+            "ten_mon": mon_str,
+            "tin_chi": tin_chi_int,
+            "diem": round(diem_float, 2),
+            "hoc_ky": hoc_ky_parsed,
+            # Dual-mapping tương thích ngược hoàn toàn
             "mon": mon_str,
-            "diem": round(diem_float, 2)
+            "course_code": ma_mon_str,
+            "course_name": mon_str,
+            "credits": tin_chi_int,
+            "grade": round(diem_float, 2),
+            "semester": hoc_ky_parsed
         }
 
-        # Nếu model có trả về bounding box (tùy chọn)
         if "bbox" in item:
             item_dict["bbox"] = item["bbox"]
 
@@ -229,7 +291,7 @@ def resolve_vision_model(model_name: str, host: str = DEFAULT_OLLAMA_HOST) -> st
             installed = [m.get("name", "") for m in r.json().get("models", [])]
             if any(target in m for m in installed):
                 return target
-            for fallback in [DEFAULT_VISION_MODEL, "qwen2.5vl:3b", "qwen2.5vl:7b", "qwen2.5vl", "llava"]:
+            for fallback in [DEFAULT_VISION_MODEL, "qwen2.5vl:7b", "qwen2.5vl:3b", "qwen2.5vl", "llava"]:
                 for m in installed:
                     if fallback in m:
                         return m
@@ -247,6 +309,7 @@ def query_ollama(
 ) -> str:
     """
     Gửi request tới API Ollama `/api/generate`.
+    Sử dụng VLM_KEEP_ALIVE ngắn để giải phóng VRAM ngay sau khi hoàn thành.
     """
     model = resolve_vision_model(model, host)
     url = f"{host.rstrip('/')}/api/generate"
@@ -258,12 +321,13 @@ def query_ollama(
         "prompt": prompt,
         "images": [image_base64],
         "stream": False,
+        "keep_alive": getattr(settings, "VLM_KEEP_ALIVE", "0s"),
         "format": "json",  # Bật chế độ ép JSON của Ollama
         "options": {
             "num_thread": num_threads,
             "num_predict": 1500,
             "temperature": 0.1,
-            "num_ctx": 2048
+            "num_ctx": getattr(settings, "NUM_CTX", 2048)
         }
     }
 
@@ -307,52 +371,57 @@ def extract_grades_from_image(
     2. Parse JSON. Nếu lỗi, ghi log cảnh báo và retry 1 lần với prompt nhấn mạnh hơn.
     """
     image_b64 = encode_image_to_base64(image_input)
-
-    logger.info(f"Đang gửi ảnh tới Ollama Vision (Model: {model}, Host: {host})...")
-    raw_response = query_ollama(PRIMARY_PROMPT, image_b64, model=model, host=host, timeout=timeout)
+    actual_model = resolve_vision_model(model, host)
+    logger.info(f"Đang gửi ảnh tới Ollama Vision (Model: {actual_model}, Host: {host})...")
 
     try:
-        parsed_result = clean_and_parse_json(raw_response)
-        logger.info(f"Lần 1: Trích xuất được {len(parsed_result)} môn học.")
+        raw_response = query_ollama(PRIMARY_PROMPT, image_b64, model=actual_model, host=host, timeout=timeout)
 
-        # Nếu model chỉ đọc 1 dòng đầu tiên trong khi bảng có nhiều dòng, kích hoạt retry bổ sung
-        if len(parsed_result) <= 1 and max_retries > 0:
-            logger.warning("Mô hình mới chỉ trả về 1 dòng môn học. Đang yêu cầu quét tiếp toàn bộ các dòng bên dưới...")
-            retry_multi_prompt = (
-                "CẢNH BÁO: Bạn mới chỉ lấy 1 dòng đầu tiên! "
-                "Trong ảnh là bảng điểm đầy đủ gồm NHIỀU DÒNG từ trên xuống dưới. "
-                "Hãy trích xuất TẤT CẢ các dòng môn học trong bảng thành một mảng JSON đầy đủ: "
-                '[{"mon": "...", "diem": ...}, {"mon": "...", "diem": ...}, ...]. '
-                "chỉ trả JSON, không thêm giải thích."
-            )
-            retry_response = query_ollama(retry_multi_prompt, image_b64, model=model, host=host, timeout=timeout)
-            try:
-                second_result = clean_and_parse_json(retry_response)
-                if len(second_result) > len(parsed_result):
-                    logger.info(f"Quét lại thành công: tìm thấy {len(second_result)} môn học.")
-                    return second_result
-            except Exception as e:
-                logger.warning(f"Lỗi khi quét lại nhiều dòng: {e}")
+        try:
+            parsed_result = clean_and_parse_json(raw_response)
+            logger.info(f"Lần 1: Trích xuất được {len(parsed_result)} môn học.")
 
-        return parsed_result
-    except Exception as parse_error:
-        logger.warning(
-            f"Lần 1: Model trả về sai định dạng JSON. Lỗi: {parse_error}. "
-            f"Nội dung phản hồi thô: {raw_response[:200]}..."
-        )
-
-        if max_retries > 0:
-            logger.info("Tiến hành RETRY 1 lần với prompt nhấn mạnh yêu cầu JSON thuần túy...")
-            retry_response = query_ollama(RETRY_PROMPT, image_b64, model=model, host=host, timeout=timeout)
-            try:
-                parsed_result = clean_and_parse_json(retry_response)
-                logger.info(f"Retry thành công! Trích xuất được {len(parsed_result)} môn học.")
-                return parsed_result
-            except Exception as retry_error:
-                logger.error(f"Retry thất bại. Model vẫn không trả về JSON hợp lệ: {retry_error}")
-                raise ValueError(
-                    f"Không thể phân tích kết quả JSON từ mô hình {model} sau khi retry. "
-                    f"Phản hồi: {retry_response}"
+            # Nếu model chỉ đọc 1 dòng đầu tiên trong khi bảng có nhiều dòng, kích hoạt retry bổ sung
+            if len(parsed_result) <= 1 and max_retries > 0:
+                logger.warning("Mô hình mới chỉ trả về 1 dòng môn học. Đang yêu cầu quét tiếp toàn bộ các dòng bên dưới...")
+                retry_multi_prompt = (
+                    "CẢNH BÁO: Bạn mới chỉ lấy 1 dòng đầu tiên! "
+                    "Trong ảnh là bảng điểm đầy đủ gồm NHIỀU DÒNG từ trên xuống dưới. "
+                    "Hãy trích xuất TẤT CẢ các dòng môn học trong bảng thành một mảng JSON đầy đủ: "
+                    '[{"ma_mon": "...", "ten_mon": "...", "tin_chi": 3, "diem": 8.0, "hoc_ky": 1}, ...]. '
+                    "chỉ trả JSON, không thêm giải thích."
                 )
+                retry_response = query_ollama(retry_multi_prompt, image_b64, model=actual_model, host=host, timeout=timeout)
+                try:
+                    second_result = clean_and_parse_json(retry_response)
+                    if len(second_result) > len(parsed_result):
+                        logger.info(f"Quét lại thành công: tìm thấy {len(second_result)} môn học.")
+                        return second_result
+                except Exception as e:
+                    logger.warning(f"Lỗi khi quét lại nhiều dòng: {e}")
 
-        raise parse_error
+            return parsed_result
+        except Exception as parse_error:
+            logger.warning(
+                f"Lần 1: Model trả về sai định dạng JSON. Lỗi: {parse_error}. "
+                f"Nội dung phản hồi thô: {raw_response[:200]}..."
+            )
+
+            if max_retries > 0:
+                logger.info("Tiến hành RETRY 1 lần với prompt nhấn mạnh yêu cầu JSON thuần túy...")
+                retry_response = query_ollama(RETRY_PROMPT, image_b64, model=actual_model, host=host, timeout=timeout)
+                try:
+                    parsed_result = clean_and_parse_json(retry_response)
+                    logger.info(f"Retry thành công! Trích xuất được {len(parsed_result)} môn học.")
+                    return parsed_result
+                except Exception as retry_error:
+                    logger.error(f"Retry thất bại. Model vẫn không trả về JSON hợp lệ: {retry_error}")
+                    raise ValueError(
+                        f"Không thể phân tích kết quả JSON từ mô hình {actual_model} sau khi retry. "
+                        f"Phản hồi: {retry_response}"
+                    )
+
+            raise parse_error
+    finally:
+        # Giải phóng VRAM của VLM model ngay lập tức để nhường bộ nhớ cho LLM
+        unload_model(actual_model, host)

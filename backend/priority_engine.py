@@ -69,7 +69,11 @@ def rank_priority(
         # Lấy thông số từ failed_courses trước, nếu không có thì lấy từ curriculum
         tin_chi = course.get("tin_chi")
         if tin_chi is None:
-            tin_chi = curr_info.get("tin_chi", 2)
+            tin_chi = curr_info.get("tin_chi")
+            
+        # Môn có tin_chi=None thì loại khỏi kế hoạch xếp lịch (0 tín chỉ là hợp lệ)
+        if tin_chi is None:
+            continue
             
         hoc_ky_de_xuat = curr_info.get("hoc_ky_de_xuat") 
         

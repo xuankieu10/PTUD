@@ -125,3 +125,26 @@ def test_extract_grades_from_pdf_text_layer_text_lines(mock_pdfplumber_open, moc
     assert subjects[1]["mon"] == "Giải tích 1"
     assert subjects[1]["diem"] == 7.0
 
+
+def test_recover_grade_from_components():
+    """Yêu cầu 1: Kiểm tra khôi phục điểm bị mất số đầu (.95, .45) từ điểm thành phần"""
+    from backend.pdf_processor import recover_or_validate_grade
+    # Quá trình: 7.5 (30%), Giữa kỳ: 7 (30%), Cuối kỳ: 6.5 (40%) -> 0.3*7.5 + 0.3*7 + 0.4*6.5 = 6.95
+    val, needs_confirm, note = recover_or_validate_grade(".95", "Quá trình: 7.5 Giữa kỳ: 7 Cuối kỳ: 6.5")
+    assert val == 6.95
+    assert needs_confirm is False
+
+    # Điểm mất đầu .45: Quá trình: 8, Giữa kỳ: 7.5, Cuối kỳ: 7 -> 0.3*8 + 0.3*7.5 + 0.4*7 = 7.45
+    val2, needs_confirm2, note2 = recover_or_validate_grade(".45", "Quá trình: 8 Giữa kỳ: 7.5 Cuối kỳ: 7")
+    assert val2 == 7.45
+    assert needs_confirm2 is False
+
+
+def test_grade_without_components_marked_needs_confirmation():
+    """Yêu cầu 1: Điểm mất số đầu (.45) nhưng không có điểm thành phần thì đánh dấu 'cần xác nhận', không đoán bừa"""
+    from backend.pdf_processor import recover_or_validate_grade
+    val, needs_confirm, note = recover_or_validate_grade(".45", "")
+    assert val is None
+    assert needs_confirm is True
+    assert "cần xác nhận" in note
+

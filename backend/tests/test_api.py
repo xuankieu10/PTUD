@@ -4,6 +4,8 @@ from fastapi.testclient import TestClient
 from backend.api import app, SESSION_CACHE
 from unittest.mock import patch, MagicMock
 
+pytestmark = pytest.mark.db
+
 client = TestClient(app)
 
 def test_health_endpoint():
