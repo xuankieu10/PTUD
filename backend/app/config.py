@@ -59,10 +59,13 @@ class Settings(BaseSettings):
     MAX_IMAGE_DIM: int = 1280  # Cạnh dài ảnh tối đa <= 1280px
 
     # Cổng trường LHU (DKMH)
-    LHU_PORTAL_URL: str = "https://dkmh.lhu.edu.vn/api"
+    LHU_PORTAL_URL: str = "https://tapi.lhu.edu.vn"
     LHU_SESSION_TTL_SECONDS: int = 1800  # 30 phút
     LHU_LOCKOUT_ATTEMPTS: int = 5
     LHU_LOCKOUT_SECONDS: int = 900  # 15 phút
+    DAO_TAO_OFFICE: str = "B101, Cơ sở 1"
+    DKMH_URL: str = "https://dkmh.lhu.edu.vn"
+    GPA4_ROUND_1DP: bool = False  # Làm tròn 1 chữ số thập phân (half-up) cho GPA thang 4 (mặc định False)
     
     # Tư vấn học vụ & Tùy chọn LLM
     ADVISORY_USE_LLM: bool = True  # True: Dùng LLM format lại 4 phần; False: Dùng bản dựng sẵn từ code (cho máy yếu)

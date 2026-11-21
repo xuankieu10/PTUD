@@ -45,6 +45,12 @@ class LHUSession:
         return time.time() >= self.expires_at
 
 
+# Chuẩn header chung cho các API LHU
+LHU_COMMON_HEADERS = {
+    "Accept": "application/json, text/javascript, */*; q=0.01",
+    "Content-Type": "application/json; charset=utf-8",
+}
+
 # In-memory storage (RAM ONLY - Tuyệt đối không lưu DB, log hay file)
 _SESSIONS: Dict[int, LHUSession] = {}
 _FAILED_ATTEMPTS: Dict[str, Dict[str, Any]] = {}
@@ -144,9 +150,12 @@ def login(
 ) -> LHUSession:
     """
     Đăng nhập vào cổng LHU lấy Token xác thực.
+    - POST {BASE}/Security/SignIn (Origin/Referer của me)
+    - Body: {"UserID": "<mssv>", "Password": "<mk>", "DeviceInfo": "{0}{WebAuth}{LHU AI Advisor}"}
     - Token CHỈ lưu trong RAM, TTL 30 phút.
     - Tuyệt đối không log mật khẩu hoặc body request.
     - Khóa tạm 15 phút sau 5 lần sai mật khẩu liên tiếp.
+    - Chỉ đọc đúng khóa "Token". Không có Token = sai đăng nhập (HTTP 401).
     """
     clean_sid = str(student_id).strip()
     clean_pwd = str(password).strip()
@@ -160,16 +169,19 @@ def login(
     # 1. Kiểm tra lockout
     _check_and_update_lockout(clean_sid, is_success=False)
 
-    portal_url = getattr(settings, "LHU_PORTAL_URL", "https://dkmh.lhu.edu.vn/api").rstrip("/")
-    login_url = f"{portal_url}/auth/login"
+    portal_url = getattr(settings, "LHU_PORTAL_URL", "https://tapi.lhu.edu.vn").rstrip("/")
+    login_url = f"{portal_url}/Security/SignIn"
 
-    # Chuẩn bị payload (hỗ trợ cả username/password và MaSinhVien/MatKhau của LHU)
+    headers = {
+        **LHU_COMMON_HEADERS,
+        "Origin": "https://me.lhu.edu.vn",
+        "Referer": "https://me.lhu.edu.vn/",
+    }
+
     payload = {
-        "username": clean_sid,
-        "password": clean_pwd,
-        "student_id": clean_sid,
-        "MaSinhVien": clean_sid,
-        "MatKhau": clean_pwd
+        "UserID": clean_sid,
+        "Password": clean_pwd,
+        "DeviceInfo": "{0}{WebAuth}{LHU AI Advisor}",
     }
 
     should_close_client = False
@@ -178,7 +190,7 @@ def login(
         should_close_client = True
 
     try:
-        resp = client.post(login_url, json=payload)
+        resp = client.post(login_url, json=payload, headers=headers)
     except httpx.RequestError as e:
         logger.error("Lỗi mạng khi kết nối tới cổng trường LHU: %s", type(e).__name__)
         raise HTTPException(
@@ -212,21 +224,24 @@ def login(
             detail="Hệ thống trường trả về định dạng dữ liệu không hợp lệ."
         )
 
-    # 3. Trích xuất Token (Test: không có Token trong response -> 502)
-    token = data.get("Token") or data.get("token") or data.get("access_token")
+    # 3. Trích xuất Token: Chỉ đọc đúng khóa "Token". Không có Token = sai đăng nhập (HTTP 401).
+    token = data.get("Token")
     if not token:
         logger.error("Phản hồi đăng nhập từ cổng trường thiếu trường Token.")
+        _record_failed_attempt(clean_sid)
         raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Hệ thống trường không trả về mã xác thực (Token)."
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Mã số sinh viên hoặc mật khẩu cổng trường không chính xác."
         )
 
     # Đăng nhập thành công -> Reset trạng thái khóa
     _check_and_update_lockout(clean_sid, is_success=True)
 
-    # Trích xuất thông tin sinh viên từ phản hồi đăng nhập (nếu có)
+    # Trích xuất thông tin sinh viên từ phản hồi đăng nhập
+    full_name = data.get("UserName")
     stu_info = data.get("student") or data.get("Student") or {}
-    full_name = stu_info.get("full_name") or stu_info.get("HoTen")
+    if not full_name:
+        full_name = stu_info.get("full_name") or stu_info.get("HoTen")
     major = stu_info.get("major") or stu_info.get("Nganh")
     cohort = stu_info.get("cohort") or stu_info.get("Khoa")
 
@@ -249,8 +264,12 @@ def fetch_transcript(
     client: Optional[httpx.Client] = None
 ) -> Dict[str, Any]:
     """
-    Lấy bảng điểm trực tiếp từ cổng LHU bằng Bearer Token trong session.
-    Trả về định dạng:
+    Lấy bảng điểm trực tiếp từ cổng LHU bằng Bearer Token trong session:
+    - POST {BASE}/mark/MarkViewer_GetBangDiem (Origin/Referer của mark)
+    - KHÔNG có body (content=b"", Content-Length: 0), chứng thực hoàn toàn qua Bearer token.
+    - Response: {"StudentID", "HoTen", "LopID", "TinhTrang", "DiemTB", "data": [{"HocKy", "KyThiID", "MonHocID", "TenMH", "HeSo", "DiemTBMon", "SoLanThi", "Dau", "KyThiThayThe", "DangKyThiLai", "UpdateTime", "DiemThanhPhan"}]}
+    - Map: ma_mon=MonHocID, ten_mon=TenMH, tin_chi=HeSo (đối chiếu DB), diem=DiemTBMon, dat=Dau, hoc_ky=HocKy, so_lan_thi=SoLanThi, cap_nhat=UpdateTime.
+    - Trả về định dạng:
     {
       "student": {"student_id", "full_name", "major", "cohort"},
       "gpa_portal": float,
@@ -265,17 +284,22 @@ def fetch_transcript(
             detail="Phiên làm việc LHU đã hết hạn. Vui lòng liên kết lại."
         )
 
-    portal_url = getattr(settings, "LHU_PORTAL_URL", "https://dkmh.lhu.edu.vn/api").rstrip("/")
-    transcript_url = f"{portal_url}/bang-diem"
+    portal_url = getattr(settings, "LHU_PORTAL_URL", "https://tapi.lhu.edu.vn").rstrip("/")
+    transcript_url = f"{portal_url}/mark/MarkViewer_GetBangDiem"
 
-    headers = {"Authorization": f"Bearer {session.token}"}
+    headers = {
+        **LHU_COMMON_HEADERS,
+        "Authorization": f"Bearer {session.token}",
+        "Origin": "https://mark.lhu.edu.vn",
+        "Referer": "https://mark.lhu.edu.vn/",
+    }
     should_close_client = False
     if client is None:
         client = httpx.Client(timeout=15.0)
         should_close_client = True
 
     try:
-        resp = client.get(transcript_url, headers=headers)
+        resp = client.post(transcript_url, headers=headers, content=b"")
     except httpx.RequestError as e:
         logger.error("Lỗi kết nối khi tải bảng điểm từ cổng trường: %s", type(e).__name__)
         raise HTTPException(
@@ -286,7 +310,7 @@ def fetch_transcript(
         if should_close_client:
             client.close()
 
-    if resp.status_code == 401:
+    if resp.status_code in [401, 403]:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Phiên làm việc LHU đã hết hạn trên cổng trường. Vui lòng liên kết lại."
@@ -306,11 +330,13 @@ def fetch_transcript(
             detail="Dữ liệu bảng điểm từ cổng trường không hợp lệ."
         )
 
-    raw_courses = data.get("courses") or data.get("DanhSachDiem") or data.get("data") or []
+    raw_courses = data.get("data") if isinstance(data, dict) and "data" in data else (data.get("courses") or data.get("DanhSachDiem") or [])
     student_meta = data.get("student") or data.get("SinhVien") or {}
+    full_name_resp = data.get("HoTen") or student_meta.get("full_name") or session.full_name or "Sinh viên"
+    student_id_resp = data.get("StudentID") or session.student_id
 
-    # Trích xuất GPA cổng trường
-    gpa_portal = data.get("gpa_portal") or data.get("DiemTichLuy") or data.get("gpa")
+    # Trích xuất GPA cổng trường (DiemTB)
+    gpa_portal = data.get("DiemTB") if data.get("DiemTB") is not None else (data.get("gpa_portal") or data.get("DiemTichLuy") or data.get("gpa"))
     try:
         gpa_portal_val = round(float(str(gpa_portal).replace(",", ".")), 2) if gpa_portal is not None else 0.0
     except (ValueError, TypeError):
@@ -318,11 +344,11 @@ def fetch_transcript(
 
     parsed_courses = []
     for c in raw_courses:
-        ma_mon = str(c.get("ma_mon") or c.get("MaMon") or c.get("MaHocPhan") or c.get("code") or "").strip().upper()
-        ten_mon = str(c.get("ten_mon") or c.get("TenMon") or c.get("TenHocPhan") or c.get("name") or "").strip()
+        ma_mon = str(c.get("MonHocID") or c.get("ma_mon") or c.get("MaMon") or c.get("MaHocPhan") or c.get("code") or "").strip().upper()
+        ten_mon = str(c.get("TenMH") or c.get("ten_mon") or c.get("TenMon") or c.get("TenHocPhan") or c.get("name") or "").strip()
         
         # Hệ số / tín chỉ map từ HeSo của API
-        raw_he_so = c.get("tin_chi") if c.get("tin_chi") is not None else (c.get("HeSo") if c.get("HeSo") is not None else c.get("credits"))
+        raw_he_so = c.get("HeSo") if c.get("HeSo") is not None else (c.get("tin_chi") if c.get("tin_chi") is not None else c.get("credits"))
         try:
             tin_chi_val = int(raw_he_so) if raw_he_so is not None else 0
         except (ValueError, TypeError):
@@ -331,15 +357,15 @@ def fetch_transcript(
             except Exception:
                 tin_chi_val = 0
 
-        # Điểm số
-        raw_diem = c.get("diem") if c.get("diem") is not None else (c.get("Diem") if c.get("Diem") is not None else (c.get("DiemSo") if c.get("DiemSo") is not None else c.get("grade")))
+        # Điểm số map từ DiemTBMon
+        raw_diem = c.get("DiemTBMon") if c.get("DiemTBMon") is not None else (c.get("diem") if c.get("diem") is not None else (c.get("Diem") if c.get("Diem") is not None else (c.get("DiemSo") if c.get("DiemSo") is not None else c.get("grade"))))
         try:
             diem_val = round(float(str(raw_diem).replace(",", ".")), 2) if raw_diem is not None else None
         except (ValueError, TypeError):
             diem_val = None
 
-        # Cờ đạt
-        raw_dat = c.get("dat") if c.get("dat") is not None else (c.get("Dat") if c.get("Dat") is not None else c.get("is_passed"))
+        # Cờ đạt map từ Dau
+        raw_dat = c.get("Dau") if c.get("Dau") is not None else (c.get("dat") if c.get("dat") is not None else (c.get("Dat") if c.get("Dat") is not None else c.get("is_passed")))
         if raw_dat is not None:
             dat_val = bool(raw_dat)
         elif diem_val is not None:
@@ -347,16 +373,16 @@ def fetch_transcript(
         else:
             dat_val = False
 
-        # Số lần thi
-        so_lan_thi_raw = c.get("so_lan_thi") or c.get("SoLanThi") or 1
+        # Số lần thi map từ SoLanThi
+        so_lan_thi_raw = c.get("SoLanThi") if c.get("SoLanThi") is not None else (c.get("so_lan_thi") or 1)
         try:
             so_lan_thi = int(so_lan_thi_raw)
         except (ValueError, TypeError):
             so_lan_thi = 1
 
-        dang_ky_thi_lai = bool(c.get("dang_ky_thi_lai") or c.get("DangKyThiLai") or False)
-        cap_nhat = str(c.get("cap_nhat") or c.get("UpdateTime") or c.get("NgayCapNhat") or "").strip()
-        hoc_ky = str(c.get("hoc_ky") or c.get("HocKy") or c.get("semester") or "").strip()
+        dang_ky_thi_lai = bool(c.get("DangKyThiLai") if c.get("DangKyThiLai") is not None else (c.get("dang_ky_thi_lai") or False))
+        cap_nhat = str(c.get("UpdateTime") or c.get("cap_nhat") or c.get("NgayCapNhat") or "").strip()
+        hoc_ky = str(c.get("HocKy") or c.get("hoc_ky") or c.get("semester") or "").strip()
 
         parsed_courses.append({
             "hoc_ky": hoc_ky,
@@ -372,8 +398,8 @@ def fetch_transcript(
 
     return {
         "student": {
-            "student_id": session.student_id,
-            "full_name": student_meta.get("full_name") or session.full_name or "Sinh viên",
+            "student_id": student_id_resp,
+            "full_name": full_name_resp,
             "major": student_meta.get("major") or session.major or "Công nghệ thông tin",
             "cohort": student_meta.get("cohort") or session.cohort or ""
         },
@@ -387,8 +413,11 @@ def fetch_certificates(
     client: Optional[httpx.Client] = None
 ) -> List[Dict[str, Any]]:
     """
-    Lấy danh sách chứng chỉ (Ngoại ngữ, Tin học...) từ cổng trường LHU.
-    - MSSV lấy trực tiếp từ session.student_id (không nhận từ client).
+    Lấy danh sách chứng chỉ từ cổng trường LHU:
+    - POST {BASE}/gm//ChungChi_New_SelectChungChiSinhVien (giữ đúng 2 dấu / liên tiếp; Origin/Referer của graduate)
+    - Body: {"StudentID": "<mssv lấy từ phiên đăng nhập, không nhận từ client>"}
+    - Response: {"data": [{"TenChungChiCan", "TenLoaiChungChi", "TinhTrang", "TinhTrangXet", "DuyetChungChi"}]}
+    - Hoàn tất khi TinhTrangXet == 2 hoặc TinhTrang == "Đã hoàn tất".
     - Trả về: [{ten, loai, tinh_trang, hoan_tat, da_duyet}]
     """
     if session.is_expired():
@@ -397,11 +426,16 @@ def fetch_certificates(
             detail="Phiên làm việc LHU đã hết hạn. Vui lòng liên kết lại."
         )
 
-    portal_url = getattr(settings, "LHU_PORTAL_URL", "https://dkmh.lhu.edu.vn/api").rstrip("/")
-    cert_url = f"{portal_url}/chung-chi"
+    portal_url = getattr(settings, "LHU_PORTAL_URL", "https://tapi.lhu.edu.vn").rstrip("/")
+    cert_url = f"{portal_url}/gm//ChungChi_New_SelectChungChiSinhVien"
 
-    headers = {"Authorization": f"Bearer {session.token}"}
-    params = {"student_id": session.student_id}
+    headers = {
+        **LHU_COMMON_HEADERS,
+        "Authorization": f"Bearer {session.token}",
+        "Origin": "https://graduate.lhu.edu.vn",
+        "Referer": "https://graduate.lhu.edu.vn/",
+    }
+    payload = {"StudentID": session.student_id}
 
     should_close_client = False
     if client is None:
@@ -409,7 +443,7 @@ def fetch_certificates(
         should_close_client = True
 
     try:
-        resp = client.get(cert_url, headers=headers, params=params)
+        resp = client.post(cert_url, headers=headers, json=payload)
     except httpx.RequestError as e:
         logger.error("Lỗi kết nối khi tải chứng chỉ từ cổng trường: %s", type(e).__name__)
         raise HTTPException(
@@ -420,7 +454,7 @@ def fetch_certificates(
         if should_close_client:
             client.close()
 
-    if resp.status_code == 401:
+    if resp.status_code in [401, 403]:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Phiên làm việc LHU đã hết hạn trên cổng trường. Vui lòng liên kết lại."
@@ -440,18 +474,25 @@ def fetch_certificates(
             detail="Dữ liệu chứng chỉ từ cổng trường không hợp lệ."
         )
 
-    raw_certs = data if isinstance(data, list) else (data.get("certificates") or data.get("DanhSachChungChi") or data.get("data") or [])
+    raw_certs = data.get("data") if isinstance(data, dict) and "data" in data else (data if isinstance(data, list) else (data.get("certificates") or data.get("DanhSachChungChi") or []))
     parsed_certs = []
 
     for item in raw_certs:
-        ten = str(item.get("ten") or item.get("TenChungChi") or item.get("name") or "").strip()
-        loai = str(item.get("loai") or item.get("LoaiChungChi") or item.get("type") or "").strip()
-        tinh_trang = str(item.get("tinh_trang") or item.get("TinhTrang") or item.get("status") or "").strip()
-        
-        raw_hoan_tat = item.get("hoan_tat") if item.get("hoan_tat") is not None else (item.get("HoanTat") if item.get("HoanTat") is not None else item.get("is_completed"))
-        hoan_tat = bool(raw_hoan_tat) if raw_hoan_tat is not None else ("đạt" in tinh_trang.lower() or "hoàn thành" in tinh_trang.lower())
-        
-        raw_da_duyet = item.get("da_duyet") if item.get("da_duyet") is not None else (item.get("DaDuyet") if item.get("DaDuyet") is not None else True)
+        ten = str(item.get("TenChungChiCan") or item.get("ten") or item.get("TenChungChi") or item.get("name") or "").strip()
+        loai = str(item.get("TenLoaiChungChi") or item.get("loai") or item.get("LoaiChungChi") or item.get("type") or "").strip()
+        tinh_trang = str(item.get("TinhTrang") or item.get("tinh_trang") or item.get("status") or "").strip()
+
+        tinh_trang_xet = item.get("TinhTrangXet")
+        if tinh_trang_xet is not None or "TinhTrang" in item:
+            hoan_tat = bool(tinh_trang_xet == 2 or tinh_trang == "Đã hoàn tất")
+        elif item.get("hoan_tat") is not None:
+            hoan_tat = bool(item.get("hoan_tat"))
+        elif item.get("HoanTat") is not None:
+            hoan_tat = bool(item.get("HoanTat"))
+        else:
+            hoan_tat = bool(tinh_trang_xet == 2 or tinh_trang == "Đã hoàn tất")
+
+        raw_da_duyet = item.get("DuyetChungChi") if item.get("DuyetChungChi") is not None else (item.get("da_duyet") if item.get("da_duyet") is not None else (item.get("DaDuyet") if item.get("DaDuyet") is not None else True))
         da_duyet = bool(raw_da_duyet)
 
         parsed_certs.append({

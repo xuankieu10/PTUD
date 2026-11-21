@@ -66,16 +66,22 @@ def make_mock_transport(handler_func) -> httpx.MockTransport:
 def test_login_success():
     """Kiểm tra đăng nhập LHU thành công: lưu session vào RAM, token không rỗng, TTL 30 phút."""
     def handler(request: httpx.Request) -> httpx.Response:
-        assert request.url.path == "/api/auth/login"
+        assert request.method == "POST"
+        assert request.url.path == "/Security/SignIn"
+        assert request.headers["Accept"] == "application/json, text/javascript, */*; q=0.01"
+        assert "application/json" in request.headers["Content-Type"]
+        assert request.headers["Origin"] == "https://me.lhu.edu.vn"
+        assert request.headers["Referer"] == "https://me.lhu.edu.vn/"
+
         body = json.loads(request.content)
-        assert body["student_id"] == "SV123456"
+        assert body["UserID"] == "SV123456"
+        assert body["Password"] == "valid_password"
+        assert body["DeviceInfo"] == "{0}{WebAuth}{LHU AI Advisor}"
+
         return httpx.Response(200, json={
             "Token": "mock_jwt_token_ram_only_12345",
-            "student": {
-                "full_name": "Nguyen Van A",
-                "major": "Công nghệ thông tin",
-                "cohort": "2021"
-            }
+            "UserName": "Nguyen Van A",
+            "UserID": "SV123456"
         })
 
     client = httpx.Client(transport=make_mock_transport(handler))
@@ -103,8 +109,8 @@ def test_login_wrong_credentials_raises_401():
     assert "không chính xác" in exc_info.value.detail
 
 
-def test_login_response_missing_token_raises_502():
-    """Kiểm tra phản hồi 200 nhưng không có Token -> ném HTTPException 502."""
+def test_login_response_missing_token_raises_401():
+    """Kiểm tra phản hồi 200 nhưng không có trường Token -> coi như sai đăng nhập (HTTP 401)."""
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"message": "Success without token", "data": {}})
 
@@ -112,8 +118,8 @@ def test_login_response_missing_token_raises_502():
     with pytest.raises(HTTPException) as exc_info:
         login(student_id="SV123456", password="valid_password", user_id=1, client=client)
 
-    assert exc_info.value.status_code == 502
-    assert "Token" in exc_info.value.detail
+    assert exc_info.value.status_code == 401
+    assert "không chính xác" in exc_info.value.detail
 
 
 def test_login_portal_offline_raises_502():
@@ -178,7 +184,7 @@ def test_session_expired_raises_401():
 # ==================== UNIT TESTS: FETCH & NORMALIZATION ====================
 
 def test_fetch_transcript_and_certificates():
-    """Kiểm tra fetch_transcript và fetch_certificates đúng định dạng và truyền student_id từ session."""
+    """Kiểm tra fetch_transcript và fetch_certificates đúng đặc tả API LHU thật."""
     session = LHUSession(
         token="valid_token_xyz",
         student_id="123000999",
@@ -187,21 +193,36 @@ def test_fetch_transcript_and_certificates():
     )
 
     def handler_transcript(request: httpx.Request) -> httpx.Response:
+        assert request.method == "POST"
+        assert request.url.path == "/mark/MarkViewer_GetBangDiem"
         assert request.headers["Authorization"] == "Bearer valid_token_xyz"
+        assert request.headers["Accept"] == "application/json, text/javascript, */*; q=0.01"
+        assert "application/json" in request.headers["Content-Type"]
+        assert request.headers["Origin"] == "https://mark.lhu.edu.vn"
+        assert request.headers["Referer"] == "https://mark.lhu.edu.vn/"
+        # Không có body
+        assert request.content == b""
+
         return httpx.Response(200, json={
-            "student": {"full_name": "Tran Van B", "major": "CNTT", "cohort": "2022"},
-            "gpa_portal": 3.25,
-            "courses": [
+            "StudentID": "123000999",
+            "HoTen": "Tran Van B",
+            "LopID": "22CT111",
+            "TinhTrang": "Đang học",
+            "DiemTB": 3.25,
+            "data": [
                 {
-                    "hoc_ky": "Học kỳ 1",
-                    "ma_mon": "102014",
-                    "ten_mon": "Tin học đại cương",
-                    "tin_chi": 3,
-                    "diem": 8.0,
-                    "dat": True,
-                    "so_lan_thi": 1,
-                    "dang_ky_thi_lai": False,
-                    "cap_nhat": "2023-01-10"
+                    "HocKy": "Học kỳ 1",
+                    "KyThiID": 1,
+                    "MonHocID": "102014",
+                    "TenMH": "Tin học đại cương",
+                    "HeSo": 3,
+                    "DiemTBMon": 8.0,
+                    "SoLanThi": 1,
+                    "Dau": True,
+                    "KyThiThayThe": None,
+                    "DangKyThiLai": False,
+                    "UpdateTime": "2023-01-10",
+                    "DiemThanhPhan": []
                 }
             ]
         })
@@ -209,38 +230,57 @@ def test_fetch_transcript_and_certificates():
     client_t = httpx.Client(transport=make_mock_transport(handler_transcript))
     t_data = fetch_transcript(session, client=client_t)
 
+    assert t_data["student"]["student_id"] == "123000999"
     assert t_data["student"]["full_name"] == "Tran Van B"
     assert t_data["gpa_portal"] == 3.25
     assert len(t_data["courses"]) == 1
     assert t_data["courses"][0]["ma_mon"] == "102014"
+    assert t_data["courses"][0]["ten_mon"] == "Tin học đại cương"
+    assert t_data["courses"][0]["tin_chi"] == 3
     assert t_data["courses"][0]["diem"] == 8.0
+    assert t_data["courses"][0]["dat"] is True
 
     def handler_certs(request: httpx.Request) -> httpx.Response:
-        # MSSV phải lấy từ session.student_id trên URL params, không nhận từ client
-        assert request.url.params["student_id"] == "123000999"
+        assert request.method == "POST"
+        # Đường dẫn phải giữ đúng 2 dấu slash //
+        assert request.url.raw_path == b"/gm//ChungChi_New_SelectChungChiSinhVien" or "/gm//ChungChi_New_SelectChungChiSinhVien" in str(request.url)
         assert request.headers["Authorization"] == "Bearer valid_token_xyz"
-        return httpx.Response(200, json=[
-            {
-                "ten": "TOEIC 450",
-                "loai": "Ngoại ngữ",
-                "tinh_trang": "Đạt",
-                "hoan_tat": True,
-                "da_duyet": True
-            },
-            {
-                "ten": "Chuẩn đầu ra Tin học MOS",
-                "loai": "Tin học",
-                "tinh_trang": "Chưa hoàn tất",
-                "hoan_tat": False,
-                "da_duyet": False
-            }
-        ])
+        assert request.headers["Accept"] == "application/json, text/javascript, */*; q=0.01"
+        assert "application/json" in request.headers["Content-Type"]
+        assert request.headers["Origin"] == "https://graduate.lhu.edu.vn"
+        assert request.headers["Referer"] == "https://graduate.lhu.edu.vn/"
+
+        # MSSV phải lấy từ session.student_id trong body JSON, không nhận từ client
+        body = json.loads(request.content)
+        assert body["StudentID"] == "123000999"
+
+        return httpx.Response(200, json={
+            "data": [
+                {
+                    "TenChungChiCan": "TOEIC 450",
+                    "TenLoaiChungChi": "Ngoại ngữ",
+                    "TinhTrang": "Đã hoàn tất",
+                    "TinhTrangXet": 2,
+                    "DuyetChungChi": True
+                },
+                {
+                    "TenChungChiCan": "Chuẩn đầu ra Tin học MOS",
+                    "TenLoaiChungChi": "Tin học",
+                    "TinhTrang": "Chưa hoàn tất",
+                    "TinhTrangXet": 1,
+                    "DuyetChungChi": False
+                }
+            ]
+        })
 
     client_c = httpx.Client(transport=make_mock_transport(handler_certs))
     c_data = fetch_certificates(session, client=client_c)
 
     assert len(c_data) == 2
+    assert c_data[0]["ten"] == "TOEIC 450"
+    assert c_data[0]["loai"] == "Ngoại ngữ"
     assert c_data[0]["hoan_tat"] is True
+    assert c_data[1]["ten"] == "Chuẩn đầu ra Tin học MOS"
     assert c_data[1]["hoan_tat"] is False
 
 
@@ -372,22 +412,40 @@ def test_api_link_status_and_isolation():
     # Mock LHU portal endpoints cho User A
     def mock_lhu_handler(request: httpx.Request) -> httpx.Response:
         url_str = str(request.url)
-        if "/api/auth/login" in url_str:
+        if "/Security/SignIn" in url_str:
             return httpx.Response(200, json={
                 "Token": "token_a_123",
-                "student": {"full_name": "Sinh Vien A", "major": "CNTT"}
+                "UserName": "Sinh Vien A",
+                "UserID": "SV_A_001"
             })
-        elif "/api/bang-diem" in url_str:
+        elif "/mark/MarkViewer_GetBangDiem" in url_str:
             return httpx.Response(200, json={
-                "gpa_portal": 3.4,
-                "courses": [
-                    {"ma_mon": "102014", "ten_mon": "Tin học đại cương", "tin_chi": 3, "diem": 8.0, "dat": True}
+                "StudentID": "SV_A_001",
+                "HoTen": "Sinh Vien A",
+                "DiemTB": 3.4,
+                "data": [
+                    {
+                        "HocKy": "Học kỳ 1",
+                        "MonHocID": "102014",
+                        "TenMH": "Tin học đại cương",
+                        "HeSo": 3,
+                        "DiemTBMon": 8.0,
+                        "Dau": True
+                    }
                 ]
             })
-        elif "/api/chung-chi" in url_str:
-            return httpx.Response(200, json=[
-                {"ten": "TOEIC 550", "loai": "Ngoại ngữ", "tinh_trang": "Đạt", "hoan_tat": True, "da_duyet": True}
-            ])
+        elif "/gm//ChungChi_New_SelectChungChiSinhVien" in url_str or "ChungChi_New_SelectChungChiSinhVien" in url_str:
+            return httpx.Response(200, json={
+                "data": [
+                    {
+                        "TenChungChiCan": "TOEIC 550",
+                        "TenLoaiChungChi": "Ngoại ngữ",
+                        "TinhTrang": "Đã hoàn tất",
+                        "TinhTrangXet": 2,
+                        "DuyetChungChi": True
+                    }
+                ]
+            })
         return httpx.Response(404)
 
     # Monkeypatch httpx.Client trong module lhu_connector để dùng MockTransport
@@ -545,3 +603,163 @@ def test_chat_prioritizes_lhu_and_falls_back_to_ocr():
     assert "Cổng trường LHU" in ocr_lhu["filename"]
     assert "KẾT QUẢ BẢNG ĐIỂM TRÍCH XUẤT TỪ CỔNG TRƯỜNG LHU" in ctx_lhu
     assert "Lập trình hướng đối tượng" in ctx_lhu
+
+
+def test_lhu_connector_request_specification():
+    """
+    Kiểm tra độc lập và tường minh toàn bộ HTTP request gửi đi:
+    1. Đăng nhập: POST {BASE}/Security/SignIn
+       - Header: Origin https://me.lhu.edu.vn, Referer https://me.lhu.edu.vn/
+       - Header: Accept application/json, text/javascript, */*; q=0.01, Content-Type: application/json; charset=utf-8
+       - Body: {"UserID": "221000123", "Password": "mypassword", "DeviceInfo": "{0}{WebAuth}{LHU AI Advisor}"}
+    2. Bảng điểm: POST {BASE}/mark/MarkViewer_GetBangDiem
+       - Header: Authorization: Bearer <token>
+       - Header: Origin https://mark.lhu.edu.vn, Referer https://mark.lhu.edu.vn/
+       - Body: RỖNG (content == b"")
+    3. Chứng chỉ: POST {BASE}/gm//ChungChi_New_SelectChungChiSinhVien (giữ đúng 2 dấu //)
+       - Header: Authorization: Bearer <token>
+       - Header: Origin https://graduate.lhu.edu.vn, Referer https://graduate.lhu.edu.vn/
+       - Body: {"StudentID": "<mssv>"}
+    """
+    captured_requests = []
+
+    def mock_all_endpoints(request: httpx.Request) -> httpx.Response:
+        captured_requests.append(request)
+        url_path = request.url.path
+        raw_path = request.url.raw_path.decode("utf-8")
+
+        if url_path == "/Security/SignIn":
+            return httpx.Response(200, json={
+                "Token": "sample_bearer_token_xyz_999",
+                "UserName": "Le Thi C",
+                "UserID": "221000123"
+            })
+        elif url_path == "/mark/MarkViewer_GetBangDiem":
+            return httpx.Response(200, json={
+                "StudentID": "221000123",
+                "HoTen": "Le Thi C",
+                "LopID": "22CT111",
+                "TinhTrang": "Đang học",
+                "DiemTB": 3.75,
+                "data": [
+                    {
+                        "HocKy": "Học kỳ 1",
+                        "MonHocID": "111070",
+                        "TenMH": "Lập trình hướng đối tượng",
+                        "HeSo": 3,
+                        "DiemTBMon": 9.0,
+                        "SoLanThi": 1,
+                        "Dau": True,
+                        "UpdateTime": "2023-01-15"
+                    }
+                ]
+            })
+        elif "ChungChi_New_SelectChungChiSinhVien" in raw_path:
+            return httpx.Response(200, json={
+                "data": [
+                    {
+                        "TenChungChiCan": "Chứng chỉ Tiếng Anh B1",
+                        "TenLoaiChungChi": "Ngoại ngữ",
+                        "TinhTrang": "Đã hoàn tất",
+                        "TinhTrangXet": 2,
+                        "DuyetChungChi": True
+                    }
+                ]
+            })
+        return httpx.Response(404)
+
+    client = httpx.Client(transport=make_mock_transport(mock_all_endpoints))
+
+    # 1. Gọi login
+    session = login(student_id="221000123", password="mypassword", user_id=42, client=client)
+    assert len(captured_requests) == 1
+    req_login = captured_requests[0]
+    assert req_login.method == "POST"
+    assert req_login.url.path == "/Security/SignIn"
+    assert req_login.headers["Accept"] == "application/json, text/javascript, */*; q=0.01"
+    assert "application/json" in req_login.headers["Content-Type"]
+    assert req_login.headers["Origin"] == "https://me.lhu.edu.vn"
+    assert req_login.headers["Referer"] == "https://me.lhu.edu.vn/"
+    assert "Authorization" not in req_login.headers
+    body_login = json.loads(req_login.content)
+    assert body_login == {
+        "UserID": "221000123",
+        "Password": "mypassword",
+        "DeviceInfo": "{0}{WebAuth}{LHU AI Advisor}"
+    }
+
+    # 2. Gọi fetch_transcript
+    transcript = fetch_transcript(session, client=client)
+    assert len(captured_requests) == 2
+    req_transcript = captured_requests[1]
+    assert req_transcript.method == "POST"
+    assert req_transcript.url.path == "/mark/MarkViewer_GetBangDiem"
+    assert req_transcript.headers["Accept"] == "application/json, text/javascript, */*; q=0.01"
+    assert "application/json" in req_transcript.headers["Content-Type"]
+    assert req_transcript.headers["Origin"] == "https://mark.lhu.edu.vn"
+    assert req_transcript.headers["Referer"] == "https://mark.lhu.edu.vn/"
+    assert req_transcript.headers["Authorization"] == "Bearer sample_bearer_token_xyz_999"
+    assert req_transcript.content == b""  # Không có body, content rỗng b""
+    assert transcript["gpa_portal"] == 3.75
+
+    # 3. Gọi fetch_certificates
+    certs = fetch_certificates(session, client=client)
+    assert len(captured_requests) == 3
+    req_certs = captured_requests[2]
+    assert req_certs.method == "POST"
+    # Kiểm tra URL giữ đúng 2 dấu slash //
+    raw_path_certs = req_certs.url.raw_path.decode("utf-8")
+    assert "/gm//ChungChi_New_SelectChungChiSinhVien" in raw_path_certs
+    assert req_certs.headers["Accept"] == "application/json, text/javascript, */*; q=0.01"
+    assert "application/json" in req_certs.headers["Content-Type"]
+    assert req_certs.headers["Origin"] == "https://graduate.lhu.edu.vn"
+    assert req_certs.headers["Referer"] == "https://graduate.lhu.edu.vn/"
+    assert req_certs.headers["Authorization"] == "Bearer sample_bearer_token_xyz_999"
+    body_certs = json.loads(req_certs.content)
+    assert body_certs == {"StudentID": "221000123"}
+    assert len(certs) == 1
+    assert certs[0]["hoan_tat"] is True
+
+
+def test_api_401_403_raises_session_expired():
+    """Kiểm tra khi LHU portal trả về 401 hoặc 403 ở fetch transcript/certificates -> raise HTTPException 401."""
+    session = LHUSession(token="invalid_token", student_id="221000123", user_id=1)
+
+    for status_code in [401, 403]:
+        def handler_err(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(status_code, json={"message": "Unauthorized or Forbidden"})
+
+        client = httpx.Client(transport=make_mock_transport(handler_err))
+
+        with pytest.raises(HTTPException) as exc_t:
+            fetch_transcript(session, client=client)
+        assert exc_t.value.status_code == 401
+        assert "hết hạn" in exc_t.value.detail
+
+        with pytest.raises(HTTPException) as exc_c:
+            fetch_certificates(session, client=client)
+        assert exc_c.value.status_code == 401
+        assert "hết hạn" in exc_c.value.detail
+
+
+def test_certificate_completion_conditions():
+    """Kiểm tra logic hoàn tất chứng chỉ: TinhTrangXet == 2 HOẶC TinhTrang == 'Đã hoàn tất'."""
+    session = LHUSession(token="tok", student_id="SV001", user_id=1)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={
+            "data": [
+                {"TenChungChiCan": "CC1", "TinhTrang": "Đã hoàn tất", "TinhTrangXet": 0},   # TinhTrang == "Đã hoàn tất"
+                {"TenChungChiCan": "CC2", "TinhTrang": "Chờ duyệt", "TinhTrangXet": 2},      # TinhTrangXet == 2
+                {"TenChungChiCan": "CC3", "TinhTrang": "Chưa hoàn tất", "TinhTrangXet": 1},  # Chưa đạt cả 2 -> False
+                {"TenChungChiCan": "CC4", "TinhTrang": "Hết hạn", "TinhTrangXet": 3},        # False
+            ]
+        })
+
+    client = httpx.Client(transport=make_mock_transport(handler))
+    certs = fetch_certificates(session, client=client)
+
+    assert certs[0]["hoan_tat"] is True
+    assert certs[1]["hoan_tat"] is True
+    assert certs[2]["hoan_tat"] is False
+    assert certs[3]["hoan_tat"] is False
