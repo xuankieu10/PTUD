@@ -70,8 +70,8 @@ def test_login_success():
         assert request.url.path == "/Security/SignIn"
         assert request.headers["Accept"] == "application/json, text/javascript, */*; q=0.01"
         assert "application/json" in request.headers["Content-Type"]
-        assert request.headers["Origin"] == "https://me.lhu.edu.vn"
-        assert request.headers["Referer"] == "https://me.lhu.edu.vn/"
+        assert request.headers["Origin"] == "https://app.lhu.edu.vn"
+        assert request.headers["Referer"] == "https://app.lhu.edu.vn/"
 
         body = json.loads(request.content)
         assert body["UserID"] == "SV123456"
@@ -609,7 +609,7 @@ def test_lhu_connector_request_specification():
     """
     Kiểm tra độc lập và tường minh toàn bộ HTTP request gửi đi:
     1. Đăng nhập: POST {BASE}/Security/SignIn
-       - Header: Origin https://me.lhu.edu.vn, Referer https://me.lhu.edu.vn/
+       - Header: Origin https://app.lhu.edu.vn, Referer https://app.lhu.edu.vn/
        - Header: Accept application/json, text/javascript, */*; q=0.01, Content-Type: application/json; charset=utf-8
        - Body: {"UserID": "221000123", "Password": "mypassword", "DeviceInfo": "{0}{WebAuth}{LHU AI Advisor}"}
     2. Bảng điểm: POST {BASE}/mark/MarkViewer_GetBangDiem
@@ -678,8 +678,8 @@ def test_lhu_connector_request_specification():
     assert req_login.url.path == "/Security/SignIn"
     assert req_login.headers["Accept"] == "application/json, text/javascript, */*; q=0.01"
     assert "application/json" in req_login.headers["Content-Type"]
-    assert req_login.headers["Origin"] == "https://me.lhu.edu.vn"
-    assert req_login.headers["Referer"] == "https://me.lhu.edu.vn/"
+    assert req_login.headers["Origin"] == "https://app.lhu.edu.vn"
+    assert req_login.headers["Referer"] == "https://app.lhu.edu.vn/"
     assert "Authorization" not in req_login.headers
     body_login = json.loads(req_login.content)
     assert body_login == {
@@ -763,3 +763,115 @@ def test_certificate_completion_conditions():
     assert certs[1]["hoan_tat"] is True
     assert certs[2]["hoan_tat"] is False
     assert certs[3]["hoan_tat"] is False
+
+
+def test_api_get_summary_success_without_pii():
+    """
+    Kiểm tra endpoint GET /lhu/summary:
+    - Trả về đúng: gpa_portal, gpa (tính bằng code hệ thống), total_accumulated_credits, debt_courses_count.
+    - Trả về danh sách credit_discrepancies (mã môn, HeSo, db_credits).
+    - Trả về danh sách certificates và trạng thái hoàn tất.
+    - TUYỆT ĐỐI KHÔNG chứa thông tin cá nhân (MSSV, Họ tên, Ngày sinh, Token).
+    """
+    from backend.app.deps import get_current_user
+    client = TestClient(app)
+
+    user_test = {"id": 888, "username": "student_test_summary", "role": "student"}
+    app.dependency_overrides[get_current_user] = lambda: user_test
+
+    try:
+        session = LHUSession(
+            token="secret_token_12345",
+            student_id="221009999",
+            user_id=888,
+            full_name="Bui Van An Ninh",
+            expires_at=time.time() + 1800
+        )
+        _SESSIONS[888] = session
+
+        # Giả lập bảng điểm có:
+        # 1. Môn 102014 đạt: 3 tín chỉ, điểm 8.0
+        # 2. Môn 111059 lệch tín chỉ: HeSo API = 2, trong khi CTĐT DB = 3 tín chỉ (điểm 7.0 đạt)
+        # 3. Môn 111062 rớt: 3 tín chỉ, điểm 3.0 (nợ môn)
+        raw_courses = [
+            {"ma_mon": "102014", "ten_mon": "Tin học đại cương", "tin_chi": 3, "diem": 8.0, "dat": True},
+            {"ma_mon": "111059", "ten_mon": "Cơ sở dữ liệu", "tin_chi": 2, "diem": 7.0, "dat": True},
+            {"ma_mon": "111062", "ten_mon": "CTDL & GT", "tin_chi": 3, "diem": 3.0, "dat": False},
+        ]
+        reconciled = reconcile_and_deduplicate_lhu_courses(raw_courses)
+
+        certs = [
+            {"ten": "TOEIC 500", "loai": "Ngoại ngữ", "tinh_trang": "Đạt", "hoan_tat": True, "da_duyet": True},
+            {"ten": "Tin học MOS", "loai": "Tin học", "tinh_trang": "Chưa hoàn tất", "hoan_tat": False, "da_duyet": False}
+        ]
+
+        _CACHED_DATA[888] = {
+            "transcript": {
+                "student": {"student_id": "221009999", "full_name": "Bui Van An Ninh"},
+                "gpa_portal": 3.12,
+                "courses": raw_courses
+            },
+            "reconciled_courses": reconciled,
+            "certificates": certs,
+            "cached_at": time.time()
+        }
+
+        # Gọi endpoint GET /lhu/summary
+        res = client.get("/lhu/summary")
+        assert res.status_code == 200
+        data = res.json()
+
+        # 1. Kiểm tra số liệu tính toán
+        assert data["gpa_portal"] == 3.12
+        assert isinstance(data["gpa"], float)
+        assert data["gpa"] > 0
+        assert data["total_accumulated_credits"] == 6  # 3 TC môn Tin học ĐC + 3 TC môn CSDL (đối chiếu DB)
+        assert data["debt_courses_count"] == 1  # 1 môn CTDL & GT rớt
+
+        # 2. Kiểm tra lệch tín chỉ môn CSDL (HeSo=2 vs DB=3)
+        discrepancies = data["credit_discrepancies"]
+        assert len(discrepancies) == 1
+        disc = discrepancies[0]
+        assert disc["ma_mon"] == "111059"
+        assert disc["he_so"] == 2 or disc["HeSo"] == 2
+        assert disc["db_credits"] == 3
+
+        # 3. Kiểm tra danh sách chứng chỉ
+        assert len(data["certificates"]) == 2
+        assert data["certificates"][0]["ten"] == "TOEIC 500"
+        assert data["certificates"][0]["hoan_tat"] is True
+        assert data["certificates"][1]["ten"] == "Tin học MOS"
+        assert data["certificates"][1]["hoan_tat"] is False
+
+        # 4. KHẲNG ĐỊNH TUYỆT ĐỐI KHÔNG CÓ THÔNG TIN CÁ NHÂN (PII)
+        assert "student_id" not in data
+        assert "student_code" not in data
+        assert "mssv" not in data
+        assert "full_name" not in data
+        assert "ho_ten" not in data
+        assert "date_of_birth" not in data
+        assert "ngay_sinh" not in data
+        assert "token" not in data
+        assert "token" not in str(data).lower()
+        assert "221009999" not in str(data)
+        assert "Bui Van An Ninh" not in str(data)
+
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_api_get_summary_unauthorized_when_not_linked():
+    """Kiểm tra khi chưa liên kết hoặc phiên hết hạn -> GET /lhu/summary trả về 401."""
+    from backend.app.deps import get_current_user
+    client = TestClient(app)
+
+    user_unlinked = {"id": 9999, "username": "student_unlinked", "role": "student"}
+    app.dependency_overrides[get_current_user] = lambda: user_unlinked
+
+    try:
+        clear_user_session(9999)
+        res = client.get("/lhu/summary")
+        assert res.status_code == 401
+        assert "hết hạn hoặc chưa liên kết" in res.json()["detail"]
+    finally:
+        app.dependency_overrides.clear()

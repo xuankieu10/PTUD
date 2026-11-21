@@ -1,5 +1,6 @@
 import io
 import os
+import re
 import json
 import uuid
 import pytest
@@ -465,6 +466,11 @@ class TestChatOcrIntegration:
       (c) không có dữ liệu của sinh viên khác.
     """
 
+    @pytest.fixture(autouse=True)
+    def mock_chat_search_chunks(self):
+        with patch("backend.app.routers.chat.search_chunks", return_value=[]):
+            yield
+
     def test_ocr_and_graduation_in_chat_prompt_with_mock_llm(self, test_setup):
         user_a = test_setup["user_a"]
         user_b = test_setup["user_b"]
@@ -864,7 +870,7 @@ class TestChatOcrIntegration:
             assert "đạt chuẩn đầu ra tiếng anh" not in ans_grad.lower()
             assert "đạt chuẩn đầu ra tin học" not in ans_grad.lower()
             assert "toeic" not in ans_grad.lower()
-            assert "b1" not in ans_grad.lower()
+            assert not re.search(r"\b(chứng chỉ\s+)?b1\b", ans_grad.lower())
 
         # ================== BƯỚC 3: KIỂM TRA GRADUATION-CHECK ==================
         res_check = client.get("/students/me/graduation-check?explain=false", headers=headers_a)

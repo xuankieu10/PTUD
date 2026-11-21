@@ -150,7 +150,7 @@ def login(
 ) -> LHUSession:
     """
     Đăng nhập vào cổng LHU lấy Token xác thực.
-    - POST {BASE}/Security/SignIn (Origin/Referer của me)
+    - POST {BASE}/Security/SignIn (Origin/Referer của app: https://app.lhu.edu.vn)
     - Body: {"UserID": "<mssv>", "Password": "<mk>", "DeviceInfo": "{0}{WebAuth}{LHU AI Advisor}"}
     - Token CHỈ lưu trong RAM, TTL 30 phút.
     - Tuyệt đối không log mật khẩu hoặc body request.
@@ -174,8 +174,8 @@ def login(
 
     headers = {
         **LHU_COMMON_HEADERS,
-        "Origin": "https://me.lhu.edu.vn",
-        "Referer": "https://me.lhu.edu.vn/",
+        "Origin": "https://app.lhu.edu.vn",
+        "Referer": "https://app.lhu.edu.vn/",
     }
 
     payload = {
@@ -597,8 +597,10 @@ def reconcile_and_deduplicate_lhu_courses(
         if db_credits is None:
             db_credits = curriculum_by_name.get(norm_ten)
 
+        is_discrepancy = False
         if db_credits is not None:
             if he_so_val > 0 and db_credits != he_so_val:
+                is_discrepancy = True
                 # Cảnh báo lệch tín chỉ, TUYỆT ĐỐI không ghi PII
                 logger.warning(
                     "Lệch tín chỉ môn '%s' (Mã: %s): HeSo=%s, DB=%s. Ưu tiên tín chỉ từ CTĐT trong DB.",
@@ -612,6 +614,9 @@ def reconcile_and_deduplicate_lhu_courses(
         c_copy = dict(c)
         c_copy["tin_chi"] = resolved_credits
         c_copy["credits"] = resolved_credits
+        c_copy["he_so"] = he_so_val
+        c_copy["db_credits"] = db_credits
+        c_copy["is_credit_discrepancy"] = is_discrepancy
 
         grouped.setdefault(group_key, []).append(c_copy)
 
@@ -669,6 +674,9 @@ def reconcile_and_deduplicate_lhu_courses(
             # Chuẩn số tín chỉ
             "tin_chi": tin_chi,
             "credits": tin_chi,
+            "he_so": best_attempt.get("he_so", tin_chi),
+            "db_credits": best_attempt.get("db_credits"),
+            "is_credit_discrepancy": bool(best_attempt.get("is_credit_discrepancy", False)),
             # Chuẩn điểm số
             "diem": diem_val,
             "grade": diem_val,
@@ -837,6 +845,85 @@ def build_router(get_user_id: Callable[..., int]) -> APIRouter:
         certs = fetch_certificates(session)
         _CACHED_DATA.setdefault(user_id, {})["certificates"] = certs
         return certs
+
+    @router.get("/summary")
+    def get_summary(
+        user_id: int = Depends(get_user_id),
+        db: Session = Depends(get_db)
+    ):
+        """
+        Kiểm tra nhanh thông tin tổng kết học vụ từ LHU (không chứa PII: không MSSV, họ tên, ngày sinh):
+        - gpa_portal, gpa tính bằng code của hệ thống (gpa_system)
+        - tổng tín chỉ tích lũy (total_accumulated_credits)
+        - số môn nợ (debt_courses_count)
+        - danh sách môn có tín chỉ lệch giữa HeSo và DB (credit_discrepancies: mã môn, HeSo, db_credits)
+        - danh sách chứng chỉ và trạng thái hoàn tất (certificates)
+        """
+        session = get_active_session(user_id)
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Phiên làm việc LHU đã hết hạn hoặc chưa liên kết."
+            )
+
+        cached = _CACHED_DATA.get(user_id)
+        if not cached or "reconciled_courses" not in cached or "transcript" not in cached or "certificates" not in cached:
+            raw_transcript = fetch_transcript(session)
+            reconciled = reconcile_and_deduplicate_lhu_courses(raw_transcript.get("courses", []), db=db)
+            raw_certs = fetch_certificates(session)
+            cached = {
+                "transcript": raw_transcript,
+                "reconciled_courses": reconciled,
+                "certificates": raw_certs,
+                "cached_at": time.time()
+            }
+            _CACHED_DATA[user_id] = cached
+
+        transcript = cached.get("transcript", {})
+        reconciled_courses = cached.get("reconciled_courses", [])
+        raw_certs = cached.get("certificates", [])
+
+        # Tính toán bằng code hệ thống chuẩn xác
+        from backend.app.services.graduation_checker import calculate_academic_summary
+        summary_code = calculate_academic_summary(reconciled_courses)
+
+        gpa_portal = transcript.get("gpa_portal", 0.0)
+        gpa_system = summary_code.get("gpa_10", 0.0)
+        total_accumulated_credits = summary_code.get("passed_credits", 0)
+        debt_courses_count = sum(1 for c in reconciled_courses if c.get("status") == "failed" or c.get("is_failed") is True)
+
+        credit_discrepancies = [
+            {
+                "ma_mon": c.get("ma_mon"),
+                "HeSo": c.get("he_so", c.get("tin_chi")),
+                "he_so": c.get("he_so", c.get("tin_chi")),
+                "db_credits": c.get("db_credits")
+            }
+            for c in reconciled_courses
+            if c.get("is_credit_discrepancy")
+        ]
+
+        certs_list = [
+            {
+                "ten": c.get("ten", ""),
+                "loai": c.get("loai", ""),
+                "hoan_tat": bool(c.get("hoan_tat")),
+                "tinh_trang": c.get("tinh_trang", "")
+            }
+            for c in raw_certs
+        ]
+
+        # Tuyệt đối KHÔNG trả MSSV, họ tên, ngày sinh, token
+        return {
+            "gpa_portal": gpa_portal,
+            "gpa": gpa_system,
+            "gpa_system": gpa_system,
+            "gpa_system_4": summary_code.get("gpa_4", 0.0),
+            "total_accumulated_credits": total_accumulated_credits,
+            "debt_courses_count": debt_courses_count,
+            "credit_discrepancies": credit_discrepancies,
+            "certificates": certs_list
+        }
 
     @router.delete("/link")
     def unlink_account(user_id: int = Depends(get_user_id)):
