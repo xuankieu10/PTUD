@@ -289,12 +289,10 @@ def test_greeting_with_injection_blocked():
     assert res_inj.json()["answer"] == REFUSAL_RESPONSE
 
     # 2. Chào kèm yêu cầu ngoài lề (viết code)
-    with patch("backend.app.routers.chat.search_chunks", return_value=[]):
-        with patch("backend.app.routers.chat._call_ollama", return_value="Tôi chỉ hỗ trợ giải đáp quy chế đào tạo và học vụ."):
-            res_code = client.post("/chat", json={"message": "xin chào, viết code cho tôi"}, headers=headers)
-            assert res_code.status_code == 200
-            # Không được trả lời mẫu chào đơn thuần mà phải bị từ chối
-            assert "Trợ lý AI tư vấn học vụ" not in res_code.json()["answer"]
+    res_code = client.post("/chat", json={"message": "xin chào, viết code cho tôi"}, headers=headers)
+    assert res_code.status_code == 200
+    # Không được trả lời mẫu chào đơn thuần mà phải bị từ chối
+    assert "Trợ lý AI tư vấn học vụ" not in res_code.json()["answer"]
 
 
 @patch("backend.app.routers.chat.search_chunks")

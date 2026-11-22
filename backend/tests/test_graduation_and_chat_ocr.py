@@ -466,11 +466,6 @@ class TestChatOcrIntegration:
       (c) không có dữ liệu của sinh viên khác.
     """
 
-    @pytest.fixture(autouse=True)
-    def mock_chat_search_chunks(self):
-        with patch("backend.app.routers.chat.search_chunks", return_value=[]):
-            yield
-
     def test_ocr_and_graduation_in_chat_prompt_with_mock_llm(self, test_setup):
         user_a = test_setup["user_a"]
         user_b = test_setup["user_b"]

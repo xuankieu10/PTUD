@@ -23,6 +23,44 @@ def _is_db_server_running(host="127.0.0.1", port=1433, timeout=0.3) -> bool:
 
 _skipped_db_count = 0
 
+@pytest.fixture(autouse=True)
+def block_unmarked_ollama_network_calls(request, monkeypatch):
+    """
+    Yêu cầu I.8: Chặn gọi mạng tới Ollama trong test không có marker 'ollama'.
+    Nếu code test vô tình gọi sang Ollama (port 11434) mà không gắn marker @pytest.mark.ollama,
+    nó sẽ bị chặn ngay lập tức bằng RuntimeError.
+    """
+    if "ollama" in request.keywords or "network" in request.keywords:
+        return
+
+    import requests
+    orig_send = requests.Session.send
+
+    def patched_send(self, req, *args, **kwargs):
+        if "11434" in str(req.url) or "localhost:11434" in str(req.url):
+            raise RuntimeError(f"Chặn gọi mạng tới Ollama trong test không có marker 'ollama': {req.url}")
+        return orig_send(self, req, *args, **kwargs)
+
+    monkeypatch.setattr(requests.Session, "send", patched_send)
+
+
+@pytest.fixture(autouse=True)
+def auto_mock_ollama_for_non_ollama_tests(request, monkeypatch):
+    """
+    Tự động mock search_chunks trong chat router cho mọi test KHÔNG có marker 'ollama'
+    để test mock LLM không vô tình gọi sang Ollama (http://localhost:11434) gây lỗi 500 hoặc bị chặn.
+    Các test có marker 'ollama' hoặc 'network' vẫn chạy thật.
+    """
+    if "ollama" in request.keywords or "network" in request.keywords:
+        return
+
+    # Mock search_chunks trong chat router trả về danh sách rỗng (tránh trigger embedding và DB tri thức khi chat)
+    try:
+        monkeypatch.setattr("backend.app.routers.chat.search_chunks", lambda *args, **kwargs: [])
+    except Exception:
+        pass
+
+
 def pytest_collection_modifyitems(config, items):
     """Tự động skip CHỈ các test có marker @pytest.mark.db khi SQL Server đang offline."""
     global _skipped_db_count
