@@ -47,14 +47,12 @@ def block_unmarked_ollama_network_calls(request, monkeypatch):
 @pytest.fixture(autouse=True)
 def auto_mock_ollama_for_non_ollama_tests(request, monkeypatch):
     """
-    Tự động mock search_chunks trong chat router cho mọi test KHÔNG có marker 'ollama'
-    để test mock LLM không vô tình gọi sang Ollama (http://localhost:11434) gây lỗi 500 hoặc bị chặn.
-    Các test có marker 'ollama' hoặc 'network' vẫn chạy thật.
+    Mock search_chunks trong chat router CHỈ cho các test có marker 'mock_chat_rag'.
+    Các test khác (không có marker này) hoàn toàn không bị mock.
     """
-    if "ollama" in request.keywords or "network" in request.keywords:
+    if "mock_chat_rag" not in request.keywords:
         return
 
-    # Mock search_chunks trong chat router trả về danh sách rỗng (tránh trigger embedding và DB tri thức khi chat)
     try:
         monkeypatch.setattr("backend.app.routers.chat.search_chunks", lambda *args, **kwargs: [])
     except Exception:

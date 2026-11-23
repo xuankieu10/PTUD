@@ -466,6 +466,7 @@ class TestChatOcrIntegration:
       (c) không có dữ liệu của sinh viên khác.
     """
 
+    @pytest.mark.mock_chat_rag
     def test_ocr_and_graduation_in_chat_prompt_with_mock_llm(self, test_setup):
         user_a = test_setup["user_a"]
         user_b = test_setup["user_b"]
@@ -601,6 +602,7 @@ class TestChatOcrIntegration:
             assert user_a["student_code"] not in user_prompt_b, "Rò rỉ MSSV sinh viên A sang sinh viên B!"
             assert user_a["full_name"] not in user_prompt_b, "Rò rỉ họ tên sinh viên A sang sinh viên B!"
 
+    @pytest.mark.mock_chat_rag
     def test_hallucination_guard_replaces_with_template(self, test_setup):
         """Test mock LLM trả về câu bịa (18 tín chỉ, môn GDQP, 'đổi điểm')
         và kiểm tra hậu kiểm thay bằng template đúng với số liệu xác thực.
@@ -661,6 +663,7 @@ class TestChatOcrIntegration:
             assert "146" in ans or "116" in ans
             assert "Tiến độ tín chỉ" in ans
 
+    @pytest.mark.mock_chat_rag
     def test_hallucination_guard_failed_courses_template(self, test_setup):
         """Test mock LLM trả về câu bịa khi hỏi môn rớt -> thay bằng template môn rớt đúng."""
         user_a = test_setup["user_a"]
@@ -703,6 +706,7 @@ class TestChatOcrIntegration:
             assert "Giáo dục thể chất" not in ans
             assert "Lập trình mạng A" in ans
 
+    @pytest.mark.mock_chat_rag
     def test_graduation_template_like_sv01_real_data(self, test_setup):
         """Test với dữ liệu giống sv01 thật (17/120 tín chỉ, IT2030 rớt, IT3100 chưa học):
         Mock LLM trả đúng câu sai:
@@ -774,6 +778,7 @@ class TestChatOcrIntegration:
             # 5. KHÔNG có từ "giấy chứng nhận"
             assert "giấy chứng nhận" not in ans.lower()
 
+    @pytest.mark.mock_chat_rag
     def test_merge_duplicate_course_and_red_marked_and_cert_status(self, test_setup):
         """Test yêu cầu:
         1. OCR có 'Cấu trúc dữ liệu và Giải thuật' 3.2 trong khi hệ thống có IT2030 3.5 phải ra một dòng

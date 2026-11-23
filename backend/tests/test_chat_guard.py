@@ -280,6 +280,7 @@ def test_greeting_smalltalk_thanks_and_who_are_you():
     assert res_what.json()["sources"] == []
 
 
+@pytest.mark.mock_chat_rag
 def test_greeting_with_injection_blocked():
     """Lời chào kèm injection hoặc lệnh ngoài phạm vi vẫn phải bị chặn nghiêm ngặt."""
     headers = make_headers()
