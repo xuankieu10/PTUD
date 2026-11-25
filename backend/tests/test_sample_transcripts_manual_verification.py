@@ -7,7 +7,13 @@ So sánh khớp chính xác với số liệu tính toán chuẩn (tính tay).
 import os
 import pytest
 from backend.pdf_processor import extract_grades_from_pdf_text_layer
-from backend.app.services.graduation_checker import calculate_academic_summary
+from backend.app.services.graduation_checker import (
+    calculate_academic_summary,
+    check_graduation,
+    build_structured_advisory_text,
+    format_advisory_response,
+    DEFAULT_CNTT_CURRICULUM
+)
 
 SAMPLE_DIR = "D:/test điểm"
 
@@ -414,12 +420,16 @@ def test_partial_transcript_unverified_prerequisites_do_not_block_future_courses
 
 def test_prerequisite_map_courses_exist_in_curriculum_and_names_match():
     """
-    Test E.3: Mọi mã trong prerequisite map phải tồn tại trong curriculum và tên khớp.
+    Test E.3 & I.8: Mọi mã trong prerequisite map phải tồn tại trong curriculum và tên khớp.
+    - 26 cạnh tiên quyết (học trước)
+    - 1 cạnh song hành (Thực tập 111049 <-> Tốt nghiệp 33333)
+    -> Tổng cộng 27 quan hệ ràng buộc môn học.
     """
     from backend.app.services.graduation_checker import DEFAULT_CNTT_CURRICULUM
     curriculum_by_code = {c["ma_mon"]: c["ten_mon"] for c in DEFAULT_CNTT_CURRICULUM}
 
     total_edges = 0
+    total_coreqs = 0
     for course in DEFAULT_CNTT_CURRICULUM:
         target_code = course["ma_mon"]
         target_name = course["ten_mon"]
@@ -429,8 +439,64 @@ def test_prerequisite_map_courses_exist_in_curriculum_and_names_match():
             assert prereq_code in curriculum_by_code, f"Môn tiên quyết {prereq_code} của {target_name} ({target_code}) không tồn tại trong CTĐT"
             prereq_name = curriculum_by_code[prereq_code]
             assert prereq_name, f"Tên môn tiên quyết {prereq_code} không được để trống"
+        for coreq_code in course.get("mon_song_hanh", []):
+            total_coreqs += 1
+            assert coreq_code in curriculum_by_code, f"Môn song hành {coreq_code} của {target_name} ({target_code}) không tồn tại trong CTĐT"
 
-    assert total_edges == 27, f"Tổng số liên kết tiên quyết là {total_edges}, kỳ vọng 27"
+    assert total_edges == 26, f"Tổng số liên kết tiên quyết (học trước) là {total_edges}, kỳ vọng 26"
+    assert total_coreqs == 1, f"Tổng số liên kết song hành là {total_coreqs}, kỳ vọng 1"
+    assert total_edges + total_coreqs == 27, f"Tổng số quan hệ ràng buộc là {total_edges + total_coreqs}, kỳ vọng 27"
+
+
+def test_compare_prerequisite_edges_with_curriculum_tables_in_docx():
+    """
+    Test H.5 & I.8: Parse bảng 2-9 (HK1 - HK8) trong file Tong_hop_quy_che_dao_tao_hoc_vu_LHU.docx
+    và so tập cạnh tiên quyết ('Học trước') và song hành ('Song hành') với DEFAULT_CNTT_CURRICULUM.
+    """
+    import docx
+    import re
+    from backend.app.services.graduation_checker import DEFAULT_CNTT_CURRICULUM
+
+    docx_path = os.path.join(os.path.dirname(__file__), "..", "..", "database", "seed_data", "Tong_hop_quy_che_dao_tao_hoc_vu_LHU.docx")
+    if not os.path.exists(docx_path):
+        pytest.skip("Không tìm thấy file Tong_hop_quy_che_dao_tao_hoc_vu_LHU.docx")
+
+    doc = docx.Document(docx_path)
+    docx_prereqs = set()
+    docx_coreqs = set()
+
+    for i in range(2, 10):
+        t = doc.tables[i]
+        for r in t.rows[1:]:
+            cells = [c.text.strip().replace("\n", " ") for c in r.cells]
+            code = cells[0].strip()
+            note = cells[4].strip() if len(cells) > 4 else ""
+            if "Học trước:" in note:
+                m = re.search(r"Học trước:\s*([0-9,\s]+)", note)
+                if m:
+                    prereqs = [x.strip() for x in m.group(1).split(",") if x.strip()]
+                    for p in prereqs:
+                        docx_prereqs.add((p, code))
+            if "Song hành:" in note:
+                m = re.search(r"Song hành:\s*([0-9,\s]+)", note)
+                if m:
+                    coreqs = [x.strip() for x in m.group(1).split(",") if x.strip()]
+                    for p in coreqs:
+                        docx_coreqs.add((p, code))
+
+    curriculum_prereqs = set()
+    curriculum_coreqs = set()
+    for c in DEFAULT_CNTT_CURRICULUM:
+        target = c["ma_mon"]
+        for p in c.get("mon_tien_quyet", []):
+            curriculum_prereqs.add((p, target))
+        for s in c.get("mon_song_hanh", []):
+            curriculum_coreqs.add((s, target))
+
+    assert len(docx_prereqs) == 26, f"Docx có {len(docx_prereqs)} cạnh học trước, kỳ vọng 26"
+    assert len(docx_coreqs) == 1, f"Docx có {len(docx_coreqs)} cạnh song hành, kỳ vọng 1"
+    assert docx_prereqs == curriculum_prereqs, f"Cạnh học trước lệch giữa Docx và CTĐT: {docx_prereqs ^ curriculum_prereqs}"
+    assert docx_coreqs == curriculum_coreqs, f"Cạnh song hành lệch giữa Docx và CTĐT: {docx_coreqs ^ curriculum_coreqs}"
 
 
 def test_sample_transcripts_courses_match_curriculum_names_by_code():
@@ -463,4 +529,103 @@ def test_sample_transcripts_courses_match_curriculum_names_by_code():
                 assert clean_std == expected_std, (
                     f"Mẫu {i}: Môn mã {code} có tên thô bóc tag '{clean_raw}' không khớp tên CTĐT '{expected_name}'"
                 )
+
+
+@pytest.mark.skipif(not os.path.exists(os.path.join(SAMPLE_DIR, "Bảng điểm mẫu 1.pdf")), reason="Không tìm thấy Mẫu 1")
+def test_verify_sample_transcript_1_gpa_range_formatting():
+    """Kiểm tra Mẫu 1 format GPA thang 4 dạng khoảng khi làm tròn 1 chữ số cho kết quả khác ngưỡng cứng (2.81 vs 2.89)."""
+    pdf_path = os.path.join(SAMPLE_DIR, "Bảng điểm mẫu 1.pdf")
+    subjects, _ = extract_grades_from_pdf_text_layer(pdf_path, max_pages=10)
+    summary = calculate_academic_summary(subjects)
+    assert summary["gpa_4"] == 2.81
+    assert summary["gpa_4_round"] == 2.89
+
+    profile = {"student_code": "SV01", "full_name": "Test SV", "courses": subjects}
+    grad = check_graduation(profile, DEFAULT_CNTT_CURRICULUM)
+    parts = build_structured_advisory_text(grad)
+    formatted = format_advisory_response(parts)
+    assert "2.81-2.89 (ước tính, chờ giáo vụ xác nhận cách làm tròn)" in formatted
+
+
+@pytest.mark.skipif(not os.path.exists(os.path.join(SAMPLE_DIR, "Bảng điểm mẫu 2.pdf")), reason="Không tìm thấy Mẫu 2")
+def test_verify_sample_transcript_2_gpa_range_formatting():
+    """Kiểm tra Mẫu 2 format GPA thang 4 dạng khoảng khi làm tròn 1 chữ số cho kết quả khác ngưỡng cứng (2.38 vs 2.52)."""
+    pdf_path = os.path.join(SAMPLE_DIR, "Bảng điểm mẫu 2.pdf")
+    subjects, _ = extract_grades_from_pdf_text_layer(pdf_path, max_pages=10)
+    summary = calculate_academic_summary(subjects)
+    assert summary["gpa_4"] == 2.38
+    assert summary["gpa_4_round"] == 2.52
+
+    profile = {"student_code": "SV02", "full_name": "Test SV", "courses": subjects}
+    grad = check_graduation(profile, DEFAULT_CNTT_CURRICULUM)
+    parts = build_structured_advisory_text(grad)
+    formatted = format_advisory_response(parts)
+    assert "2.38-2.52 (ước tính, chờ giáo vụ xác nhận cách làm tròn)" in formatted
+
+
+def test_verify_synthetic_transcript_gpa_single_number_formatting():
+    """
+    Kiểm tra trường hợp bảng điểm có gpa_4 == gpa_4_round thì format dạng một số:
+    '2.50 (ước tính theo bảng quy đổi)'.
+
+    Tính tay:
+    - Môn 1: Cơ sở dữ liệu (111059), 3 TC, điểm 7.0 (thang 10) -> điểm chữ B, thang 4 = 3.0. Điểm quy đổi = 3 * 3.0 = 9.0.
+      Khi làm tròn 1 chữ số: 7.0 -> 7.0 (B, 3.0).
+    - Môn 2: Dịch vụ mạng (111036), 3 TC, điểm 6.0 (thang 10) -> điểm chữ C, thang 4 = 2.0. Điểm quy đổi = 3 * 2.0 = 6.0.
+      Khi làm tròn 1 chữ số: 6.0 -> 6.0 (C, 2.0).
+    - Tổng tín chỉ tính GPA = 3 + 3 = 6 TC.
+    - Tổng điểm thang 4 theo ngưỡng cứng = 9.0 + 6.0 = 15.0.
+      => GPA thang 4 (ngưỡng cứng) = 15.0 / 6 = 2.50.
+    - Tổng điểm thang 4 khi làm tròn 1 chữ số = 9.0 + 6.0 = 15.0.
+      => GPA thang 4 (làm tròn 1 chữ số) = 15.0 / 6 = 2.50.
+    - Kết quả: gpa_4 == gpa_4_round == 2.50.
+    - Định dạng tư vấn mong đợi: '2.50 (ước tính theo bảng quy đổi)'.
+    """
+    synthetic_subjects = [
+        {"course_code": "111059", "course_name": "Cơ sở dữ liệu", "tin_chi": 3, "diem": 7.0, "he_so": 3},
+        {"course_code": "111036", "course_name": "Dịch vụ mạng", "tin_chi": 3, "diem": 6.0, "he_so": 3},
+    ]
+    summary = calculate_academic_summary(synthetic_subjects)
+    assert summary["gpa_4"] == 2.50
+    assert summary["gpa_4_round"] == 2.50
+
+    profile = {"student_code": "SV_SYNTH", "full_name": "Sinh viên Tổng hợp", "courses": synthetic_subjects}
+    grad = check_graduation(profile, DEFAULT_CNTT_CURRICULUM)
+    parts = build_structured_advisory_text(grad)
+    formatted = format_advisory_response(parts)
+    assert "2.50 (ước tính theo bảng quy đổi)" in formatted
+
+
+@pytest.mark.skipif(not os.path.exists(os.path.join(SAMPLE_DIR, "Bảng điểm mẫu 3.pdf")), reason="Không tìm thấy Mẫu 3")
+def test_verify_sample_transcript_3_gpa_range_formatting():
+    """Kiểm tra Mẫu 3 format GPA thang 4 dạng khoảng vì có môn đổi mức điểm (gpa_4=2.91, gpa_4_round=3.03)."""
+    pdf_path = os.path.join(SAMPLE_DIR, "Bảng điểm mẫu 3.pdf")
+    subjects, _ = extract_grades_from_pdf_text_layer(pdf_path, max_pages=10)
+    summary = calculate_academic_summary(subjects)
+    assert summary["gpa_4"] == 2.91
+    assert summary["gpa_4_round"] == 3.03
+
+    profile = {"student_code": "SV03", "full_name": "Test SV", "courses": subjects}
+    grad = check_graduation(profile, DEFAULT_CNTT_CURRICULUM)
+    parts = build_structured_advisory_text(grad)
+    formatted = format_advisory_response(parts)
+    assert "2.91-3.03 (ước tính, chờ giáo vụ xác nhận cách làm tròn)" in formatted
+
+
+@pytest.mark.skipif(not os.path.exists(os.path.join(SAMPLE_DIR, "Bảng điểm mẫu 4.pdf")), reason="Không tìm thấy Mẫu 4")
+def test_verify_sample_transcript_4_gpa_range_formatting():
+    """Kiểm tra Mẫu 4 format GPA thang 4 dạng khoảng vì có môn đổi mức điểm (gpa_4=2.54, gpa_4_round=2.76)."""
+    pdf_path = os.path.join(SAMPLE_DIR, "Bảng điểm mẫu 4.pdf")
+    subjects, _ = extract_grades_from_pdf_text_layer(pdf_path, max_pages=10)
+    summary = calculate_academic_summary(subjects)
+    assert summary["gpa_4"] == 2.54
+    assert summary["gpa_4_round"] == 2.76
+
+    profile = {"student_code": "SV04", "full_name": "Test SV", "courses": subjects}
+    grad = check_graduation(profile, DEFAULT_CNTT_CURRICULUM)
+    parts = build_structured_advisory_text(grad)
+    formatted = format_advisory_response(parts)
+    assert "2.54-2.76 (ước tính, chờ giáo vụ xác nhận cách làm tròn)" in formatted
+
+
 

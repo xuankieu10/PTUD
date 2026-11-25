@@ -8,7 +8,8 @@ import pytest
 from backend.app.services.graduation_checker import (
     check_graduation,
     calculate_academic_summary,
-    convert_score_to_scale_4
+    convert_score_to_scale_4,
+    DEFAULT_CNTT_CURRICULUM
 )
 
 
@@ -348,3 +349,65 @@ def test_elective_branch_b_completion():
     assert "111043" not in planned_codes
     assert "111071" not in planned_codes
     assert "111088" not in planned_codes
+
+
+def test_elective_taking_both_a_and_b_does_not_double_count_credits():
+    """
+    Yêu cầu I.3: Sinh viên học cả 2 môn trong một cặp tự chọn (A và B):
+    - Ví dụ: học cả 111043 (3 TC) và 111089 (3 TC).
+    - Hệ thống KHÔNG cộng đôi tín chỉ vào tích lũy tốt nghiệp (chỉ tính 3 TC, không tính 6 TC).
+    """
+    profile = {
+        "student_code": "SV_BOTH_ELECTIVES",
+        "full_name": "Sinh viên học cả 2 nhánh",
+        "courses": [
+            {"ma_mon": "111043", "ten_mon": "Phân tích thiết kế hệ thống hướng đối tượng", "tin_chi": 3, "diem": 8.0},
+            {"ma_mon": "111089", "ten_mon": "Phân tích thiết kế hệ thống hướng quan hệ", "tin_chi": 3, "diem": 7.5},
+        ],
+        "certificates": {}
+    }
+
+    res = check_graduation(profile, DEFAULT_CNTT_CURRICULUM, current_semester=6, required_credits=150)
+    assert res["student_summary"]["passed_credits"] == 3
+
+
+def test_mixing_elective_branches_reaches_150_credits():
+    """
+    Yêu cầu I.3: Trộn nhánh tự chọn (A ở HK5, B ở HK6, A ở HK7) vẫn đủ 150 tín chỉ:
+    - 49 môn bắt buộc thuần = 142 TC
+    - HK5 chọn Nhánh A: 111043 (3 TC)
+    - HK6 chọn Nhánh B: 111084 (2 TC)
+    - HK7 chọn Nhánh A: 111088 (3 TC)
+    -> Tổng = 142 + 3 + 2 + 3 = 150 TC.
+    -> missing_required_courses phải rỗng.
+    -> is_eligible = True khi đủ chứng chỉ.
+    """
+    mandatory_courses = [
+        {"ma_mon": c["ma_mon"], "ten_mon": c["ten_mon"], "tin_chi": c["tin_chi"], "diem": 7.0}
+        for c in DEFAULT_CNTT_CURRICULUM
+        if c.get("is_required", True) and c["ma_mon"] not in ["111043", "111071", "111088"]
+    ]
+    mixed_electives = [
+        {"ma_mon": "111043", "ten_mon": "Phân tích thiết kế hệ thống hướng đối tượng", "tin_chi": 3, "diem": 8.0},
+        {"ma_mon": "111084", "ten_mon": "Lập trình Python trong thị giác máy tính", "tin_chi": 2, "diem": 8.0},
+        {"ma_mon": "111088", "ten_mon": "Trí tuệ nhân tạo", "tin_chi": 3, "diem": 8.5},
+    ]
+
+    all_courses = mandatory_courses + mixed_electives
+    profile = {
+        "student_code": "SV_MIXED_ELECTIVES",
+        "full_name": "Sinh viên trộn nhánh tự chọn",
+        "courses": all_courses,
+        "certificates": {
+            "has_english": True,
+            "has_it": True,
+            "has_gdqp": True,
+            "has_gdtc": True,
+            "has_soft_skills": True
+        }
+    }
+
+    res = check_graduation(profile, DEFAULT_CNTT_CURRICULUM, current_semester=8, required_credits=150)
+    assert res["student_summary"]["passed_credits"] == 150
+    assert len(res["missing_required_courses"]) == 0
+    assert res["is_eligible"] is True

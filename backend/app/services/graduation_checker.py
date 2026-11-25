@@ -44,7 +44,7 @@ MAX_STANDARD_SEMESTERS = getattr(settings, "MAX_STANDARD_SEMESTERS", 8)  # Ngu�
 MAX_EXTENDED_SEMESTERS = getattr(settings, "MAX_EXTENDED_SEMESTERS", 12)  # Nguồn: QĐ 22 Điều 3 Khoản 1
 
 
-def convert_score_to_scale_4(score_10: float, use_plus_grades: bool = True) -> Tuple[float, str]:
+def convert_score_to_scale_4(score_10: float, use_plus_grades: bool = True, round_1dp: Optional[bool] = None) -> Tuple[float, str]:
     """
     Quy đổi điểm thang 10 sang thang 4 và điểm chữ theo Quy chế đào tạo LHU (Điều 11 Khoản 5 QĐ 22):
     - Bảng quy đổi chính thức 8 mức (Điều 11 Khoản 5):
@@ -58,7 +58,13 @@ def convert_score_to_scale_4(score_10: float, use_plus_grades: bool = True) -> T
       + Dưới 4.0:   F  (0.0) - Không đạt
       
     - Mặc định use_plus_grades=True theo đúng chuẩn văn bản Điều 11 Khoản 5 QĐ 22.
+    - Tùy chọn round_1dp (mặc định cấu hình GPA4_ROUND_1DP): làm tròn 1 chữ số thập phân (half-up) trước khi tra bảng.
     """
+    if round_1dp is None:
+        round_1dp = getattr(settings, "GPA4_ROUND_1DP", False)
+    if round_1dp and score_10 is not None:
+        score_10 = round_half_up(score_10, 1)
+
     if use_plus_grades:
         if score_10 >= 8.5:
             return 4.0, "A"
@@ -122,7 +128,7 @@ def is_special_condition_subject(name: str) -> bool:
     return any(t in norm for t in triggers)
 
 
-def calculate_academic_summary(courses_history: List[Dict[str, Any]]) -> Dict[str, Any]:
+def calculate_academic_summary(courses_history: List[Dict[str, Any]], round_1dp: Optional[bool] = None) -> Dict[str, Any]:
     """
     Tính toán các chỉ số học tập tổng hợp từ lịch sử bảng điểm của sinh viên:
     - Tổng tín chỉ đã tích lũy (passed >= 4.0):
@@ -130,6 +136,7 @@ def calculate_academic_summary(courses_history: List[Dict[str, Any]]) -> Dict[st
       + Môn hệ số 0, tín chỉ = 0 KHÔNG tính vào tín chỉ và GPA.
       + Môn điều kiện (GDQP, GDTC) KHÔNG tính vào 150 tín chỉ và GPA.
       + Môn ngoài CTĐT (is_outside_curriculum=True) KHÔNG tính vào tín chỉ và GPA.
+      + Học cả 2 môn trong một cặp tự chọn (A và B) KHÔNG cộng đôi tín chỉ (chỉ tính 1 môn).
     - Thiếu TC (tc is None) hoặc thiếu điểm (diem is None) hoặc needs_confirmation:
       -> KHÔNG tính vào tích lũy/GPA, đưa vào danh sách unconfirmed_courses.
     - GPA thang 10 và GPA thang 4 (chỉ tính môn có điểm số và tín chỉ hợp lệ).
@@ -138,10 +145,21 @@ def calculate_academic_summary(courses_history: List[Dict[str, Any]]) -> Dict[st
     failed_credits = 0
     total_weighted_10 = Decimal("0.0")
     total_weighted_4 = Decimal("0.0")
+    total_weighted_4_round = Decimal("0.0")
     total_gpa_credits = 0
     unconfirmed_courses = []
 
     seen_passed_courses = set()
+
+    ELECTIVE_GROUPS = {
+        "111043": "ELECTIVE_HK5",
+        "111089": "ELECTIVE_HK5",
+        "111071": "ELECTIVE_HK6",
+        "111084": "ELECTIVE_HK6",
+        "111088": "ELECTIVE_HK7",
+        "111061": "ELECTIVE_HK7",
+    }
+    seen_elective_groups = set()
 
     for c in courses_history:
         code = str(c.get("ma_mon") or c.get("course_code") or c.get("code") or "").strip().upper()
@@ -201,16 +219,28 @@ def calculate_academic_summary(courses_history: List[Dict[str, Any]]) -> Dict[st
                 # Môn hệ số 0, môn điều kiện GDTC/GDQP và môn ngoài CTĐT KHÔNG tính vào tín chỉ tích lũy tốt nghiệp và GPA
                 if not is_outside and not is_zero_coef and not is_condition_sub:
                     if course_unique_key not in seen_passed_courses:
-                        passed_credits += tc_val
-                        seen_passed_courses.add(course_unique_key)
+                        is_dup_elective = False
+                        if code in ELECTIVE_GROUPS:
+                            grp = ELECTIVE_GROUPS[code]
+                            if grp in seen_elective_groups:
+                                is_dup_elective = True
+                            else:
+                                seen_elective_groups.add(grp)
 
-                        score_4, _ = convert_score_to_scale_4(diem_val)
-                        d_val = Decimal(str(diem_val))
-                        d_tc = Decimal(str(tc_val))
-                        d_score_4 = Decimal(str(score_4))
-                        total_weighted_10 += d_val * d_tc
-                        total_weighted_4 += d_score_4 * d_tc
-                        total_gpa_credits += tc_val
+                        if not is_dup_elective:
+                            passed_credits += tc_val
+                            seen_passed_courses.add(course_unique_key)
+
+                            score_4, _ = convert_score_to_scale_4(diem_val, round_1dp=round_1dp)
+                            score_4_r, _ = convert_score_to_scale_4(diem_val, round_1dp=True)
+                            d_val = Decimal(str(diem_val))
+                            d_tc = Decimal(str(tc_val))
+                            d_score_4 = Decimal(str(score_4))
+                            d_score_4_r = Decimal(str(score_4_r))
+                            total_weighted_10 += d_val * d_tc
+                            total_weighted_4 += d_score_4 * d_tc
+                            total_weighted_4_round += d_score_4_r * d_tc
+                            total_gpa_credits += tc_val
             else:
                 if not is_outside and not is_zero_coef and not is_condition_sub:
                     failed_credits += tc_val
@@ -219,9 +249,11 @@ def calculate_academic_summary(courses_history: List[Dict[str, Any]]) -> Dict[st
         d_cr = Decimal(str(total_gpa_credits))
         gpa_10 = float((total_weighted_10 / d_cr).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
         gpa_4 = float((total_weighted_4 / d_cr).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+        gpa_4_round = float((total_weighted_4_round / d_cr).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
     else:
         gpa_10 = 0.0
         gpa_4 = 0.0
+        gpa_4_round = 0.0
 
     # Trích xuất danh sách học kỳ có trong bảng điểm
     sem_nums = []
@@ -239,6 +271,7 @@ def calculate_academic_summary(courses_history: List[Dict[str, Any]]) -> Dict[st
         "failed_credits": failed_credits,
         "gpa_10": gpa_10,
         "gpa_4": gpa_4,
+        "gpa_4_round": gpa_4_round,
         "total_gpa_credits": total_gpa_credits,
         "unconfirmed_courses": unconfirmed_courses,
         "partial_transcript": partial_transcript,
@@ -305,7 +338,8 @@ def check_graduation(
             "tin_chi": tc,
             "hoc_ky_de_xuat": c.get("hoc_ky_de_xuat") or c.get("hoc_ky") or 1,
             "is_required": bool(c.get("is_required", True)),
-            "mon_tien_quyet": [str(p).strip().upper() for p in c.get("mon_tien_quyet", []) if p]
+            "mon_tien_quyet": [str(p).strip().upper() for p in c.get("mon_tien_quyet", []) if p],
+            "mon_song_hanh": [str(p).strip().upper() for p in c.get("mon_song_hanh", []) if p]
         }
         if ma:
             curr_lookup[ma] = item
@@ -315,7 +349,24 @@ def check_graduation(
 
     # 2. Phân loại các môn trong lịch sử sinh viên (Đạt vs Chưa đạt vs Cần xác nhận)
     raw_courses = profile.get("courses", [])
-    summary = calculate_academic_summary(raw_courses)
+
+    # Tự động đánh dấu môn ngoài CTĐT nếu môn không nằm trong CTĐT (cả theo mã môn lẫn tên chuẩn hóa)
+    annotated_courses = []
+    for c in raw_courses:
+        c_item = dict(c)
+        c_code = str(c_item.get("ma_mon") or c_item.get("course_code") or c_item.get("code") or "").strip().upper()
+        c_name = str(c_item.get("ten_mon") or c_item.get("course_name") or c_item.get("mon") or c_item.get("name") or "").strip()
+        c_norm = normalize_course_name(c_name)
+        c_cond = is_special_condition_subject(c_name)
+
+        if not c_cond and not c_item.get("is_outside_curriculum") and not c_item.get("ngoai_ctdt"):
+            is_generic_elective = ("elective" in c_code.lower() or "tu chon" in c_norm)
+            is_in_curr = bool((c_norm and c_norm in curr_name_lookup) or (c_code and c_code in curr_code_multimap) or is_generic_elective)
+            if not is_in_curr:
+                c_item["is_outside_curriculum"] = True
+        annotated_courses.append(c_item)
+
+    summary = calculate_academic_summary(annotated_courses)
     min_semester = summary.get("min_semester", 1)
     is_partial = summary.get("partial_transcript", False)
 
@@ -465,7 +516,8 @@ def check_graduation(
                 "ten_mon": ten,
                 "tin_chi": c.get("tin_chi"),
                 "hoc_ky_de_xuat": hk_val,
-                "mon_tien_quyet": [str(p).strip().upper() for p in c.get("mon_tien_quyet", []) if p]
+                "mon_tien_quyet": [str(p).strip().upper() for p in c.get("mon_tien_quyet", []) if p],
+                "mon_song_hanh": [str(p).strip().upper() for p in c.get("mon_song_hanh", []) if p]
             }
 
             # Nếu bảng điểm bị thiếu các học kỳ trước (min_semester > 1):
@@ -548,19 +600,22 @@ def check_graduation(
             "is_retake": True,
             "priority": rank_score_map.get(ma, 2.0) + 10.0, # Ưu tiên môn học lại trước môn mới
             "mon_tien_quyet": curr_lookup.get(f.get("ma_mon", ""), {}).get("mon_tien_quyet", []),
+            "mon_song_hanh": curr_lookup.get(f.get("ma_mon", ""), {}).get("mon_song_hanh", []),
             "hoc_ky_de_xuat": safe_int_hk(f.get("hoc_ky") or 1)
         })
 
     for m in missing_required_courses:
         ma = m.get("ma_mon")
         num_blocked = len(blocked_map.get(ma, [])) if ma else 0
+        p_offset = -0.5 if m.get("mon_song_hanh") else 0.0
         items_to_schedule.append({
             "ma_mon": m.get("ma_mon", ""),
             "ten_mon": m.get("ten_mon", ""),
             "tin_chi": m.get("tin_chi"),
             "is_retake": False,
-            "priority": float(num_blocked * 2.0) + max(0.0, (9.0 - float(safe_int_hk(m.get("hoc_ky_de_xuat", 1)))) * 0.5),
+            "priority": float(num_blocked * 2.0) + max(0.0, (9.0 - float(safe_int_hk(m.get("hoc_ky_de_xuat", 1)))) * 0.5) + p_offset,
             "mon_tien_quyet": m.get("mon_tien_quyet", []),
+            "mon_song_hanh": m.get("mon_song_hanh", []),
             "hoc_ky_de_xuat": safe_int_hk(m.get("hoc_ky_de_xuat", 1))
         })
 
@@ -628,13 +683,22 @@ def check_graduation(
                     prereq_satisfied = False
                     break
 
+            # Kiểm tra môn song hành (có thể đã hoàn thành kỳ trước HOẶC đang được xếp trong cùng kỳ này)
+            song_hanh = item.get("mon_song_hanh", [])
+            coreq_satisfied = True
+            curr_sem_codes = {c["ma_mon"] for c in current_sem_courses}
+            for sh in song_hanh:
+                if sh and (sh not in scheduled_passed_codes) and (sh not in curr_sem_codes):
+                    coreq_satisfied = False
+                    break
+
             # Nếu là kỳ hè: chỉ cho phép đăng ký học lại hoặc tối đa tín chỉ nhỏ
             if is_summer and not item["is_retake"]:
                 remaining_items_next.append(item)
                 continue
 
-            # Nếu thỏa điều kiện tiên quyết và không vượt giới hạn tín chỉ học kỳ
-            if prereq_satisfied and (current_sem_credits + tc <= credit_limit):
+            # Nếu thỏa điều kiện tiên quyết & song hành và không vượt giới hạn tín chỉ học kỳ
+            if prereq_satisfied and coreq_satisfied and (current_sem_credits + tc <= credit_limit):
                 assumed_prereqs = []
                 for pr in tien_quyet:
                     if pr and (pr in unverified_codes_set or normalize_course_name(pr) in unverified_codes_set):
@@ -648,6 +712,8 @@ def check_graduation(
                     "loai": "Học lại" if item["is_retake"] else "Học mới",
                     "mon_tien_quyet": tien_quyet
                 }
+                if song_hanh:
+                    c_item["mon_song_hanh"] = song_hanh
                 if assumed_prereqs:
                     c_item["ghi_chu_tien_quyet"] = f"Giả định đã đạt tiên quyết ({', '.join(assumed_prereqs)})"
 
@@ -705,6 +771,7 @@ def check_graduation(
             "failed_credits": summary["failed_credits"],
             "gpa_10": summary["gpa_10"],
             "gpa_4": summary["gpa_4"],
+            "gpa_4_round": summary.get("gpa_4_round"),
             "partial_transcript": summary.get("partial_transcript", False),
             "min_semester": summary.get("min_semester", 1),
             "present_semesters": summary.get("present_semesters", [])
@@ -750,6 +817,12 @@ def build_structured_advisory_text(
     req_cr = summary.get("required_credits", DEFAULT_REQUIRED_CREDITS)
     gpa_10 = summary.get("gpa_10", 0.0)
     gpa_4 = summary.get("gpa_4", 0.0)
+    gpa_4_round = summary.get("gpa_4_round")
+
+    if gpa_4_round is not None and gpa_4_round != gpa_4:
+        gpa_4_str = f"{gpa_4:.2f}-{gpa_4_round:.2f} (ước tính, chờ giáo vụ xác nhận cách làm tròn)"
+    else:
+        gpa_4_str = f"{gpa_4:.2f} (ước tính theo bảng quy đổi)"
 
     is_partial = bool(grad_result.get("partial_transcript") or summary.get("partial_transcript"))
     min_sem = grad_result.get("min_semester") or summary.get("min_semester") or 1
@@ -757,7 +830,7 @@ def build_structured_advisory_text(
     gpa_sub = " (tính trên các kỳ hiện có)" if is_partial else ""
     part_1_lines = [
         f"- Tiến độ tín chỉ: Đã đạt {passed_cr}/{req_cr} tín chỉ tích lũy.",
-        f"- Điểm trung bình tích lũy (GPA{gpa_sub}): {gpa_10} (thang 10, yêu cầu tốt nghiệp toàn khóa tối thiểu là 5.0) tương đương {gpa_4} (thang 4)."
+        f"- Điểm trung bình tích lũy (GPA{gpa_sub}): {gpa_10} (thang 10, yêu cầu tốt nghiệp toàn khóa 5.0 theo trang web Khoa, CHƯA KIỂM CHỨNG (chờ giáo vụ)); {gpa_4_str} (thang 4)."
     ]
     if is_partial:
         part_1_lines.append(
@@ -871,22 +944,30 @@ def build_structured_advisory_text(
     if not certs.get("english") or not certs.get("it"):
         part_4_lines.append("- Rủi ro chứng chỉ: Chuẩn đầu ra Ngoại ngữ và Tin học cần nộp trước thời điểm xét tốt nghiệp; sinh viên nên theo dõi lịch thi của Trung tâm Ngoại ngữ - Tin học để đăng ký thi sớm.")
 
-    part_4_lines.append("- Thời hạn đăng ký: Đăng ký môn học theo đúng thông báo từng đợt của Phòng Đào tạo trên cổng https://dkmh.lhu.edu.vn.")
-    part_4_lines.append("- Khi cần hỗ trợ học vụ chính thức: Liên hệ Phòng Đào tạo (phòng B.101, Cơ sở 1) hoặc Văn phòng Khoa Công nghệ thông tin để được giải quyết các trường hợp đặc biệt.")
+    dkmh_url = getattr(settings, "DKMH_URL", "").strip()
+    if dkmh_url:
+        part_4_lines.append(f"- Thời hạn đăng ký: Đăng ký môn học theo đúng thông báo từng đợt của Phòng Đào tạo trên cổng {dkmh_url}.")
+    else:
+        part_4_lines.append("- Thời hạn đăng ký: Đăng ký môn học theo đúng thông báo từng đợt của Phòng Đào tạo hoặc liên hệ Phòng Đào tạo.")
+
+    dao_tao_office = getattr(settings, "DAO_TAO_OFFICE", "").strip()
+    if dao_tao_office:
+        part_4_lines.append(f"- Khi cần hỗ trợ học vụ chính thức: Liên hệ Phòng Đào tạo (phòng {dao_tao_office}) hoặc Văn phòng Khoa Công nghệ thông tin để được giải quyết các trường hợp đặc biệt.")
+    else:
+        part_4_lines.append("- Khi cần hỗ trợ học vụ chính thức: Liên hệ Phòng Đào tạo hoặc Văn phòng Khoa Công nghệ thông tin để được giải quyết các trường hợp đặc biệt.")
 
     if rag_regulations:
-        # Hỗ trợ cả danh sách chuỗi hoặc danh sách dict chunk
+        # Hỗ trợ cả danh sách chuỗi hoặc danh sách dict chunk (giữ nguyên nhãn VB1 như gốc)
         added_count = 0
         for r in rag_regulations:
             if added_count >= 2:
                 break
             if isinstance(r, str) and r.strip():
-                clean_r = r.strip().replace("VB1", "Văn bản 1")
-                part_4_lines.append(clean_r)
+                part_4_lines.append(r.strip())
                 added_count += 1
             elif isinstance(r, dict) and r.get("title"):
-                s_title = r.get("title", "").replace("VB1", "Văn bản 1")
-                s_sec = r.get("section", "Chung").replace("VB1", "Văn bản 1")
+                s_title = r.get("title", "")
+                s_sec = r.get("section", "Chung")
                 part_4_lines.append(f"- Căn cứ quy chế: {s_title} (Mục {s_sec})")
                 added_count += 1
 
@@ -1187,7 +1268,7 @@ DEFAULT_CNTT_CURRICULUM = [
 
     # HK8 (10 TC)
     {"ma_mon": "111049", "ten_mon": "Thực tập", "tin_chi": 2, "hoc_ky_de_xuat": 8, "is_required": True, "mon_tien_quyet": ["111081"]}, # Học trước: 111081
-    {"ma_mon": "33333", "ten_mon": "Tốt nghiệp", "tin_chi": 8, "hoc_ky_de_xuat": 8, "is_required": True, "mon_tien_quyet": ["111049"]} # Song hành: 111049
+    {"ma_mon": "33333", "ten_mon": "Tốt nghiệp", "tin_chi": 8, "hoc_ky_de_xuat": 8, "is_required": True, "mon_tien_quyet": [], "mon_song_hanh": ["111049"]} # Song hành: 111049
 ]
 
 
@@ -1213,13 +1294,17 @@ def load_curriculum_from_db(db=None, major: str = "Công nghệ thông tin") -> 
                         "tin_chi": r.tin_chi,
                         "hoc_ky_de_xuat": r.hoc_ky_de_xuat or 1,
                         "is_required": bool(r.is_required),
-                        "mon_tien_quyet": []
+                        "mon_tien_quyet": [],
+                        "mon_song_hanh": []
                     })
-                # Merge quan hệ tiên quyết từ DEFAULT_CNTT_CURRICULUM
-                prereq_map = {c["ma_mon"]: c["mon_tien_quyet"] for c in DEFAULT_CNTT_CURRICULUM}
+                # Merge quan hệ tiên quyết & song hành từ DEFAULT_CNTT_CURRICULUM
+                prereq_map = {c["ma_mon"]: c.get("mon_tien_quyet", []) for c in DEFAULT_CNTT_CURRICULUM}
+                song_hanh_map = {c["ma_mon"]: c.get("mon_song_hanh", []) for c in DEFAULT_CNTT_CURRICULUM}
                 for res in result:
                     if res["ma_mon"] in prereq_map:
                         res["mon_tien_quyet"] = prereq_map[res["ma_mon"]]
+                    if res["ma_mon"] in song_hanh_map:
+                        res["mon_song_hanh"] = song_hanh_map[res["ma_mon"]]
                 return result
         except Exception as e:
             logger.warning(f"Không thể đọc CTĐT từ DB ({e}), sử dụng CTĐT mặc định.")
