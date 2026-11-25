@@ -82,27 +82,36 @@ def test_parse_docx_all_16_chunks():
 
 
 @pytest.mark.db
+@pytest.mark.ollama
 def test_ingest_quy_dinh_idempotent():
-    """Kiểm tra tính idempotent của ingest: nạp lại không bị duplicate chunks."""
-    # Chạy lần 1
-    cnt1 = ingest_quy_dinh()
-    assert cnt1 == 37
+    """Kiểm tra tính idempotent của ingest: nạp lại không bị duplicate chunks.
+    Sử dụng target_doc_id=9999 tạm thời để TUYỆT ĐỐI không xóa/ghi đè doc 9001 thật trong DB."""
+    TEST_DOC_ID = 9999
+    try:
+        # Chạy lần 1 với doc_id tạm
+        cnt1 = ingest_quy_dinh(target_doc_id=TEST_DOC_ID)
+        assert cnt1 == 37
 
-    # Chạy lần 2
-    cnt2 = ingest_quy_dinh()
-    assert cnt2 == 37
+        # Chạy lần 2 với doc_id tạm
+        cnt2 = ingest_quy_dinh(target_doc_id=TEST_DOC_ID)
+        assert cnt2 == 37
 
-    # Truy vấn DB xác nhận chính xác 37 chunks của DOCUMENT_ID_QUY_DINH
-    with engine.connect() as conn:
-        doc_count = conn.execute(
-            text("SELECT COUNT(*) FROM documents WHERE id = :did"),
-            {"did": DOCUMENT_ID_QUY_DINH}
-        ).scalar()
-        assert doc_count == 1
+        # Truy vấn DB xác nhận chính xác 37 chunks của TEST_DOC_ID
+        with engine.connect() as conn:
+            doc_count = conn.execute(
+                text("SELECT COUNT(*) FROM documents WHERE id = :did"),
+                {"did": TEST_DOC_ID}
+            ).scalar()
+            assert doc_count == 1
 
-        chunk_count = conn.execute(
-            text("SELECT COUNT(*) FROM document_chunks WHERE document_id = :did"),
-            {"did": DOCUMENT_ID_QUY_DINH}
-        ).scalar()
-        assert chunk_count == 37, f"Dữ liệu bị duplicate! Đếm được {chunk_count} chunks thay vì 37"
+            chunk_count = conn.execute(
+                text("SELECT COUNT(*) FROM document_chunks WHERE document_id = :did"),
+                {"did": TEST_DOC_ID}
+            ).scalar()
+            assert chunk_count == 37, f"Dữ liệu bị duplicate! Đếm được {chunk_count} chunks thay vì 37"
+    finally:
+        # Dọn dẹp bản ghi test doc 9999 sau khi test xong
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM document_chunks WHERE document_id = :did"), {"did": TEST_DOC_ID})
+            conn.execute(text("DELETE FROM documents WHERE id = :did"), {"did": TEST_DOC_ID})
 

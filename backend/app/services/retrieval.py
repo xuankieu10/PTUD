@@ -378,7 +378,7 @@ def search_chunks(db: Session, query: str, student_cohort: Optional[str] = None)
         combined_score = float(0.70 * v_score + 0.30 * kw_score)
 
         # Giữ nguyên ngưỡng SIMILARITY_THRESHOLD không hạ thấp
-        if combined_score >= settings.SIMILARITY_THRESHOLD or v_score >= settings.SIMILARITY_THRESHOLD:
+        if combined_score >= settings.SIMILARITY_THRESHOLD:
             c["score"] = combined_score
             c["vector_score"] = float(v_score)
             c["keyword_score"] = float(kw_score)

@@ -211,7 +211,38 @@ BENCHMARK_QUESTIONS = [
 
 
 def load_all_chunks():
-    """Tải và đóng gói toàn bộ 53 chunks của Doc 9001, Doc 1 và Doc 2."""
+    """Tải toàn bộ chunks từ cơ sở dữ liệu nếu DB online; fallback về in-memory nếu DB offline."""
+    # 1. Thử tải trực tiếp từ DB
+    try:
+        from backend.app.db import SessionLocal
+        from sqlalchemy import text
+        with SessionLocal() as db:
+            rows = db.execute(text("""
+                SELECT c.id, c.document_id, d.title, c.chunk_index, c.content, c.embedding, c.section, d.so_hieu, d.url, c.verified
+                FROM document_chunks c
+                JOIN documents d ON c.document_id = d.id
+                ORDER BY c.document_id, c.chunk_index
+            """)).fetchall()
+            if rows and len(rows) >= 50:
+                print(f"--> [DB Online] Đã nạp thành công {len(rows)} chunks trực tiếp từ SQL Server production.")
+                chunk_rows = []
+                for r in rows:
+                    chunk_rows.append(ChunkRow(
+                        id=r.id,
+                        document_id=r.document_id,
+                        title=r.title,
+                        chunk_index=r.chunk_index,
+                        content=r.content,
+                        embedding=r.embedding,
+                        section=r.section,
+                        so_hieu=r.so_hieu,
+                        url=r.url,
+                        verified=bool(r.verified)
+                    ))
+                return chunk_rows
+    except Exception as e:
+        print(f"--> [DB Offline/Không kết nối được]: {e}, chuyển sang nạp chunks giả lập in-memory...")
+
     chunks_list = []
     
     # 1. Doc 9001 (Quy chế hợp nhất)
@@ -282,18 +313,29 @@ def load_all_chunks():
 def run_evaluation():
     chunk_rows = load_all_chunks()
     
-    # Tạo Mock DB Session
-    mock_db = MagicMock()
-    mock_db.execute.return_value.fetchall.return_value = chunk_rows
-    
+    # Kết nối DB thật nếu có, ngược lại dùng Mock DB Session
+    active_db = None
+    try:
+        from backend.app.db import SessionLocal
+        from sqlalchemy import text
+        s = SessionLocal()
+        s.execute(text("SELECT 1"))
+        active_db = s
+        print("--> Sử dụng Session kết nối SQL Server production cho retrieval.search_chunks.")
+    except Exception:
+        mock_db = MagicMock()
+        mock_db.execute.return_value.fetchall.return_value = chunk_rows
+        active_db = mock_db
+        print("--> Sử dụng Mock Session với chunk_rows in-memory cho retrieval.search_chunks.")
+
     results_table = []
     total_valid_q = 0
     hit_count = 0
     vb2_leak_count = 0
 
-    print("\n" + "=" * 110)
-    print(f"{'Mã':<6} | {'Nhóm':<15} | {'Câu hỏi':<45} | {'Hit@4':<6} | {'VB2?':<5} | {'Top 1 (Section & Điểm)':<30}")
-    print("=" * 110)
+    print("\n" + "=" * 135)
+    print(f"{'Mã':<6} | {'Nhóm':<15} | {'Câu hỏi':<40} | {'Hit@4':<6} | {'Chunk kỳ vọng':<25} | {'VB2?':<5} | {'Top 1 (Section & Điểm)':<30}")
+    print("=" * 135)
 
     for q in BENCHMARK_QUESTIONS:
         qid = q["id"]
@@ -301,7 +343,7 @@ def run_evaluation():
         query = q["query"]
         expected_sec = q["expected_sections"]
 
-        top_chunks = search_chunks(mock_db, query)
+        top_chunks = search_chunks(active_db, query)
         
         # Kiểm tra Hit@4
         is_hit = False
@@ -338,7 +380,8 @@ def run_evaluation():
             vb2_leak_count += 1
 
         vb2_str = "CÓ" if has_vb2 else "Không"
-        print(f"{qid:<6} | {cat:<15} | {query[:42]:<45} | {hit_str:<6} | {vb2_str:<5} | {top1_info:<30}")
+        exp_display = ", ".join(expected_sec[:2]) if expected_sec else "(Ngoài phạm vi)"
+        print(f"{qid:<6} | {cat:<15} | {query[:38]:<40} | {hit_str:<6} | {exp_display[:23]:<25} | {vb2_str:<5} | {top1_info:<30}")
 
         results_table.append({
             "id": qid,

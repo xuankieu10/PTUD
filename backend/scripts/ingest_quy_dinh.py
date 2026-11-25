@@ -691,8 +691,8 @@ def parse_docx_chunks(docx_path: str) -> list[dict]:
     return chunks
 
 
-def ingest_quy_dinh(docx_path: str = None, dry_run: bool = False) -> int:
-    """Nạp các chunk quy định vào cơ sở dữ liệu (idempotent, chỉ xóa và nạp lại document_id 9001)."""
+def ingest_quy_dinh(docx_path: str = None, dry_run: bool = False, target_doc_id: int = DOCUMENT_ID_QUY_DINH) -> int:
+    """Nạp các chunk quy định vào cơ sở dữ liệu (idempotent, xóa và nạp lại target_doc_id, tự ghi metadata và verified)."""
     if docx_path is None:
         docx_path = find_docx_file()
 
@@ -709,16 +709,16 @@ def ingest_quy_dinh(docx_path: str = None, dry_run: bool = False) -> int:
         print("--> Chế độ DRY-RUN: Không ghi vào database.")
         return len(chunks)
 
+    import json
     engine = create_engine(settings.DATABASE_URL)
     with engine.begin() as conn:
-        # 1. Đảm bảo bảng documents có record với id = DOCUMENT_ID_QUY_DINH
+        # 1. Đảm bảo bảng documents có record với id = target_doc_id
         doc_exists = conn.execute(
             text("SELECT id FROM documents WHERE id = :did"),
-            {"did": DOCUMENT_ID_QUY_DINH}
+            {"did": target_doc_id}
         ).fetchone()
 
         if not doc_exists:
-            target_doc_id = DOCUMENT_ID_QUY_DINH
             try:
                 conn.execute(text("SET IDENTITY_INSERT documents ON"))
                 conn.execute(
@@ -751,7 +751,6 @@ def ingest_quy_dinh(docx_path: str = None, dry_run: bool = False) -> int:
                 )
                 target_doc_id = res_ins.scalar()
         else:
-            target_doc_id = DOCUMENT_ID_QUY_DINH
             conn.execute(
                 text("UPDATE documents SET status = 'indexed', title = :title, source = :source, so_hieu = :so_hieu, url = :url WHERE id = :id"),
                 {
@@ -763,25 +762,42 @@ def ingest_quy_dinh(docx_path: str = None, dry_run: bool = False) -> int:
                 }
             )
 
-        # Đảm bảo cột verified tồn tại trong document_chunks (tương ứng migration_add_verified_to_document_chunks.sql)
+        # Đảm bảo cột verified và metadata tồn tại trong document_chunks
         col_verified_exists = conn.execute(
             text("SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'document_chunks' AND COLUMN_NAME = 'verified'")
         ).fetchone()
         if not col_verified_exists:
             conn.execute(text("ALTER TABLE document_chunks ADD verified BIT NOT NULL CONSTRAINT DF_document_chunks_verified DEFAULT 1"))
 
-        # 2. Xóa CHỈ các chunk cũ của document 9001 để đảm bảo idempotent
+        col_meta_exists = conn.execute(
+            text("SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'document_chunks' AND COLUMN_NAME = 'metadata'")
+        ).fetchone()
+        if not col_meta_exists:
+            conn.execute(text("ALTER TABLE document_chunks ADD metadata NVARCHAR(MAX) NULL"))
+
+        # 2. Xóa CHỈ các chunk cũ của target_doc_id để đảm bảo idempotent
         conn.execute(
             text("DELETE FROM document_chunks WHERE document_id = :did"),
             {"did": target_doc_id}
         )
 
-        # 3. Chèn các chunk mới kèm embedding và cờ verified
+        # 3. Chèn các chunk mới kèm embedding, cờ verified và metadata
         for idx, c in enumerate(chunks):
+            # Tạo metadata tự động cho chunk
+            is_v = bool(c.get("verified", True))
+            meta = {
+                "loai_van_ban": "quy_che" if is_v else "huong_dan_khoa",
+                "so_hieu": "QĐ 22/QĐ-ĐHLH" if is_v else None,
+                "nam_ban_hanh": 2021 if is_v else 2025,
+                "khoa_ap_dung": "K2021 trở lên" if is_v else "all"
+            }
+            if c.get("metadata"):
+                meta.update(c["metadata"])
+
             conn.execute(
                 text("""
-                    INSERT INTO document_chunks (document_id, chunk_index, content, embedding, section, verified)
-                    VALUES (:did, :idx, :content, :emb, :sec, :ver)
+                    INSERT INTO document_chunks (document_id, chunk_index, content, embedding, section, verified, metadata)
+                    VALUES (:did, :idx, :content, :emb, :sec, :ver, :meta)
                 """),
                 {
                     "did": target_doc_id,
@@ -789,7 +805,8 @@ def ingest_quy_dinh(docx_path: str = None, dry_run: bool = False) -> int:
                     "content": c["content"],
                     "emb": embeddings[idx],
                     "sec": c["section"],
-                    "ver": 1 if c.get("verified", True) else 0
+                    "ver": 1 if is_v else 0,
+                    "meta": json.dumps(meta, ensure_ascii=False)
                 }
             )
 

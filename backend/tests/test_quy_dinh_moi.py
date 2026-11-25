@@ -44,6 +44,8 @@ def test_verified_flags_in_database():
         assert verified_map[32] is False
 
 
+@pytest.mark.db
+@pytest.mark.ollama
 def test_retrieval_returns_verified_field():
     """search_chunks phải trả về trường verified cho mỗi chunk."""
     with SessionLocal() as db:
@@ -158,30 +160,62 @@ def test_personal_vs_general_query_routing():
       có dùng dữ liệu sinh viên (trả về môn IT2030 hoặc tín chỉ của student 1).
     - Câu hỏi quy chế chung ('điều kiện tốt nghiệp là gì?'):
       không bị chèn template dữ liệu cá nhân của sinh viên.
+    Số liệu lấy động từ check_graduation (không hardcode 17/133).
     """
     from fastapi.testclient import TestClient
     from backend.api import app
     from backend.app.security import create_access_token
+    from backend.app.services.graduation_checker import check_graduation, DEFAULT_CNTT_CURRICULUM
+    from backend.app.db import SessionLocal
+    from sqlalchemy import text
+    from unittest.mock import patch
 
     client = TestClient(app)
     # user_id = 2 là tài khoản sv01 (gắn với student_id = 1, MSSV 20210001)
     token = create_access_token(subject=2, role="student")
     headers = {"Authorization": f"Bearer {token}"}
 
-    from unittest.mock import patch
+    # Tính toán động số liệu sinh viên 1 từ check_graduation
+    with SessionLocal() as db:
+        stu_row = db.execute(text("SELECT id, user_id, student_code, full_name FROM students WHERE id = 1")).fetchone()
+        grade_rows = db.execute(text("SELECT c.code AS ma_mon, c.name AS ten_mon, c.credits AS tin_chi, g.score AS diem FROM grades g JOIN courses c ON g.course_id = c.id WHERE g.student_id = 1")).fetchall()
+        profile = {
+            "student_code": stu_row.student_code if stu_row else "20210001",
+            "full_name": stu_row.full_name if stu_row else "Nguyễn Văn A",
+            "courses": [{"ma_mon": r.ma_mon, "ten_mon": r.ten_mon, "tin_chi": r.tin_chi, "diem": r.diem} for r in grade_rows],
+            "certificates": {}
+        }
+        grad = check_graduation(profile, DEFAULT_CNTT_CURRICULUM)
+        passed_tc = grad["student_summary"]["passed_credits"]
+        missing_tc = grad["student_summary"]["credits_missing"]
 
     def mock_ollama_side_effect(messages, *args, **kwargs):
         content = messages[-1]["content"] if messages else ""
         if "điều kiện tốt nghiệp" in content.lower():
             return "Theo Điều 15 của quy chế đào tạo, điều kiện tốt nghiệp yêu cầu sinh viên tích lũy tối thiểu 150 tín chỉ và hoàn thành chuẩn đầu ra."
         return (
-            "### 1. TÌNH TRẠNG HIỆN TẠI\n- Tiến độ: Đã đạt 17/150 tín chỉ tích lũy.\n\n"
-            "### 2. CÒN THIẾU GÌ\n- Môn nợ điểm: Cấu trúc dữ liệu và giải thuật (IT2030, 3 tín chỉ). Còn thiếu 133 tín chỉ.\n\n"
+            f"### 1. TÌNH TRẠNG HIỆN TẠI\n- Tiến độ: Đã đạt {passed_tc}/150 tín chỉ tích lũy.\n\n"
+            f"### 2. CÒN THIẾU GÌ\n- Môn nợ điểm: Cấu trúc dữ liệu và giải thuật (IT2030, 3 tín chỉ). Còn thiếu {missing_tc} tín chỉ.\n\n"
             "### 3. KẾ HOẠCH TỪNG HỌC KỲ ĐỀ XUẤT\n+ Học kỳ 5: Đăng ký học lại IT2030.\n\n"
             "### 4. RỦI RO & HÀNH ĐỘNG CỤ THỂ\n- Cần đăng ký học lại sớm."
         )
 
-    with patch("backend.app.routers.chat._call_ollama", side_effect=mock_ollama_side_effect):
+    fake_chunks = [
+        {
+            "chunk_id": 10,
+            "document_id": 9001,
+            "chunk_index": 10,
+            "title": "Điều kiện xét tốt nghiệp",
+            "section": "Điều 15",
+            "content": "Điều kiện xét tốt nghiệp: Sinh viên phải tích lũy tối thiểu 150 tín chỉ theo chương trình đào tạo.",
+            "snippet": "150 tín chỉ",
+            "score": 0.85,
+            "verified": True
+        }
+    ]
+
+    with patch("backend.app.routers.chat._call_ollama", side_effect=mock_ollama_side_effect), \
+         patch("backend.app.routers.chat.search_chunks", return_value=fake_chunks):
         # 1. Câu hỏi cá nhân: "môn nào tôi đang bị F?" -> phải tra cứu dữ liệu cá nhân của student 1
         res_f = client.post("/chat", json={"message": "môn nào tôi đang bị F?"}, headers=headers)
         assert res_f.status_code == 200
@@ -194,7 +228,7 @@ def test_personal_vs_general_query_routing():
         assert res_tc.status_code == 200
         ans_tc = res_tc.json().get("answer", "")
         assert "tín chỉ" in ans_tc.lower()
-        assert "17" in ans_tc or "133" in ans_tc or "thiếu" in ans_tc.lower()
+        assert str(passed_tc) in ans_tc or str(missing_tc) in ans_tc or "thiếu" in ans_tc.lower()
 
         # 3. Câu hỏi quy chế chung: "điều kiện tốt nghiệp là gì?" -> KHÔNG chèn hồ sơ cá nhân
         res_gen = client.post("/chat", json={"message": "điều kiện tốt nghiệp là gì?"}, headers=headers)
