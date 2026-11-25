@@ -140,8 +140,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           </div>
         )}
 
-        {/* Nút liên kết cổng trường LHU nếu có */}
-        {onOpenLhuLinkModal && (
+        {/* Nút liên kết cổng trường LHU nếu có (dành riêng cho tài khoản quản trị) */}
+        {onOpenLhuLinkModal && user?.role === 'admin' && (
           <div className="mb-4 p-2.5 bg-blue-50/70 dark:bg-slate-800/60 rounded-2xl border border-blue-100 dark:border-slate-700 flex items-center justify-between text-xs">
             <span className="text-slate-600 dark:text-slate-300 font-medium">Lấy bảng điểm & chứng chỉ từ cổng trường:</span>
             <button

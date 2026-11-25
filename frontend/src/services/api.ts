@@ -7,7 +7,7 @@ import type {
   OllamaHealth
 } from '../types';
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || '';
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || '';
 
 const TOKEN_KEY = 'lhu_ai_access_token';
 const USER_KEY = 'lhu_ai_current_user';
@@ -51,7 +51,7 @@ export const setStoredUser = (user: UserProfile): void => {
   }
 };
 
-const getAuthHeaders = (): HeadersInit => {
+export const getAuthHeaders = (): HeadersInit => {
   const token = getAuthToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -264,7 +264,7 @@ export const chatApi = {
 };
 
 export const authApi = {
-  // Đăng nhập
+  // Đăng nhập cũ (dành cho admin / kiểm thử)
   async login(username: string, password: string): Promise<AuthLoginResponse> {
     const res = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
@@ -275,6 +275,32 @@ export const authApi = {
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err?.detail || 'Tài khoản hoặc mật khẩu không chính xác');
+    }
+
+    const data: AuthLoginResponse = await res.json();
+    setAuthToken(data.access_token);
+    return data;
+  },
+
+  // Đăng nhập bằng tài khoản Cổng trường LHU (MSSV + mật khẩu me.lhu.edu.vn)
+  async loginLhu(studentId: string, password: string): Promise<AuthLoginResponse> {
+    const res = await fetch(`${API_BASE_URL}/auth/login-lhu`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ student_id: studentId, password }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      const detail = err?.detail || `Lỗi máy chủ (${res.status})`;
+      if (res.status === 401) {
+        throw new Error(detail || 'Mã số sinh viên hoặc mật khẩu cổng trường không chính xác.');
+      } else if (res.status === 429) {
+        throw new Error(detail || 'Tài khoản tạm thời bị khóa do nhập sai mật khẩu quá 5 lần.');
+      } else if (res.status === 502) {
+        throw new Error(detail || 'Cổng trường LHU không phản hồi hoặc không thể kết nối.');
+      }
+      throw new Error(detail);
     }
 
     const data: AuthLoginResponse = await res.json();
@@ -424,6 +450,19 @@ export const lhuApi = {
         throw new Error('Phiên làm việc LHU đã hết hạn. Vui lòng liên kết lại.');
       }
       throw new Error(`Lỗi tải chứng chỉ LHU (${res.status})`);
+    }
+    return await res.json();
+  },
+
+  async getSummary(): Promise<any> {
+    const res = await fetch(`${API_BASE_URL}/lhu/summary`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      if (res.status === 401) {
+        throw new Error('Phiên làm việc LHU đã hết hạn hoặc chưa liên kết.');
+      }
+      throw new Error(`Lỗi tải tóm tắt học vụ LHU (${res.status})`);
     }
     return await res.json();
   },

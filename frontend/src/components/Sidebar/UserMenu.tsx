@@ -93,7 +93,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({
             </button>
           )}
 
-          {onOpenLhuLinkModal && (
+          {onOpenLhuLinkModal && user?.role === 'admin' && (
             <button
               type="button"
               onClick={() => {

@@ -44,8 +44,8 @@ def main():
         student_id = res_stu.fetchone()[0]
         
         courses_to_insert = [
-            ("CS101", "C++ Programming", 3),
-            ("CS102", "Data Structures", 4)
+            ("IT1110", "Tin học đại cương", 4),
+            ("IT2030", "Cấu trúc dữ liệu và giải thuật", 3)
         ]
         
         course_ids = []

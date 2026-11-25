@@ -20,16 +20,18 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_
         payload = jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"])
         user_id: str = payload.get("sub")
         role: str = payload.get("role")
+        token_auth_provider: Optional[str] = payload.get("auth_provider")
         if user_id is None or role is None:
             raise credentials_exception
     except JWTError:
         raise credentials_exception
     
-    user = db.execute(text("SELECT id, username, role FROM users WHERE id = :uid"), {"uid": int(user_id)}).fetchone()
+    user = db.execute(text("SELECT id, username, role, auth_provider FROM users WHERE id = :uid"), {"uid": int(user_id)}).fetchone()
     if user is None:
         raise credentials_exception
     
-    return {"id": user.id, "username": user.username, "role": user.role}
+    auth_provider = getattr(user, "auth_provider", None) or token_auth_provider or "local"
+    return {"id": user.id, "username": user.username, "role": user.role, "auth_provider": auth_provider}
 
 def get_current_user_optional(
     db: Session = Depends(get_db),
@@ -41,12 +43,14 @@ def get_current_user_optional(
         payload = jwt.decode(token, settings.JWT_SECRET, algorithms=["HS256"])
         user_id = payload.get("sub")
         role = payload.get("role")
+        token_auth_provider = payload.get("auth_provider")
         if user_id is None or role is None:
             return None
-        user = db.execute(text("SELECT id, username, role FROM users WHERE id = :uid"), {"uid": int(user_id)}).fetchone()
+        user = db.execute(text("SELECT id, username, role, auth_provider FROM users WHERE id = :uid"), {"uid": int(user_id)}).fetchone()
         if user is None:
             return None
-        return {"id": user.id, "username": user.username, "role": user.role}
+        auth_provider = getattr(user, "auth_provider", None) or token_auth_provider or "local"
+        return {"id": user.id, "username": user.username, "role": user.role, "auth_provider": auth_provider}
     except Exception:
         return None
 

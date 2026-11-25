@@ -15,6 +15,34 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/students", tags=["students"])
 
 
+def is_supported_major(major: Optional[str], db: Session) -> bool:
+    """Kiểm tra ngành học có thuộc chương trình đào tạo (program_courses) trong DB hay không."""
+    if not major:
+        return False
+    norm_major = strip_accents(str(major).strip().lower())
+    if not norm_major or norm_major in ["chua cap nhat", "chua xac dinh nganh", "chua xac dinh"]:
+        return False
+
+    supported = []
+    try:
+        rows = db.execute(text("SELECT DISTINCT major FROM program_courses")).fetchall()
+        supported = [r[0] for r in rows if r and r[0]]
+    except Exception as e:
+        logger.warning("Không thể lấy danh sách ngành từ program_courses: %s", e)
+
+    if not supported:
+        supported = ["Công nghệ thông tin"]
+
+    for s in supported:
+        norm_s = strip_accents(str(s).strip().lower())
+        if norm_major == norm_s:
+            return True
+        if norm_major in ["cntt", "it"] and "thong tin" in norm_s:
+            return True
+
+    return False
+
+
 def calculate_graduation_data(
     target_student_id: int,
     db: Session,
@@ -37,6 +65,20 @@ def calculate_graduation_data(
     ).fetchone()
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
+
+    if not is_supported_major(student.major, db):
+        major_str = str(student.major or "").strip()
+        norm_major = strip_accents(major_str.lower())
+        if not major_str or norm_major in ["chua cap nhat", "chua xac dinh nganh", "chua xac dinh"]:
+            raise HTTPException(
+                status_code=400,
+                detail="Hệ thống hiện chưa xác định được chương trình đào tạo cho lớp/ngành của bạn. Vui lòng liên hệ Phòng Đào tạo hoặc Văn phòng Khoa để được hỗ trợ."
+            )
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Hệ thống hiện chưa hỗ trợ ngành này ({student.major}). Chương trình đào tạo chỉ áp dụng cho Khoa Công nghệ thông tin."
+            )
 
     student_data = {
         "id": student.id,
@@ -70,10 +112,11 @@ def calculate_graduation_data(
         # Môn bắt buộc còn thiếu
         missing_required = []
         for r in required_rows:
-            r_code = (r.code or "").upper()
-            r_name = strip_accents(r.name or "").lower()
+            r_code = (getattr(r, "code", None) or (r[1] if isinstance(r, tuple) and len(r) > 1 else "") or "").upper()
+            r_name = strip_accents(getattr(r, "name", None) or (r[2] if isinstance(r, tuple) and len(r) > 2 else "") or "").lower()
+            r_credits = getattr(r, "credits", None) or (r[3] if isinstance(r, tuple) and len(r) > 3 else 0)
             if r_code not in passed_codes and r_name not in passed_names:
-                missing_required.append({"code": r.code, "name": r.name, "credits": r.credits})
+                missing_required.append({"code": r_code, "name": r_name, "credits": r_credits})
 
         # Môn chưa đạt (môn rớt chưa học lại đạt)
         failed_courses = []

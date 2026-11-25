@@ -38,6 +38,7 @@ class LHUSession:
     full_name: Optional[str] = None
     major: Optional[str] = None
     cohort: Optional[str] = None
+    class_id: Optional[str] = None
     created_at: float = field(default_factory=time.time)
     expires_at: float = field(default_factory=lambda: time.time() + getattr(settings, "LHU_SESSION_TTL_SECONDS", 1800))
 
@@ -53,8 +54,83 @@ LHU_COMMON_HEADERS = {
 
 # In-memory storage (RAM ONLY - Tuyệt đối không lưu DB, log hay file)
 _SESSIONS: Dict[int, LHUSession] = {}
-_FAILED_ATTEMPTS: Dict[str, Dict[str, Any]] = {}
+_FAILED_ATTEMPTS: Dict[str, Any] = {}
 _CACHED_DATA: Dict[int, Dict[str, Any]] = {}
+_LHU_LOGGED_IN_USERS: set[int] = set()
+
+
+class SessionStore:
+    """Bộ nhớ RAM quản lý phiên LHU (TTL 30 phút)."""
+    @staticmethod
+    def set(user_id: int, session: LHUSession) -> None:
+        _SESSIONS[user_id] = session
+
+    @staticmethod
+    def get(user_id: int) -> Optional[LHUSession]:
+        return get_active_session(user_id)
+
+    @staticmethod
+    def is_expired(user_id: int) -> bool:
+        session = _SESSIONS.get(user_id)
+        if not session:
+            return True
+        return session.is_expired()
+
+    @staticmethod
+    def clear(user_id: int) -> None:
+        clear_user_session(user_id)
+
+
+def mark_lhu_user(user_id: int) -> None:
+    """Ghi nhận user đăng nhập qua luồng LHU."""
+    _LHU_LOGGED_IN_USERS.add(user_id)
+
+
+def is_lhu_user(user_id: int) -> bool:
+    return user_id in _LHU_LOGGED_IN_USERS or user_id in _SESSIONS
+
+
+def check_lhu_session_validity(
+    user_id: int,
+    role: Optional[str] = None,
+    auth_provider: Optional[str] = None,
+    db: Optional[Session] = None
+) -> None:
+    """
+    Kiểm tra phiên LHU của user:
+    Chỉ áp dụng cho user đăng nhập bằng LHU (auth_provider == 'lhu').
+    Admin và tài khoản cũ (auth_provider != 'lhu') được bỏ qua và vẫn chat bình thường.
+    Nếu user đăng nhập qua LHU mà phiên đã hết hạn (TTL 30 phút) hoặc không còn trong RAM,
+    ném HTTP 401 rõ ràng để frontend yêu cầu đăng nhập lại.
+    """
+    if role == "admin":
+        return
+
+    if auth_provider is None and db is not None:
+        try:
+            row = db.execute(
+                text("SELECT role, auth_provider FROM users WHERE id = :uid"),
+                {"uid": user_id}
+            ).fetchone()
+            if row:
+                role = getattr(row, "role", None) or (row[0] if isinstance(row, tuple) else None)
+                auth_provider = getattr(row, "auth_provider", None) or (row[1] if isinstance(row, tuple) and len(row) > 1 else None)
+        except Exception:
+            pass
+
+    if role == "admin":
+        return
+
+    # Chỉ kiểm tra bắt buộc phiên LHU nếu user đăng nhập bằng LHU
+    if auth_provider == "lhu" or (auth_provider is None and user_id in _LHU_LOGGED_IN_USERS):
+        session = _SESSIONS.get(user_id)
+        if not session or session.is_expired():
+            _SESSIONS.pop(user_id, None)
+            _CACHED_DATA.pop(user_id, None)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Phiên làm việc LHU đã hết hạn. Vui lòng đăng nhập lại."
+            )
 
 
 # ==================== HELPER FUNCTIONS ====================
@@ -72,6 +148,57 @@ def normalize_text(text_val: Optional[str]) -> str:
     norm = re.sub(r'\s+', ' ', norm).strip()
     norm = norm.replace("may hoc", "hoc may")
     return norm
+
+
+# 1. Nhóm ngành Công nghệ thông tin (CÓ CĂN CỨ VỮNG CHẮC TRONG REPO)
+# Căn cứ: database/seed_data/05_sinh_vien_an_danh.xlsx (lớp 22CT111-22CT115 thuộc KCT/CNTT),
+# datasets_inventory.md (lớp 23CT111, 22CT111-22CT115), database/schema.sql.
+KNOWN_IT_PREFIXES = {"CT", "CNTT"}
+
+# 2. Nhóm ngành đã biết chắc KHÔNG phải CNTT (CÓ CĂN CỨ TỪ TEST & GUARDRAIL)
+# Căn cứ: backend/tests/test_auth_lhu.py (lớp 21DS101), guardrail Khoa Dược trong chat.py.
+KNOWN_NON_IT_PREFIXES = {
+    "DS": "Dược học",
+}
+
+
+def extract_class_prefix(class_id: Optional[str]) -> Optional[str]:
+    """Trích xuất tiền tố mã ngành từ mã lớp (ví dụ: '23CT111' -> 'CT', '21DS101' -> 'DS')."""
+    if not class_id:
+        return None
+    cid = str(class_id).strip().upper()
+    m = re.search(r'^\d*([A-Z]{2,4})', cid)
+    if m:
+        return m.group(1)
+    m_alpha = re.search(r'([A-Z]{2,4})', cid)
+    return m_alpha.group(1) if m_alpha else None
+
+
+def deduce_major_from_class_id(class_id: Optional[str]) -> Optional[str]:
+    """
+    Suy luận ngành học từ mã lớp (LopID):
+    - Tiền tố CNTT đã biết (CT, CNTT, ví dụ '23CT111') -> 'Công nghệ thông tin'.
+    - Tiền tố ngành khác đã biết chắc KHÔNG phải CNTT (DS, ví dụ '21DS101') -> 'Dược học'.
+    - Tiền tố lạ hoặc không nhận diện được: KHÔNG được kết luận ngành (trả về None),
+      ghi log WARNING CHỈ chứa tiền tố lớp (tuyệt đối không chứa MSSV hay họ tên).
+    """
+    if not class_id:
+        return None
+    prefix = extract_class_prefix(class_id)
+    if not prefix:
+        logger.warning("Không nhận diện được tiền tố mã lớp: %s", class_id)
+        return None
+
+    if prefix in KNOWN_IT_PREFIXES:
+        return "Công nghệ thông tin"
+
+    if prefix in KNOWN_NON_IT_PREFIXES:
+        return KNOWN_NON_IT_PREFIXES[prefix]
+
+    # Tiền tố lạ / không nhận diện được -> KHÔNG kết luận ngành
+    # Log WARNING CHỈ chứa tiền tố lớp, không chứa MSSV hay họ tên
+    logger.warning("Không nhận diện được ngành từ tiền tố mã lớp: %s", prefix)
+    return None
 
 
 def get_active_session(user_id: int) -> Optional[LHUSession]:
@@ -101,42 +228,55 @@ def get_active_lhu_data(user_id: int) -> Optional[Dict[str, Any]]:
     return _CACHED_DATA.get(user_id)
 
 
-def _check_and_update_lockout(student_id: str, is_success: bool = False) -> None:
-    """Kiểm tra và quản lý khóa tạm 15 phút sau 5 lần sai mật khẩu."""
+def _check_and_update_lockout(
+    student_id: str,
+    client_ip: Optional[str] = None,
+    is_success: bool = False
+) -> None:
+    """Kiểm tra và quản lý khóa tạm sau 5 lần sai mật khẩu liên tiếp theo (MSSV + IP)."""
     now = time.time()
-    record = _FAILED_ATTEMPTS.get(student_id)
+    clean_sid = str(student_id).strip()
+    key = f"{clean_sid}@{client_ip}" if client_ip else clean_sid
 
     if is_success:
-        if student_id in _FAILED_ATTEMPTS:
-            del _FAILED_ATTEMPTS[student_id]
+        if key in _FAILED_ATTEMPTS:
+            del _FAILED_ATTEMPTS[key]
         return
 
+    record = _FAILED_ATTEMPTS.get(key)
     if record:
         locked_until = record.get("locked_until", 0)
         if locked_until and now < locked_until:
             rem_minutes = max(1, int((locked_until - now) / 60) + 1)
+            duration_txt = "10 phút" if client_ip else "15 phút"
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Tài khoản tạm thời bị khóa 15 phút do nhập sai mật khẩu quá 5 lần. Vui lòng thử lại sau {rem_minutes} phút."
+                detail=f"Tài khoản tạm thời bị khóa {duration_txt} do nhập sai mật khẩu quá 5 lần. Vui lòng thử lại sau {rem_minutes} phút."
             )
         elif locked_until and now >= locked_until:
-            # Hết thời gian khóa, reset bộ đếm
-            _FAILED_ATTEMPTS[student_id] = {"count": 0, "locked_until": 0}
+            _FAILED_ATTEMPTS[key] = {"count": 0, "locked_until": 0}
 
 
-def _record_failed_attempt(student_id: str) -> None:
-    """Ghi nhận một lần đăng nhập thất bại."""
+def _record_failed_attempt(
+    student_id: str,
+    client_ip: Optional[str] = None
+) -> None:
+    """Ghi nhận một lần đăng nhập thất bại theo (MSSV + IP). Khóa tối đa 5 lần trong 10 phút."""
     now = time.time()
-    record = _FAILED_ATTEMPTS.setdefault(student_id, {"count": 0, "locked_until": 0})
+    clean_sid = str(student_id).strip()
+    key = f"{clean_sid}@{client_ip}" if client_ip else clean_sid
+
+    record = _FAILED_ATTEMPTS.setdefault(key, {"count": 0, "locked_until": 0})
     record["count"] += 1
     max_attempts = getattr(settings, "LHU_LOCKOUT_ATTEMPTS", 5)
-    lock_duration = getattr(settings, "LHU_LOCKOUT_SECONDS", 900)
+    lock_duration = 600 if client_ip else getattr(settings, "LHU_LOCKOUT_SECONDS", 900)
 
     if record["count"] >= max_attempts:
         record["locked_until"] = now + lock_duration
+        duration_txt = "10 phút" if client_ip else "15 phút"
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Tài khoản tạm thời bị khóa 15 phút do nhập sai mật khẩu quá 5 lần."
+            detail=f"Tài khoản tạm thời bị khóa {duration_txt} do nhập sai mật khẩu quá 5 lần."
         )
 
 
@@ -146,7 +286,8 @@ def login(
     student_id: str,
     password: str,
     user_id: int = 0,
-    client: Optional[httpx.Client] = None
+    client: Optional[httpx.Client] = None,
+    client_ip: Optional[str] = None
 ) -> LHUSession:
     """
     Đăng nhập vào cổng LHU lấy Token xác thực.
@@ -154,8 +295,9 @@ def login(
     - Body: {"UserID": "<mssv>", "Password": "<mk>", "DeviceInfo": "{0}{WebAuth}{LHU AI Advisor}"}
     - Token CHỈ lưu trong RAM, TTL 30 phút.
     - Tuyệt đối không log mật khẩu hoặc body request.
-    - Khóa tạm 15 phút sau 5 lần sai mật khẩu liên tiếp.
+    - Khóa tạm 10 phút sau 5 lần sai mật khẩu liên tiếp theo (MSSV + IP).
     - Chỉ đọc đúng khóa "Token". Không có Token = sai đăng nhập (HTTP 401).
+    - MSSV lấy từ UserID trong response của LHU, KHÔNG dùng giá trị client gửi.
     """
     clean_sid = str(student_id).strip()
     clean_pwd = str(password).strip()
@@ -167,7 +309,7 @@ def login(
         )
 
     # 1. Kiểm tra lockout
-    _check_and_update_lockout(clean_sid, is_success=False)
+    _check_and_update_lockout(clean_sid, client_ip=client_ip, is_success=False)
 
     portal_url = getattr(settings, "LHU_PORTAL_URL", "https://tapi.lhu.edu.vn").rstrip("/")
     login_url = f"{portal_url}/Security/SignIn"
@@ -203,7 +345,7 @@ def login(
 
     # 2. Xử lý phản hồi từ portal
     if resp.status_code in [400, 401]:
-        _record_failed_attempt(clean_sid)
+        _record_failed_attempt(clean_sid, client_ip=client_ip)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Mã số sinh viên hoặc mật khẩu cổng trường không chính xác."
@@ -228,31 +370,39 @@ def login(
     token = data.get("Token")
     if not token:
         logger.error("Phản hồi đăng nhập từ cổng trường thiếu trường Token.")
-        _record_failed_attempt(clean_sid)
+        _record_failed_attempt(clean_sid, client_ip=client_ip)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Mã số sinh viên hoặc mật khẩu cổng trường không chính xác."
         )
 
     # Đăng nhập thành công -> Reset trạng thái khóa
-    _check_and_update_lockout(clean_sid, is_success=True)
+    _check_and_update_lockout(clean_sid, client_ip=client_ip, is_success=True)
+
+    # MSSV lấy từ UserID trong response của LHU, KHÔNG dùng giá trị client gửi
+    lhu_user_id = data.get("UserID") or data.get("StudentID") or data.get("userid")
+    resolved_student_id = str(lhu_user_id).strip() if lhu_user_id else clean_sid
 
     # Trích xuất thông tin sinh viên từ phản hồi đăng nhập
     full_name = data.get("UserName")
     stu_info = data.get("student") or data.get("Student") or {}
     if not full_name:
-        full_name = stu_info.get("full_name") or stu_info.get("HoTen")
-    major = stu_info.get("major") or stu_info.get("Nganh")
-    cohort = stu_info.get("cohort") or stu_info.get("Khoa")
+        full_name = stu_info.get("full_name") or stu_info.get("HoTen") or data.get("HoTen")
+    class_id = data.get("LopID") or stu_info.get("LopID") or stu_info.get("class_id") or data.get("ClassID") or stu_info.get("ClassID")
+    major = stu_info.get("major") or stu_info.get("Nganh") or data.get("Nganh") or data.get("Major")
+    if not major and class_id:
+        major = deduce_major_from_class_id(class_id)
+    cohort = stu_info.get("cohort") or stu_info.get("Khoa") or data.get("Khoa") or data.get("Cohort")
 
     session_ttl = getattr(settings, "LHU_SESSION_TTL_SECONDS", 1800)
     session = LHUSession(
         token=token,
-        student_id=clean_sid,
+        student_id=resolved_student_id,
         user_id=user_id,
         full_name=full_name,
         major=major,
         cohort=cohort,
+        class_id=class_id,
         created_at=time.time(),
         expires_at=time.time() + session_ttl
     )
@@ -335,6 +485,16 @@ def fetch_transcript(
     full_name_resp = data.get("HoTen") or student_meta.get("full_name") or session.full_name or "Sinh viên"
     student_id_resp = data.get("StudentID") or session.student_id
 
+    # Cập nhật LopID và ngành nếu có trong phản hồi bảng điểm
+    lop_id = data.get("LopID") or student_meta.get("LopID") or student_meta.get("class_id")
+    if lop_id:
+        session.class_id = str(lop_id).strip()
+        if not session.major or session.major == "Chưa cập nhật":
+            session.major = deduce_major_from_class_id(session.class_id)
+    transcript_major = student_meta.get("major") or student_meta.get("Nganh") or data.get("Nganh")
+    if transcript_major:
+        session.major = transcript_major
+
     # Trích xuất GPA cổng trường (DiemTB)
     gpa_portal = data.get("DiemTB") if data.get("DiemTB") is not None else (data.get("gpa_portal") or data.get("DiemTichLuy") or data.get("gpa"))
     try:
@@ -400,7 +560,7 @@ def fetch_transcript(
         "student": {
             "student_id": student_id_resp,
             "full_name": full_name_resp,
-            "major": student_meta.get("major") or session.major or "Công nghệ thông tin",
+            "major": student_meta.get("major") or session.major or (deduce_major_from_class_id(session.class_id) if session.class_id else None) or "Chưa cập nhật",
             "cohort": student_meta.get("cohort") or session.cohort or ""
         },
         "gpa_portal": gpa_portal_val,
@@ -772,6 +932,15 @@ def build_router(get_user_id: Callable[..., int]) -> APIRouter:
     @router.get("/status")
     def get_link_status(user_id: int = Depends(get_user_id)):
         """Kiểm tra trạng thái liên kết tài khoản LHU của người dùng hiện tại."""
+        raw_session = _SESSIONS.get(user_id)
+        if raw_session and raw_session.is_expired():
+            _SESSIONS.pop(user_id, None)
+            _CACHED_DATA.pop(user_id, None)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Phiên làm việc LHU đã hết hạn. Vui lòng đăng nhập lại."
+            )
+
         session = get_active_session(user_id)
         if not session:
             return {

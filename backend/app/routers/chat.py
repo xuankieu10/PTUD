@@ -22,7 +22,7 @@ from backend.app.prompts import (
     LANG_REMINDER, LANG_RETRY_SYSTEM,
     is_injection, has_vietnamese, mixed_language
 )
-from backend.app.routers.students import graduation_check, calculate_graduation_data
+from backend.app.routers.students import graduation_check, calculate_graduation_data, is_supported_major
 from backend.app.services.graduation_checker import (
     check_graduation,
     calculate_academic_summary,
@@ -392,7 +392,8 @@ def get_student_academic_and_ocr_context(db: Session, user_id: int, session_id: 
     grad_info = None
 
     # 1. Kiểm tra nguồn ưu tiên: Dữ liệu tài khoản LHU đã liên kết
-    from backend.app.services.lhu_connector import get_active_lhu_data
+    from backend.app.services.lhu_connector import get_active_lhu_data, check_lhu_session_validity
+    check_lhu_session_validity(user_id, db=db)
     lhu_data = get_active_lhu_data(user_id)
 
     if lhu_data and "reconciled_courses" in lhu_data:
@@ -567,8 +568,12 @@ def get_student_academic_and_ocr_context(db: Session, user_id: int, session_id: 
 
         if stu_row:
             try:
-                grad = calculate_graduation_data(stu_row.id, db, explain=False, lhu_data=lhu_data)
-                grad_info = grad
+                if not is_supported_major(stu_row.major, db):
+                    grad = None
+                else:
+                    grad = calculate_graduation_data(stu_row.id, db, explain=False, lhu_data=lhu_data)
+                if grad:
+                    grad_info = grad
                 stu_nested = grad.get("student") if isinstance(grad.get("student"), dict) else {}
                 student_name = stu_nested.get("full_name") or stu_row.full_name
                 student_code = stu_nested.get("student_code") or stu_row.student_code
@@ -1497,6 +1502,72 @@ def chat(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
+    role = current_user.get("role")
+    auth_provider = current_user.get("auth_provider")
+    from backend.app.services.lhu_connector import check_lhu_session_validity
+    check_lhu_session_validity(user_id, role=role, auth_provider=auth_provider, db=db)
+
+    # Kiểm tra ngành học của sinh viên có thuộc CTĐT trong DB không
+    if role == "student":
+        stu = db.execute(
+            text("SELECT id, major FROM students WHERE user_id = :uid"),
+            {"uid": user_id}
+        ).fetchone()
+        if stu and not is_supported_major(stu.major, db):
+            major_str = str(stu.major or "").strip()
+            norm_major = strip_accents(major_str.lower())
+            if not major_str or norm_major in ["chua cap nhat", "chua xac dinh nganh", "chua xac dinh"]:
+                unsupported_msg = (
+                    "Hiện tại hệ thống chưa xác định được chương trình đào tạo phù hợp cho lớp của bạn. "
+                    "Hệ thống hiện chỉ hỗ trợ cố vấn học vụ cho sinh viên Khoa Công nghệ thông tin. "
+                    "Vui lòng liên hệ Phòng Đào tạo hoặc Văn phòng Khoa để được hỗ trợ."
+                )
+            else:
+                unsupported_msg = (
+                    f"Hiện tại hệ thống chưa hỗ trợ ngành này ({stu.major}). "
+                    "Hệ thống chỉ hỗ trợ chương trình đào tạo cho Khoa Công nghệ thông tin. "
+                    "Vui lòng liên hệ Văn phòng Khoa của bạn hoặc Phòng Đào tạo để được hỗ trợ tốt nhất."
+                )
+            session_id = req.session_id
+            if not session_id:
+                title = req.message[:40] + ("..." if len(req.message) > 40 else "")
+                try:
+                    session_id = db.execute(
+                        text("INSERT INTO chat_sessions (user_id, title, updated_at) OUTPUT INSERTED.id VALUES (:uid, :title, SYSDATETIME())"),
+                        {"uid": user_id, "title": title},
+                    ).scalar()
+                    db.commit()
+                except Exception:
+                    db.rollback()
+                    db.execute(
+                        text("INSERT INTO chat_sessions (user_id, title, updated_at) VALUES (:uid, :title, CURRENT_TIMESTAMP)"),
+                        {"uid": user_id, "title": title},
+                    )
+                    db.commit()
+                    s = db.execute(text("SELECT id FROM chat_sessions WHERE user_id = :uid ORDER BY id DESC"), {"uid": user_id}).fetchone()
+                    session_id = s[0] if s else 1
+
+            try:
+                db.execute(
+                    text("INSERT INTO chat_messages (session_id, role, content) VALUES (:sid, 'user', :content)"),
+                    {"sid": session_id, "content": req.message}
+                )
+                db.execute(
+                    text("INSERT INTO chat_messages (session_id, role, content) VALUES (:sid, 'assistant', :content)"),
+                    {"sid": session_id, "content": unsupported_msg}
+                )
+                db.commit()
+            except Exception:
+                db.rollback()
+
+            return {
+                "response": unsupported_msg,
+                "session_id": session_id,
+                "intent": "other_faculty",
+                "sources": [],
+                "structured_advice": None,
+                "debug": {"unsupported_major": stu.major}
+            }
 
     # ── 1. Kiểm tra injection TRƯỚC khi làm bất cứ điều gì ──────────────────
     if is_injection(req.message):
@@ -2083,6 +2154,71 @@ def chat_stream(
     current_user: dict = Depends(get_current_user),
 ):
     user_id = current_user["id"]
+    role = current_user.get("role")
+    auth_provider = current_user.get("auth_provider")
+    from backend.app.services.lhu_connector import check_lhu_session_validity
+    check_lhu_session_validity(user_id, role=role, auth_provider=auth_provider, db=db)
+
+    # Kiểm tra ngành học của sinh viên có thuộc CTĐT trong DB không
+    if role == "student":
+        stu = db.execute(
+            text("SELECT id, major FROM students WHERE user_id = :uid"),
+            {"uid": user_id}
+        ).fetchone()
+        if stu and not is_supported_major(stu.major, db):
+            major_str = str(stu.major or "").strip()
+            norm_major = strip_accents(major_str.lower())
+            if not major_str or norm_major in ["chua cap nhat", "chua xac dinh nganh", "chua xac dinh"]:
+                unsupported_msg = (
+                    "Hiện tại hệ thống chưa xác định được chương trình đào tạo phù hợp cho lớp của bạn. "
+                    "Hệ thống hiện chỉ hỗ trợ cố vấn học vụ cho sinh viên Khoa Công nghệ thông tin. "
+                    "Vui lòng liên hệ Phòng Đào tạo hoặc Văn phòng Khoa để được hỗ trợ."
+                )
+            else:
+                unsupported_msg = (
+                    f"Hiện tại hệ thống chưa hỗ trợ ngành này ({stu.major}). "
+                    "Hệ thống chỉ hỗ trợ chương trình đào tạo cho Khoa Công nghệ thông tin. "
+                    "Vui lòng liên hệ Văn phòng Khoa của bạn hoặc Phòng Đào tạo để được hỗ trợ tốt nhất."
+                )
+            session_id = req.session_id
+            if not session_id:
+                title = req.message[:40] + ("..." if len(req.message) > 40 else "")
+                try:
+                    session_id = db.execute(
+                        text("INSERT INTO chat_sessions (user_id, title, updated_at) OUTPUT INSERTED.id VALUES (:uid, :title, SYSDATETIME())"),
+                        {"uid": user_id, "title": title},
+                    ).scalar()
+                    db.commit()
+                except Exception:
+                    db.rollback()
+                    db.execute(
+                        text("INSERT INTO chat_sessions (user_id, title, updated_at) VALUES (:uid, :title, CURRENT_TIMESTAMP)"),
+                        {"uid": user_id, "title": title},
+                    )
+                    db.commit()
+                    s = db.execute(text("SELECT id FROM chat_sessions WHERE user_id = :uid ORDER BY id DESC"), {"uid": user_id}).fetchone()
+                    session_id = s[0] if s else 1
+
+            try:
+                db.execute(
+                    text("INSERT INTO chat_messages (session_id, role, content) VALUES (:sid, 'user', :content)"),
+                    {"sid": session_id, "content": req.message}
+                )
+                db.execute(
+                    text("INSERT INTO chat_messages (session_id, role, content) VALUES (:sid, 'assistant', :content)"),
+                    {"sid": session_id, "content": unsupported_msg}
+                )
+                db.commit()
+            except Exception:
+                db.rollback()
+
+            def stream_unsupported():
+                chunk_data = json.dumps({"token": unsupported_msg, "done": False}, ensure_ascii=False)
+                yield f"data: {chunk_data}\n\n"
+                done_data = json.dumps({"done": True, "session_id": session_id, "sources": []}, ensure_ascii=False)
+                yield f"data: {done_data}\n\n"
+
+            return StreamingResponse(stream_unsupported(), media_type="text/event-stream", headers=SSE_HEADERS)
 
     if is_injection(req.message):
         session_id = req.session_id

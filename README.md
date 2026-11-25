@@ -274,8 +274,7 @@ Script sẽ tự động kích hoạt môi trường ảo, bật Backend FastAPI
 
 #### 1. Khởi động Backend API
 ```powershell
-.\venv\Scripts\Activate.ps1
-uvicorn backend.api:app --host 127.0.0.1 --port 8000 --reload
+.\venv\Scripts\python.exe -m uvicorn backend.api:app --reload --port 8000
 ```
 - API Docs tương tác (Swagger UI): `http://127.0.0.1:8000/docs`
 - Kiểm tra trạng thái máy chủ: `http://127.0.0.1:8000/api/health`

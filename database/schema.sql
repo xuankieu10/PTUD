@@ -16,11 +16,22 @@ BEGIN
         username NVARCHAR(255) NOT NULL,
         password_hash NVARCHAR(255) NOT NULL,
         role NVARCHAR(50) NOT NULL,
+        auth_provider NVARCHAR(50) NULL CONSTRAINT DF_users_auth_provider DEFAULT 'local',
         created_at DATETIME2 DEFAULT SYSUTCDATETIME(),
         CONSTRAINT PK_users PRIMARY KEY (id),
         CONSTRAINT UQ_users_username UNIQUE (username),
         CONSTRAINT CK_users_role CHECK (role IN ('student', 'admin'))
     );
+END
+GO
+
+IF NOT EXISTS (
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS 
+    WHERE TABLE_NAME = 'users' AND COLUMN_NAME = 'auth_provider'
+)
+BEGIN
+    ALTER TABLE users ADD auth_provider NVARCHAR(50) NULL CONSTRAINT DF_users_auth_provider DEFAULT 'local';
+    EXEC('UPDATE users SET auth_provider = ''local'' WHERE auth_provider IS NULL;');
 END
 GO
 

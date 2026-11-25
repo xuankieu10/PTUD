@@ -7,14 +7,12 @@ interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLoginSuccess: (user: UserProfile) => void;
-  onSwitchToSignUp?: () => void;
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({
   isOpen,
   onClose,
   onLoginSuccess,
-  onSwitchToSignUp,
 }) => {
   const [username, setUsername] = useState('test01');
   const [password, setPassword] = useState('Test@123');
@@ -27,11 +25,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     e.preventDefault();
     if (!username || !password) return;
 
+    const pwd = password;
+    setPassword('');
     setIsLoading(true);
     setError(null);
 
     try {
-      await authApi.login(username, password);
+      await authApi.login(username, pwd);
       const user = await authApi.getMe();
       onLoginSuccess(user);
       onClose();
@@ -44,7 +44,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
   const handleQuickLogin = async (usr: string, pwd: string) => {
     setUsername(usr);
-    setPassword(pwd);
+    setPassword('');
     setIsLoading(true);
     setError(null);
     try {
@@ -140,22 +140,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             {isLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             <span>{isLoading ? 'Đang xác thực...' : 'Đăng nhập'}</span>
           </button>
-
-          {onSwitchToSignUp && (
-            <div className="mt-3 text-center text-xs text-slate-500 dark:text-slate-400">
-              Chưa có tài khoản sinh viên?{' '}
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  onSwitchToSignUp();
-                }}
-                className="text-[#1565C0] dark:text-[#4D8FE0] font-bold hover:underline cursor-pointer"
-              >
-                Đăng ký ngay
-              </button>
-            </div>
-          )}
         </form>
 
         {/* Tài khoản mẫu */}

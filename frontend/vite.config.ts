@@ -31,6 +31,10 @@ export default defineConfig({
       '/transcripts': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true
+      },
+      '/lhu': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true
       }
     }
   }

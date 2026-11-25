@@ -8,24 +8,22 @@ import { LoginModal } from './components/Modals/LoginModal';
 import { ProfileModal } from './components/Modals/ProfileModal';
 import { ProjectsModal } from './components/Modals/ProjectsModal';
 import { LhuLinkModal } from './components/Modals/LhuLinkModal';
-import { LandingPage } from './components/Landing/LandingPage';
-import { SignUpPage } from './components/Auth/SignUpPage';
+import { LhuLoginPage } from './components/Auth/LhuLoginPage';
 import { chatApi, authApi, healthApi, removeAuthToken } from './services/api';
 import type { ChatSession, ChatMessage, UserProfile, OllamaHealth, AttachedFile } from './types';
 
-export type AppView = 'landing' | 'signup' | 'chat';
+export type AppView = 'login' | 'chat';
 
 export interface AppProps {
   initialView?: AppView;
 }
 
 const getInitialView = (): AppView => {
-  if (typeof window === 'undefined') return 'landing';
+  if (typeof window === 'undefined') return 'login';
   const path = window.location.pathname.toLowerCase();
   const hash = window.location.hash.toLowerCase();
-  if (path === '/dang-ky' || hash === '#dang-ky' || hash === '#signup') return 'signup';
   if (path === '/chat' || hash === '#chat') return 'chat';
-  return 'landing';
+  return 'login';
 };
 
 const SIDEBAR_STORAGE_KEY = 'lhu_ai_sidebar_open';
@@ -35,27 +33,25 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_FILES_COUNT = 5;
 
 export function App({ initialView }: AppProps = {}) {
-  // Navigation View State ('landing' | 'signup' | 'chat')
+  // Navigation View State ('login' | 'chat')
   const [currentView, setCurrentView] = useState<AppView>(() => {
     if (initialView) return initialView;
     if (typeof window !== 'undefined') {
       if (import.meta.env.MODE === 'test') {
         const path = window.location.pathname.toLowerCase();
-        const hash = window.location.hash.toLowerCase();
-        if (path === '/dang-ky' || hash === '#dang-ky') return 'signup';
-        if (path === '/landing' || hash === '#landing') return 'landing';
+        if (path === '/login') return 'login';
         return 'chat';
       }
       return getInitialView();
     }
-    return 'landing';
+    return 'login';
   });
 
   const navigateTo = (view: AppView) => {
     setCurrentView(view);
     if (typeof window !== 'undefined') {
       window.scrollTo({ top: 0, behavior: 'smooth' });
-      const url = view === 'signup' ? '/dang-ky' : view === 'chat' ? '/chat' : '/';
+      const url = view === 'chat' ? '/chat' : '/';
       window.history.pushState({ view }, '', url);
     }
   };
@@ -580,52 +576,17 @@ export function App({ initialView }: AppProps = {}) {
     }
   };
 
-  // Render Landing Page View
-  if (currentView === 'landing') {
+  // Render Lhu Login Screen khi chưa đăng nhập
+  if (currentView === 'login' || (!user && import.meta.env.MODE !== 'test')) {
     return (
-      <>
-        <LandingPage
-          isDarkMode={isDarkMode}
-          onToggleDarkMode={toggleDarkMode}
-          onNavigateToSignUp={() => navigateTo('signup')}
-          onOpenLoginModal={() => setIsLoginModalOpen(true)}
-          onNavigateToChat={() => navigateTo('chat')}
-        />
-
-        <LoginModal
-          isOpen={isLoginModalOpen}
-          onClose={() => setIsLoginModalOpen(false)}
-          onLoginSuccess={(loggedUser) => {
-            handleLoginSuccess(loggedUser);
-            navigateTo('chat');
-          }}
-          onSwitchToSignUp={() => {
-            setIsLoginModalOpen(false);
-            navigateTo('signup');
-          }}
-        />
-      </>
-    );
-  }
-
-  // Render Sign Up Page View
-  if (currentView === 'signup') {
-    return (
-      <>
-        <SignUpPage
-          onBackToHome={() => navigateTo('landing')}
-          onOpenLogin={() => setIsLoginModalOpen(true)}
-        />
-
-        <LoginModal
-          isOpen={isLoginModalOpen}
-          onClose={() => setIsLoginModalOpen(false)}
-          onLoginSuccess={(loggedUser) => {
-            handleLoginSuccess(loggedUser);
-            navigateTo('chat');
-          }}
-        />
-      </>
+      <LhuLoginPage
+        onLoginSuccess={(loggedUser) => {
+          handleLoginSuccess(loggedUser);
+          navigateTo('chat');
+        }}
+        isDarkMode={isDarkMode}
+        onToggleDarkMode={toggleDarkMode}
+      />
     );
   }
 
@@ -648,7 +609,7 @@ export function App({ initialView }: AppProps = {}) {
           onLogout={handleLogout}
           onOpenLoginModal={() => setIsLoginModalOpen(true)}
           onOpenProfileModal={() => setIsProfileModalOpen(true)}
-          onOpenLhuLinkModal={() => setIsLhuModalOpen(true)}
+          onOpenLhuLinkModal={user?.role === 'admin' ? () => setIsLhuModalOpen(true) : undefined}
           onExploreProjects={() => setIsProjectsModalOpen(true)}
           isLoadingSessions={isLoadingSessions}
           errorSessions={sessionsError}
@@ -670,7 +631,6 @@ export function App({ initialView }: AppProps = {}) {
             health={health}
             isDarkMode={isDarkMode}
             onToggleDarkMode={toggleDarkMode}
-            onNavigateToHome={() => navigateTo('landing')}
           />
 
           {/* Overlay khi đang kéo tệp vào khung chat */}
@@ -736,17 +696,13 @@ export function App({ initialView }: AppProps = {}) {
         isOpen={isLoginModalOpen}
         onClose={() => setIsLoginModalOpen(false)}
         onLoginSuccess={handleLoginSuccess}
-        onSwitchToSignUp={() => {
-          setIsLoginModalOpen(false);
-          navigateTo('signup');
-        }}
       />
 
       <ProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
         user={user}
-        onOpenLhuLinkModal={() => setIsLhuModalOpen(true)}
+        onOpenLhuLinkModal={user?.role === 'admin' ? () => setIsLhuModalOpen(true) : undefined}
       />
 
       <ProjectsModal
@@ -755,11 +711,13 @@ export function App({ initialView }: AppProps = {}) {
         onSelectProjectPrompt={handleSelectPrompt}
       />
 
-      <LhuLinkModal
-        isOpen={isLhuModalOpen}
-        onClose={() => setIsLhuModalOpen(false)}
-        user={user}
-      />
+      {user?.role === 'admin' && (
+        <LhuLinkModal
+          isOpen={isLhuModalOpen}
+          onClose={() => setIsLhuModalOpen(false)}
+          user={user}
+        />
+      )}
     </div>
   );
 }

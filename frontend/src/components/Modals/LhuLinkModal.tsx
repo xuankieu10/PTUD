@@ -154,7 +154,7 @@ export const LhuLinkModal: React.FC<LhuLinkModalProps> = ({
                 )}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Lấy trực tiếp bảng điểm và chứng chỉ từ Cổng trường LHU (dkmh.lhu.edu.vn)
+                Lấy trực tiếp bảng điểm và chứng chỉ từ Cổng trường LHU (me.lhu.edu.vn)
               </p>
             </div>
           </div>
@@ -457,12 +457,12 @@ export const LhuLinkModal: React.FC<LhuLinkModalProps> = ({
           <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
             <span>Cổng trường:</span>
             <a
-              href="https://dkmh.lhu.edu.vn"
+              href="https://me.lhu.edu.vn"
               target="_blank"
               rel="noreferrer"
               className="text-[#1565C0] dark:text-[#4D8FE0] hover:underline flex items-center gap-0.5"
             >
-              <span>dkmh.lhu.edu.vn</span>
+              <span>me.lhu.edu.vn</span>
               <ExternalLink className="w-3 h-3" />
             </a>
           </div>
