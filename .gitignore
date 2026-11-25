@@ -84,3 +84,14 @@ mapping_private.csv
 06_lich_trung_tam.xlsx
 *.backup.xlsx
 exports/
+scratch/
+logs/
+temp_repo_v/
+temp_run_v3/
+.worktree_f96c/
+pytest_out.txt
+current_tests.txt
+f96c_tests.txt
+head_tests.txt
+scratch_test_chat_vb2.py
+database/rag_cache.db
